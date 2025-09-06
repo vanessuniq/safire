@@ -1,5 +1,5 @@
 module Safire
-  module Core
+  module Errors
     # Base error class for all Safire errors
     class Error < StandardError
       attr_reader :details

@@ -13,13 +13,21 @@ module Safire
       fatal: Logger::FATAL
     }.freeze
 
+    FORMATS = { text: :text, json: :json }.freeze
+
+    # Initialize the logger:
+    # output - IO object (default: $stdout)
+    # level - Symbol or String representing log level. Shoud be one of :debug, :info, :warn, :error, :fatal
+    #   (default: :info)
+    # format - :text or :json (default: :text). Can be String too.
     def initialize(output = $stdout, level: :info, format: :text)
       @logger = Logger.new(output)
-      @logger.level = LEVELS[level] || Logger::INFO
-      @format = format.to_sym
+      @logger.level = LEVELS[level.to_sym] || Logger::INFO
+      @format = FORMATS[format.to_sym] || :text
       setup_formatter
     end
 
+    # Convenience methods for each log level
     %i[debug info warn error fatal].each do |level|
       define_method(level) { |message = nil, **metadata, &block| log(level, message, metadata, &block) }
     end

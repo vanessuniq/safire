@@ -1,4 +1,5 @@
 # lib/safire.rb
+require 'active_support/all'
 require_relative 'safire/version'
 
 # Main module for Safire gem
@@ -7,10 +8,9 @@ module Safire
     attr_accessor :configuration
 
     def configure
-      @configuration ||=Configuration.new
+      @configuration ||= Configuration.new
       yield(configuration)
     end
-
   end
 
   class Configuration

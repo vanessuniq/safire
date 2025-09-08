@@ -31,6 +31,6 @@ Gem::Specification.new do |spec|
   # Runtime deps
   spec.add_dependency 'activesupport', '~> 8.0.0'
   spec.add_dependency 'addressable', '~> 2.8'
-  spec.add_dependency 'faraday', '~> 2.9'
+  spec.add_dependency 'faraday', '~> 2.13'
   spec.add_dependency 'jwt', '~> 2.8'
 end

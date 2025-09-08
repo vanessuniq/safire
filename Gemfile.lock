@@ -4,7 +4,7 @@ PATH
     safire (0.0.1)
       activesupport (~> 8.0.0)
       addressable (~> 2.8)
-      faraday (~> 2.9)
+      faraday (~> 2.13)
       jwt (~> 2.8)
 
 GEM

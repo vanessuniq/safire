@@ -33,13 +33,13 @@ module Safire
     private
 
     def build_connection
-      Faraday.new(@options) do |conn|
-        conn.request @request_format
-        conn.response :follow_redirects
-        conn.response :json, content_type: /\bjson$/
+      Faraday.new(@options) do |builder|
+        builder.request @request_format
+        builder.response :follow_redirects
+        builder.response :json
         builder.response :raise_error
         builder.response :logger
-        conn.adapter @adapter
+        builder.adapter @adapter
       end
     end
 

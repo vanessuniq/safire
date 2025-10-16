@@ -1,9 +1,11 @@
+require 'active_support/all'
 require 'faraday'
+require 'faraday/follow_redirects'
 
 module Safire
   # HTTP client wrapper for Safire
   class HTTPClient
-    def initialize(base_url: nil, adapter: nil, request_format: :url_encoded, ssl_options: {})
+    def initialize(base_url:, adapter: nil, request_format: :url_encoded, ssl_options: {})
       @options = {
         url: base_url,
         ssl: ssl_options,
@@ -14,19 +16,19 @@ module Safire
       @connection = build_connection
     end
 
-    def get(path, params: {}, headers: {})
+    def get(path = '', params: {}, headers: {})
       request(:get, path, params:, headers:)
     end
 
-    def post(path, body: nil, params: {}, headers: {})
+    def post(path = '', body: nil, params: {}, headers: {})
       request(:post, path, body:, params:, headers:)
     end
 
-    def put(path, body: nil, params: {}, headers: {})
+    def put(path = '', body: nil, params: {}, headers: {})
       request(:put, path, body:, params:, headers:)
     end
 
-    def delete(path, params: {}, headers: {})
+    def delete(path = '', params: {}, headers: {})
       request(:delete, path, params:, headers:)
     end
 
@@ -44,7 +46,8 @@ module Safire
     end
 
     def request(method, path, body: nil, params: {}, headers: {}) # rubocop:disable Metrics/AbcSize
-      @connection.send(method, path) do |req|
+      @connection.send(method) do |req|
+        req.url path
         req.params.update(params) if params.present?
         req.headers.update(headers) if headers.present?
         req.body = body if body

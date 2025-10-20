@@ -15,7 +15,8 @@ module Safire
 
         # Fetch and Parse SMART configuration
         def discover
-          response = @http_client.get(WELL_KNOWN_PATH)
+          enpoint = "#{@base_url}#{WELL_KNOWN_PATH}"
+          response = @http_client.get(enpoint)
           metadata = parse_metadata(response.body)
 
           @logger.info('SMART discovery successful',
@@ -24,7 +25,7 @@ module Safire
 
           SmartMetadata.new(metadata)
         rescue StandardError => e
-          @logger.error('SMART discovery failed', error: e.message, issuer: @base_url)
+          @logger.error('SMART discovery failed', error: e.message, base_url: @base_url)
           raise Errors::DiscoveryError, "Failed to discover SMART configuration: #{e.message.inspect}"
         end
 
@@ -33,7 +34,8 @@ module Safire
         def parse_metadata(metadata)
           unless metadata.is_a?(Hash)
             raise Errors::DiscoveryError,
-                  'Invalid SMART configuration format: SMART Discovery response should be JSON'
+                  'Invalid SMART configuration format: SMART Discovery response should be JSON',
+                  details: metadata.inspect
           end
 
           validate_required_fields(metadata)
@@ -60,7 +62,6 @@ module Safire
           capabilities&.include?('launch-ehr') || capabilities&.include?('launch-standalone')
         end
       end
-      SmartDiscovery = Protocols::Smart::Discovery
     end
   end
 end

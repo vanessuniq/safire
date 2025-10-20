@@ -15,6 +15,7 @@
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 require 'pry'
 require 'webmock/rspec'
+
 WebMock.disable_net_connect!
 
 RSpec.configure do |config|
@@ -99,3 +100,5 @@ RSpec.configure do |config|
   # as the one that triggered the failure.
   Kernel.srand config.seed
 end
+
+require 'safire'

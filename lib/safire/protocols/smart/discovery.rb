@@ -34,8 +34,8 @@ module Safire
         def parse_metadata(metadata)
           unless metadata.is_a?(Hash)
             raise Errors::DiscoveryError,
-                  'Invalid SMART configuration format: SMART Discovery response should be JSON',
-                  details: metadata.inspect
+                  "Invalid SMART configuration format: SMART Discovery response should be JSON,
+                  but obtained #{metadata.inspect}"
           end
 
           validate_required_fields(metadata)

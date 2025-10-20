@@ -4,7 +4,7 @@ require 'time'
 
 module Safire
   # Custom logger for Safire
-  class Logger
+  class SafireLogger
     LEVELS = {
       debug: Logger::DEBUG,
       info: Logger::INFO,

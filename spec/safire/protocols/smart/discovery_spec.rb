@@ -8,6 +8,7 @@ RSpec.describe Safire::Protocols::Smart::Discovery do
   end
   let(:parsed_smart_config) { JSON.parse(smart_config) }
   let(:discovery) { described_class.new(base_url) }
+  let(:headers) { { 'Content-Type' => 'aplication/json' } }
 
   describe '#discover' do
     before do
@@ -15,7 +16,7 @@ RSpec.describe Safire::Protocols::Smart::Discovery do
         .to_return(
           status: 200,
           body: smart_config,
-          headers: { 'Content-Type' => 'aplication/json' }
+          headers:
         )
     end
 
@@ -33,6 +34,17 @@ RSpec.describe Safire::Protocols::Smart::Discovery do
       it 'raises a DiscoveryError' do
         expect { discovery.discover }.to raise_error(
           Safire::Errors::DiscoveryError, /Missing required SMART configuration fields/
+        )
+      end
+    end
+
+    context 'when configuration is not json' do
+      let(:smart_config) { 'Not Found' }
+      let(:headers) { { 'Content-Type' => 'aplication/text' } }
+
+      it 'raises a DiscoveryError' do
+        expect { discovery.discover }.to raise_error(
+          Safire::Errors::DiscoveryError, /Invalid SMART configuration format/
         )
       end
     end

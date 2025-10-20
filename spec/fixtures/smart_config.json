@@ -1,0 +1,50 @@
+{
+  "issuer": "https://ehr.example.com",
+  "jwks_uri": "https://ehr.example.com/.well-known/jwks.json",
+  "authorization_endpoint": "https://ehr.example.com/auth/authorize",
+  "token_endpoint": "https://ehr.example.com/auth/token",
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "private_key_jwt"
+  ],
+  "grant_types_supported": [
+    "authorization_code",
+    "client_credentials"
+  ],
+  "registration_endpoint": "https://ehr.example.com/auth/register",
+  "scopes_supported": [
+    "openid",
+    "profile",
+    "launch",
+    "launch/patient",
+    "patient/*.rs",
+    "user/*.rs",
+    "offline_access"
+  ],
+  "response_types_supported": [
+    "code"
+  ],
+  "management_endpoint": "https://ehr.example.com/user/manage",
+  "introspection_endpoint": "https://ehr.example.com/user/introspect",
+  "revocation_endpoint": "https://ehr.example.com/user/revoke",
+  "code_challenge_methods_supported": [
+    "S256"
+  ],
+  "capabilities": [
+    "launch-ehr",
+    "permission-patient",
+    "permission-v2",
+    "client-public",
+    "client-confidential-symmetric",
+    "context-ehr-patient",
+    "sso-openid-connect"
+  ],
+  "associated_endpoints": [
+    {
+      "url": "https://state.example.com",
+      "capabilities": [
+        "smart-app-state"
+      ]
+    }
+  ]
+}

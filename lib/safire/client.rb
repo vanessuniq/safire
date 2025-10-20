@@ -10,7 +10,9 @@ module Safire
     end
 
     def smart_discovery
-      @smart_metadata = SmartDiscovery.new(config.base_url).discover
+      return @smart_metadata if @smart_metadata
+
+      @smart_metadata = Safire::Protocols::Smart::Discovery.new(config.base_url).discover
     end
   end
 end

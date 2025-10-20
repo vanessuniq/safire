@@ -34,7 +34,7 @@ gem 'safire', '~> 0.0.1'
 ```ruby
 require 'safire'
 # Initialize client configuration
-config = Safire::ClientConfig.new(base_url: 'https://example/com/fhir')
+config = Safire::ClientConfig.new(base_url: '"https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir')
 
 # Initialize Safire Client with config
 safire_client = Safire::Client.new(config)
@@ -43,10 +43,18 @@ safire_client = Safire::Client.new(config)
 metadata = safire_client.smart_discovery
 
 puts "Authorization endpoint: #{metadata.authorization_endpoint}"
-puts "Token endpoint: #{metadata.token_endpoint}"
-puts "Capabilities: #{metadata.capabilities}"
+# Authorization endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/authorize
+# => nil
 
-# Once the SMART discovery endpoint has been fetched, you can all access the SMART metadata as follow:
+puts "Token endpoint: #{metadata.token_endpoint}"
+# Token endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/token
+# => nil
+
+puts "Capabilities: #{metadata.capabilities}"
+# Capabilities: ["launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "client-confidential-asymmetric", "sso-openid-connect", "context-passthrough-banner", "context-passthrough-style", "context-ehr-patient", "context-ehr-encounter", "context-standalone-patient", "context-standalone-encounter", "permission-offline", "permission-patient", "permission-user", "permission-v1", "permission-v2", "authorize-post"]
+# => nil
+
+# Once the SMART discovery endpoint has been fetched, you can also access the SMART metadata as follow:
 client.smart_metadata
 
 puts "Token endpoint: #{client.smart_metadata.token_endpoint}"

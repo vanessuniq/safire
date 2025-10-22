@@ -1,5 +1,4 @@
 require 'spec_helper'
-require_relative '../../lib/safire/http_client'
 
 RSpec.describe Safire::HTTPClient do
   let(:base_url) { 'https://api.example.com' }

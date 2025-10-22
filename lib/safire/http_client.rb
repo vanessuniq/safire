@@ -7,7 +7,7 @@ module Safire
   class HTTPClient
     def initialize(base_url:, adapter: nil, request_format: :url_encoded, ssl_options: {})
       @options = {
-        url: base_url,
+        url: normalize_base_url(base_url),
         ssl: ssl_options,
         headers: { 'User-Agent' => "Safire v#{Safire::VERSION}", 'Accept' => 'application/json' }
       }
@@ -47,7 +47,7 @@ module Safire
 
     def request(method, path, body: nil, params: {}, headers: {}) # rubocop:disable Metrics/AbcSize
       @connection.send(method) do |req|
-        req.url path
+        req.url path.sub(%r{^/}, '') # Remove leading slash if present since base_url ends with slash
         req.params.update(params) if params.present?
         req.headers.update(headers) if headers.present?
         req.body = body if body
@@ -63,6 +63,10 @@ module Safire
       return body unless body.is_a?(String) && body.length > 2000
 
       "#{body[0..2000]}... (truncated, total #{body.length} characters)"
+    end
+
+    def normalize_base_url(url)
+      url.ends_with?('/') ? url : "#{url}/"
     end
   end
 end

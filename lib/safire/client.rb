@@ -4,7 +4,7 @@ module Safire
 
     # Initialie Safire client with a set of config
     #
-    # @param config an instance of Safire::Client::Config
+    # @param config an instance of Safire::ClientConfig
     def initialize(config)
       @config = config
     end

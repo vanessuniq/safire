@@ -22,10 +22,6 @@ module Safire
           response = @http_client.get(enpoint)
           metadata = parse_metadata(response.body)
 
-          @logger.info('SMART discovery successful',
-                       token_endpoint: metadata['token_endpoint'],
-                       capabilities: metadata['capabilities'].inspect)
-
           SmartMetadata.new(metadata)
         rescue StandardError => e
           @logger.error('SMART discovery failed', error: e.message, base_url: @base_url)
@@ -41,28 +37,7 @@ module Safire
                   but obtained #{metadata.inspect}"
           end
 
-          validate_required_fields(metadata)
           metadata
-        end
-
-        def validate_required_fields(metadata)
-          required_fields = %w[grant_types_supported token_endpoint capabilities code_challenge_methods_supported]
-          required_fields.push('issuer', 'jwks_uri') if issuer_and_jwks_uri_required?(metadata['capabilities'])
-          required_fields.push('authorization_endpoint') if authorization_endpoint_required?(metadata['capabilities'])
-
-          missing_fields = required_fields.reject { |field| metadata[field] }
-
-          return if missing_fields.empty?
-
-          raise Errors::DiscoveryError, "Missing required SMART configuration fields: #{missing_fields.to_sentence}"
-        end
-
-        def issuer_and_jwks_uri_required?(capabilities)
-          capabilities&.include?('sso-openid-connect')
-        end
-
-        def authorization_endpoint_required?(capabilities)
-          capabilities&.include?('launch-ehr') || capabilities&.include?('launch-standalone')
         end
       end
     end

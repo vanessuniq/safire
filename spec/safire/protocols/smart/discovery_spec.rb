@@ -33,7 +33,7 @@ RSpec.describe Safire::Protocols::Smart::Discovery do
 
       it 'raises a DiscoveryError' do
         expect { discovery.discover }.to raise_error(
-          Safire::Errors::DiscoveryError, /Missing required SMART configuration fields/
+          Safire::Errors::DiscoveryError, /Missing required SMART metadata attributes/
         )
       end
     end

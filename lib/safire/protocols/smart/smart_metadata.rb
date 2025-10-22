@@ -47,18 +47,56 @@ module Safire
         # @!attribute [r] code_challenge_methods_supported
         #   @return [Array<String>] list of PKCE code challenge methods supported. Must include "S256".
         #     Must not include "plain".
-        ATTRIBUTES = %i[
-          issuer jwks_uri authorization_endpoint grant_types_supported
-          token_endpoint token_endpoint_auth_methods_supported registration_endpoint
-          associated_endpoints user_access_brand_bundle user_access_brand_identifier
-          scopes_supported response_types_supported management_endpoint introspection_endpoint
-          revocation_endpoint capabilities code_challenge_methods_supported
+        REQUIRED_ATTRIBUTES = %i[
+          grant_types_supported token_endpoint capabilities
+          code_challenge_methods_supported
         ].freeze
+
+        OPTIONAL_ATTRIBUTES = %i[
+          issuer
+          jwks_uri
+          authorization_endpoint
+          token_endpoint_auth_methods_supported
+          registration_endpoint
+          associated_endpoints
+          user_access_brand_bundle
+          user_access_brand_identifier
+          scopes_supported
+          response_types_supported
+          management_endpoint
+          introspection_endpoint
+          revocation_endpoint
+        ].freeze
+
+        ATTRIBUTES = (REQUIRED_ATTRIBUTES | OPTIONAL_ATTRIBUTES).freeze
 
         attr_reader(*ATTRIBUTES)
 
         def initialize(metadata)
           super(metadata, ATTRIBUTES)
+          validate!
+        end
+
+        private
+
+        def validate!
+          required_attrs = [*REQUIRED_ATTRIBUTES]
+          required_attrs.push(:issuer, :jwks_uri) if issuer_and_jwks_uri_required?
+          required_attrs.push(:authorization_endpoint) if authorization_endpoint_required?
+
+          missing_attrs = required_attrs.reject { |attr| public_send(attr) }
+
+          return if missing_attrs.empty?
+
+          raise Errors::DiscoveryError, "Missing required SMART metadata attributes: #{missing_attrs.to_sentence}"
+        end
+
+        def issuer_and_jwks_uri_required?
+          capabilities&.include?('sso-openid-connect')
+        end
+
+        def authorization_endpoint_required?
+          capabilities&.include?('launch-ehr') || capabilities&.include?('launch-standalone')
         end
       end
     end

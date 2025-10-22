@@ -21,6 +21,6 @@ end
 
 desc 'Setup development environment'
 task :setup do
-  sh 'bundle install'
+  sh 'bin/setup'
   puts 'Development environment ready!'
 end

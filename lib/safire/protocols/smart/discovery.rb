@@ -13,7 +13,10 @@ module Safire
           @logger = Safire::SafireLogger.new
         end
 
-        # Fetch and Parse SMART configuration
+        # Fetch and Parse SMART configuration metadata
+        # @return [SmartMetadata] parsed SMART metadata object Safire::Protocols::Smart::SmartMetadata
+        # @raise [Errors::DiscoveryError] if discovery fails, response body format is not JSON,
+        #   or required fields are missing
         def discover
           enpoint = "#{@base_url}#{WELL_KNOWN_PATH}"
           response = @http_client.get(enpoint)

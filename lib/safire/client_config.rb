@@ -2,6 +2,10 @@
 
 module Safire
   class ClientConfig < Entity
+    # Attributes for Safire client configuration
+    #
+    # @!attribute [r] base_url
+    #   @return [String] the base URL of the FHIR service
     ATTRIBUTES = %i[base_url].freeze
 
     attr_reader(*ATTRIBUTES)

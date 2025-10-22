@@ -8,10 +8,11 @@ module Safire
         #   @return [String] conveying this system’s OpenID Connect Issuer URL. Required if the server’s
         #     capabilities include sso-openid-connect.
         # @!attribute [r] jwks_uri
-        #   @return [String] URL of the server’s JSON Web Key Set endpoint. Required if the server’s capabilities include sso-openid-connect.
+        #   @return [String] URL of the server’s JSON Web Key Set endpoint. Required if the server’s capabilities
+        #     include sso-openid-connect.
         # @!attribute [r] authorization_endpoint
-        #   @return [String] URL of the server’s OAuth2 Authorization Endpoint. Required if the server’s capabilities include
-        #     launch-standalone or launch-ehr-launch.
+        #   @return [String] URL of the server’s OAuth2 Authorization Endpoint. Required if the server’s capabilities
+        #     include launch-standalone or launch-ehr-launch.
         # @!attribute [r] grant_types_supported
         #   @return [Array<String>] list of OAuth2 grant types supported at the token endpoint.
         # @!attribute [r] token_endpoint

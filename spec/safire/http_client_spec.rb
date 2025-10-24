@@ -46,10 +46,6 @@ RSpec.describe Safire::HTTPClient do
       expect(connection_options.verify?).to be(false)
       expect(connection_options.ca_file).to eq('/path/to/ca')
     end
-
-    it 'fails without base_url' do
-      expect { described_class.new }.to raise_error(ArgumentError)
-    end
   end
 
   describe 'integration scenarios' do

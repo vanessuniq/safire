@@ -9,10 +9,9 @@ module Safire
         # Initialize Discovery service with the FHIR server base URL
         #
         # @param base_url the base URL of the FHIR service
-        def initialize(base_url, http_client: nil)
-          @endpoint = "#{base_url.chomp('/')}#{WELL_KNOWN_PATH}"
-          @http_client = http_client || Safire::HTTPClient.new(base_url:)
-          @logger = Safire::SafireLogger.new
+        def initialize(base_url)
+          @endpoint = "#{base_url.to_s.chomp('/')}#{WELL_KNOWN_PATH}"
+          @http_client = Safire.http_client
         end
 
         # Fetch and Parse SMART configuration metadata
@@ -25,7 +24,7 @@ module Safire
 
           SmartMetadata.new(metadata)
         rescue StandardError => e
-          @logger.error('SMART discovery failed', error: e.message, endpoint:)
+          Safire.logger.error('SMART discovery failed', error: e.message, endpoint:)
           raise Errors::DiscoveryError, "Failed to discover SMART configuration: #{e.message.inspect}"
         end
 

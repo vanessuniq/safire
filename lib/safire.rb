@@ -17,21 +17,31 @@ require_relative 'safire/client'
 # Main module for Safire gem
 module Safire
   class << self
-    attr_accessor :configuration
+    attr_reader :configuration
 
     def configure
       @configuration ||= Configuration.new
       yield(configuration)
     end
+
+    def logger
+      @logger ||= configuration&.logger || default_logger
+    end
+
+    def default_logger
+      @default_logger ||= Safire::SafireLogger.new
+    end
+
+    def http_client
+      @http_client ||= Safire::HTTPClient.new
+    end
   end
 
   class Configuration
-    attr_accessor :logger, :log_level, :timeout, :user_agent
+    attr_accessor :logger, :user_agent
 
     def initialize
       @logger = Safire::SafireLogger.new
-      @log_level = :info
-      @timeout = 30
       @user_agent = "Safire v#{Safire::VERSION}"
     end
   end

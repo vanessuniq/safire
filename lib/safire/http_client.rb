@@ -5,7 +5,7 @@ require 'faraday/follow_redirects'
 module Safire
   # HTTP client wrapper for Safire
   class HTTPClient
-    def initialize(base_url:, adapter: nil, request_format: :url_encoded, ssl_options: {})
+    def initialize(base_url: nil, adapter: nil, request_format: :url_encoded, ssl_options: {})
       @options = {
         url: normalize_base_url(base_url),
         ssl: ssl_options,
@@ -66,6 +66,8 @@ module Safire
     end
 
     def normalize_base_url(url)
+      return '' unless url
+
       url.ends_with?('/') ? url : "#{url}/"
     end
   end

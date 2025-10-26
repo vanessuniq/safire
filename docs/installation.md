@@ -46,7 +46,7 @@ rake setup # or `bin/setup`
 rake spec # or `bundle exec rspec`
 
 # Generate yard documentation
-rake docs # or `bundle exec yard doc`
+rake docs # or `bin/docs`
 
 # Drop into the Safire console for interactive prompt
 bin/console

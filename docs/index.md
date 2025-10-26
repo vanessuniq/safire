@@ -34,8 +34,8 @@ A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for both c
   </div>
 
   <div class="grid-item">
-    <h3><a href="{{ site.baseurl }}/api/">📚 API Reference</a></h3>
-    <p>Complete API documentation and examples</p>
+    <h3><a href="{{ site.baseurl }}/api/" target="_blank">📚 Safire API Docs</a></h3>
+    <p>Complete Safire Ruby documentation and examples</p>
   </div>
 </div>
 
@@ -43,7 +43,6 @@ A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for both c
 
 - [GitHub Repository](https://github.com/vanessuniq/safire)
 - [Issue Tracker](https://github.com/vanessuniq/safire/issues)
-- [Contributing Guide]({{ site.baseurl }}/contributing/)
 
 ---
 

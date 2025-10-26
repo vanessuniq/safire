@@ -1,4 +1,4 @@
-name: CI
+name: Ruby
 permissions:
   contents: read
 
@@ -7,6 +7,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -22,7 +23,7 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ matrix.ruby-version }}
-        bundler-cache: true
+        bundler-cache: true # This will run bundle install and cache gems automatically
 
     - name: Run tests
       run: bundle exec rspec
@@ -32,9 +33,6 @@ jobs:
 
     - name: Security audit
       run: bundle exec bundler-audit check --update
-
-    - name: Generate documentation
-      run: bundle exec yard doc
 
   # build:
   #   runs-on: ubuntu-latest

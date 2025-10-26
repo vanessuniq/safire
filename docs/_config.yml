@@ -74,6 +74,9 @@ aux_links:
     - https://github.com/vanessuniq/safire
 
 aux_links_new_tab: true
+
+back_to_top: true
+back_to_top_text: Back to Top ↑
 # Exclude from processing.
 # The following items will not be processed, by default.
 # Any item listed under the `exclude:` key here will be automatically added to

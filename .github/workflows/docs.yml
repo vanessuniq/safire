@@ -1,42 +1,56 @@
 name: Docs
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  generate-docs:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        ruby-version: ['3.3.6']
-
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-    - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby-version }}
-        bundler-cache: true # This will run bundle install and cache gems automatically
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3.6'
+          bundler-cache: true # This will run bundle install and cache gems automatically
 
-    - name: Remove /docs/api from .gitignore
-      run: sed -i '/\/docs\/api/d' .gitignore
-    - name: Generate Ruby yardocs
-      run: bin/docs
+      - name: Generate YARD docs
+        run: bin/docs
 
-    - name: Setup Git user
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Install Jekyll dependencies
+        working-directory: ./docs
+        run: bundle install
 
-    - name: Commit api yardocs
-      run: git add docs/api && git commit -m "Generate API docs" || echo "No changes to commit"
-    - name: Push to gh-pages branch
-      uses: ad-m/github-push-action@master
-      with:
-        branch: gh-pages
-        force: true
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Jekyll
+        # Outputs to the './_site' directory by default
+        run: |
+          cd docs
+          bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+        env:
+          JEKYLL_ENV: production
+
+      - name: Upload artifact
+      # Automatically uploads an artifact from the './_site' directory by default
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+

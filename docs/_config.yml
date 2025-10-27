@@ -20,7 +20,7 @@
 
 title: Safire Documentation
 description: SMART on FHIR and UDAP implementation library for Ruby
-baseurl: /safire/docs
+baseurl: /safire/
 url: https://vanessuniq.github.io
 
 # Build settings
@@ -64,7 +64,7 @@ defaults:
 
 aux_links:
   Safire API Docs:
-    - /safire/docs/api
+    - /safire/api
   GitHub:
     - https://github.com/vanessuniq/safire
 

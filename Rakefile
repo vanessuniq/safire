@@ -9,6 +9,12 @@ YARD::Rake::YardocTask.new
 
 task default: %i[spec rubocop]
 
+desc 'Setup development environment'
+task :setup do
+  sh 'bin/setup'
+  puts 'Development environment ready!'
+end
+
 desc 'Run security audit'
 task :audit do
   sh 'bundle exec bundler-audit check --update'
@@ -16,11 +22,5 @@ end
 
 desc 'Generate documentation'
 task :docs do
-  sh 'bundle exec yard doc'
-end
-
-desc 'Setup development environment'
-task :setup do
-  sh 'bin/setup'
-  puts 'Development environment ready!'
+  sh 'bin/docs'
 end

@@ -27,6 +27,16 @@ Add this line to your application's Gemfile:
 gem 'safire', '~> 0.0.1'
 ```
 
+## Development
+
+After checking out the repo, run:
+
+```
+bin/setup            # Install dependencies
+bin/console          # Interactive prompt
+bundle exec rspec    # Run tests
+```
+
 ## Quick Start
 
 ### SMART Discovery
@@ -58,16 +68,6 @@ puts "Capabilities: #{metadata.capabilities}"
 client.smart_metadata
 
 puts "Token endpoint: #{client.smart_metadata.token_endpoint}"
-```
-
-## Development
-
-After checking out the repo, run:
-
-```
-bin/setup            # Install dependencies
-bin/console          # Interactive prompt
-bundle exec rspec    # Run tests
 ```
 
 ## Contributing

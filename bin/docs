@@ -1,0 +1,2 @@
+#!/bin/sh
+bundle exec yard doc --no-private --output-dir docs/api -m markdown

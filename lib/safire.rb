@@ -1,7 +1,7 @@
+require 'logger'
 require 'active_support/all'
 
 require_relative 'safire/version'
-require_relative 'safire/safire_logger'
 require_relative 'safire/errors'
 require_relative 'safire/http_client'
 require_relative 'safire/entity'
@@ -29,7 +29,7 @@ module Safire
     end
 
     def default_logger
-      @default_logger ||= Safire::SafireLogger.new
+      @default_logger ||= Logger.new(ENV['SAFIRE_LOGGER'] || $stdout)
     end
 
     def http_client
@@ -38,11 +38,12 @@ module Safire
   end
 
   class Configuration
-    attr_accessor :logger, :user_agent
+    attr_accessor :logger, :log_level, :user_agent
 
     def initialize
-      @logger = Safire::SafireLogger.new
       @user_agent = "Safire v#{Safire::VERSION}"
     end
   end
+
+  Safire.logger.level = Safire.configuration&.log_level || Logger::INFO
 end

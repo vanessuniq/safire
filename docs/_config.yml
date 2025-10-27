@@ -57,15 +57,10 @@ kramdown:
 
 defaults:
   - scope:
-      path: ""
+      path: "docs"
       type: pages
     values:
       layout: default
-  - scope:
-      path: ""
-      type: api
-    values:
-      layout: api
 
 aux_links:
   Safire API Docs:

@@ -32,10 +32,13 @@
   ],
   "capabilities": [
     "launch-ehr",
+    "launch-standalone",
     "permission-patient",
     "permission-v2",
+    "authorize-post",
     "client-public",
     "client-confidential-symmetric",
+    "client-confidential-asymmetric",
     "context-ehr-patient",
     "sso-openid-connect"
   ],

@@ -44,6 +44,7 @@ module Safire
     def initialize(config)
       super(config, ATTRIBUTES)
       validate!
+      @issuer ||= base_url
     end
 
     class << self

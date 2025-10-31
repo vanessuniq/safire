@@ -72,4 +72,89 @@ RSpec.describe Safire::Protocols::Smart::PublicClient do
       end
     end
   end
+
+  describe '#request_access_token' do
+    let(:authorization_code) { 'auth_code_abc123' }
+    # let(:token_params) do
+    #   {
+    #     grant_type: 'authorization_code',
+    #     code: authorization_code,
+    #     redirect_uri: config[:redirect_uri],
+    #     client_id: config[:client_id]
+    #   }
+    # end
+    let(:token_response_body) do
+      {
+        access_token: 'access_token_xyz789',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        scope: 'openid profile patient/*.read'
+      }
+    end
+
+    it 'successfully exchanges authorization code for access token' do
+      stub_request(:post, config[:token_endpoint])
+        .with(
+          query: hash_including(
+            'grant_type' => 'authorization_code',
+            'code' => authorization_code,
+            'redirect_uri' => config[:redirect_uri],
+            'client_id' => config[:client_id]
+          )
+        )
+        .to_return(
+          status: 200,
+          body: token_response_body.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      token_response = public_client.request_access_token(authorization_code)
+
+      expect(token_response).to be_a(Hash)
+      expect(token_response).to eq(token_response_body.transform_keys(&:to_s))
+    end
+
+    it 'raises an AuthError if the token request fails' do
+      stub_request(:post, config[:token_endpoint])
+        .with(
+          query: hash_including(
+            'grant_type' => 'authorization_code',
+            'code' => nil,
+            'redirect_uri' => config[:redirect_uri],
+            'client_id' => config[:client_id]
+          )
+        )
+        .to_return(
+          status: 401,
+          body: { error: 'Invalid code' }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      expect { public_client.request_access_token(nil) }.to raise_error(
+        Safire::Errors::AuthError, /HTTP request failed/
+      )
+    end
+
+    it 'raises AuthError if access token is missing from the response' do
+      token_response = token_response_body.dup
+      token_response.delete(:access_token)
+
+      stub_request(:post, config[:token_endpoint])
+        .with(
+          query: hash_including(
+            'grant_type' => 'authorization_code',
+            'code' => authorization_code,
+            'redirect_uri' => config[:redirect_uri],
+            'client_id' => config[:client_id]
+          )
+        ).to_return(
+          status: 200,
+          body: token_response.to_json
+        )
+
+      expect { public_client.request_access_token(authorization_code) }.to raise_error(
+        Safire::Errors::AuthError, /Missing access token/
+      )
+    end
+  end
 end

@@ -26,13 +26,19 @@ module Safire
 
         def initialize(config)
           super(config, ATTRIBUTES)
+
+          @http_client = Safire.http_client
           validate!
+        end
+
+        def current_pkce
+          @current_pkce ||= Safire::PKCE.new
         end
 
         # This method builds the authorization URL to request an authorization code
         # @param launch [String, nil] optional launch parameter
         # @param custom_scopes [Array<String>, nil] optional custom scopes to override the configured ones
-        # @return [Hash] a hash containing the authorization URL and state parameter
+        # @return [Hash] a hash containing the authorization URL and state parameter (used for CSRF protection)
         #
         # @example Building authorization URL
         #   public_client = Safire::Protocols::Smart::PublicClient.new(
@@ -45,14 +51,38 @@ module Safire
         #   )
         #   auth_data = public_client.authorization_url
         #   puts auth_data[:auth_url]  # The authorization URL
-        #   puts auth_data[:state]     # The state parameter
+        #   puts auth_data[:state]     # The state parameter (user should store to verify the state in the callback)
         def authorization_url(launch: nil, custom_scopes: nil)
           validate_scopes_presence!(custom_scopes)
+
+          Safire.logger.info('Generating authorization URL for SMART Public Client...')
 
           uri = Addressable::URI.parse(authorization_endpoint)
           uri.query_values = authorization_params(launch:, custom_scopes:)
 
           { auth_url: uri.to_s, state: uri.query_values['state'] }
+        end
+
+        # Exchanges the authorization code for an access token
+        # @param code [String] the authorization code received from the authorization server
+        # @return [Hash] the token response containing the access token and other details
+        # @raise [Safire::Errors::AuthError] if the token request fails or the response is invalid
+        def request_access_token(code)
+          Safire.logger.info('Requesting access token using authorization code...')
+
+          response = @http_client.post(
+            token_endpoint,
+            params: request_access_token_params(code),
+            headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
+          )
+
+          clear_pkce # Clear PKCE data after token request
+
+          parse_token_response(response.body)
+        rescue Faraday::ClientError => e
+          raise Errors::AuthError, "Failed to obtain access token: #{e.response[:body].inspect}"
+        rescue StandardError => e
+          raise Errors::AuthError, "Failed to obtain access token: #{e.message.inspect}"
         end
 
         private
@@ -87,8 +117,26 @@ module Safire
           params.merge(current_pkce.auth_params)
         end
 
-        def current_pkce
-          @current_pkce ||= Safire::PKCE.new
+        def request_access_token_params(code)
+          {
+            grant_type: 'authorization_code',
+            code:,
+            redirect_uri:,
+            client_id:,
+            code_verifier: current_pkce.code_verifier
+          }
+        end
+
+        def parse_token_response(token_response)
+          unless token_response.is_a?(Hash) && token_response['access_token'].present?
+            raise Errors::AuthError, "Missing access token in response: #{token_response.inspect}"
+          end
+
+          token_response
+        end
+
+        def clear_pkce
+          @current_pkce = nil
         end
       end
     end

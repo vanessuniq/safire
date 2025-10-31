@@ -85,6 +85,22 @@ module Safire
           raise Errors::AuthError, "Failed to obtain access token: #{e.message.inspect}"
         end
 
+        def refresh_token(refresh_token:, scopes: nil)
+          Safire.logger.info('Refreshing access token using refresh token...')
+
+          response = @http_client.post(
+            token_endpoint,
+            params: refresh_token_params(refresh_token:, scopes:),
+            headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
+          )
+
+          parse_token_response(response.body)
+        rescue Faraday::ClientError => e
+          raise Errors::AuthError, "Failed to refresh access token: #{e.response[:body].inspect}"
+        rescue StandardError => e
+          raise Errors::AuthError, "Failed to refresh access token: #{e.message.inspect}"
+        end
+
         private
 
         def validate!
@@ -125,6 +141,16 @@ module Safire
             client_id:,
             code_verifier: current_pkce.code_verifier
           }
+        end
+
+        def refresh_token_params(refresh_token:, scopes:)
+          params = {
+            grant_type: 'refresh_token',
+            refresh_token:,
+            client_id:
+          }
+          params[:scope] = scopes.join(' ') if scopes.present?
+          params
         end
 
         def parse_token_response(token_response)

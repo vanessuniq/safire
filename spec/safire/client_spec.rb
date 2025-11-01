@@ -87,7 +87,7 @@ RSpec.describe Safire::Client do
       # In real app, the app would redirect user to auth_url and handle the callback
 
       # step 4: exchange authorization code for access token
-      token_response = public_client.request_access_token(authorization_code)
+      token_response = public_client.request_access_token(code: authorization_code)
       expect(token_response).to be_a(Hash)
       expect(token_response).to eq(token_response_body.transform_keys(&:to_s))
     end

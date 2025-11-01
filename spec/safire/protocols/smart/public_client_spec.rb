@@ -113,7 +113,7 @@ RSpec.describe Safire::Protocols::Smart::PublicClient do
       end
 
       it 'successfully exchanges authorization code for access token' do
-        token_response = public_client.request_access_token(authorization_code)
+        token_response = public_client.request_access_token(code: authorization_code)
 
         expect(token_response).to be_a(Hash)
         expect(token_response).to eq(token_response_body.transform_keys(&:to_s))
@@ -130,7 +130,7 @@ RSpec.describe Safire::Protocols::Smart::PublicClient do
       end
 
       it 'raises an AuthError' do
-        expect { public_client.request_access_token(nil) }
+        expect { public_client.request_access_token(code: nil) }
           .to raise_error(Safire::Errors::AuthError, /HTTP request failed/)
       end
     end
@@ -145,7 +145,7 @@ RSpec.describe Safire::Protocols::Smart::PublicClient do
       end
 
       it 'raises AuthError' do
-        expect { public_client.request_access_token(authorization_code) }
+        expect { public_client.request_access_token(code: authorization_code) }
           .to raise_error(Safire::Errors::AuthError, /Missing access token/)
       end
     end

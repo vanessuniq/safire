@@ -31,13 +31,14 @@ module Safire
           validate!
         end
 
-        def current_pkce
-          @current_pkce ||= Safire::PKCE.new
+        def current_pkce(code_verifier: nil)
+          @current_pkce ||= Safire::PKCE.new(code_verifier:)
         end
 
         # This method builds the authorization URL to request an authorization code
         # @param launch [String, nil] optional launch parameter
         # @param custom_scopes [Array<String>, nil] optional custom scopes to override the configured ones
+        # @param code_verifier [String, nil] optional code verifier to use for PKCE
         # @return [Hash] a hash containing the authorization URL and state parameter (used for CSRF protection)
         #
         # @example Building authorization URL
@@ -52,9 +53,10 @@ module Safire
         #   auth_data = public_client.authorization_url
         #   puts auth_data[:auth_url]  # The authorization URL
         #   puts auth_data[:state]     # The state parameter (user should store to verify the state in the callback)
-        def authorization_url(launch: nil, custom_scopes: nil)
+        def authorization_url(launch: nil, custom_scopes: nil, code_verifier: nil)
           validate_scopes_presence!(custom_scopes)
 
+          current_pkce(code_verifier:) # set up PKCE
           Safire.logger.info('Generating authorization URL for SMART Public Client...')
 
           uri = Addressable::URI.parse(authorization_endpoint)
@@ -65,14 +67,15 @@ module Safire
 
         # Exchanges the authorization code for an access token
         # @param code [String] the authorization code received from the authorization server
+        # @param code_verifier [String, nil] optional code verifier if not using the stored one
         # @return [Hash] the token response containing the access token and other details
         # @raise [Safire::Errors::AuthError] if the token request fails or the response is invalid
-        def request_access_token(code)
+        def request_access_token(code:, code_verifier: nil)
           Safire.logger.info('Requesting access token using authorization code...')
 
           response = @http_client.post(
             token_endpoint,
-            params: request_access_token_params(code),
+            params: request_access_token_params(code, code_verifier),
             headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
           )
 
@@ -133,13 +136,13 @@ module Safire
           params.merge(current_pkce.auth_params)
         end
 
-        def request_access_token_params(code)
+        def request_access_token_params(code, code_verifier = nil)
           {
             grant_type: 'authorization_code',
             code:,
             redirect_uri:,
             client_id:,
-            code_verifier: current_pkce.code_verifier
+            code_verifier: code_verifier.presence || current_pkce.code_verifier
           }
         end
 

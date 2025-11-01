@@ -50,7 +50,7 @@ config = Safire::ClientConfig.new(base_url: '"https://launch.smarthealthit.org/v
 safire_client = Safire::Client.new(config)
 
 # Discovery SMART Configuration
-metadata = safire_client.smart_discovery
+metadata = safire_client.smart_metadata
 
 puts "Authorization endpoint: #{metadata.authorization_endpoint}"
 # Authorization endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/authorize
@@ -63,11 +63,6 @@ puts "Token endpoint: #{metadata.token_endpoint}"
 puts "Capabilities: #{metadata.capabilities}"
 # Capabilities: ["launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "client-confidential-asymmetric", "sso-openid-connect", "context-passthrough-banner", "context-passthrough-style", "context-ehr-patient", "context-ehr-encounter", "context-standalone-patient", "context-standalone-encounter", "permission-offline", "permission-patient", "permission-user", "permission-v1", "permission-v2", "authorize-post"]
 # => nil
-
-# Once the SMART discovery endpoint has been fetched, you can also access the SMART metadata as follow:
-client.smart_metadata
-
-puts "Token endpoint: #{client.smart_metadata.token_endpoint}"
 ```
 
 ## Contributing

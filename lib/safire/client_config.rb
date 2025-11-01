@@ -55,10 +55,31 @@ module Safire
 
     private
 
+    def validate_uris!
+      uri_attrs = %i[base_url redirect_uri issuer]
+      invalid_uris = uri_attrs.select do |attr|
+        value = send(attr)
+        begin
+          uri = Addressable::URI.parse(value)
+          !(uri.scheme && uri.host)
+        rescue Addressable::URI::InvalidURIError
+          true
+        end
+      end
+      return if invalid_uris.empty?
+
+      raise Errors::ConfigurationError,
+            "Client configuration has invalid URIs for attributes: #{invalid_uris.to_sentence}"
+    end
+
     def validate!
       required_attrs = %i[base_url client_id redirect_uri]
       nil_vars = required_attrs.select { |attr| send(attr).nil? }
-      return if nil_vars.empty?
+
+      if nil_vars.empty?
+        validate_uris!
+        return
+      end
 
       raise Errors::ConfigurationError,
             "Client configuration missing required attributes: #{nil_vars.to_sentence}"

@@ -31,9 +31,26 @@ module Safire
 
     # Initialie Safire client with a set of config
     #
-    # @param config an instance of Safire::ClientConfig
+    # @param config an instance of Safire::ClientConfig or a Hash of configuration parameters
+    # @return [Safire::Client] the initialized Safire client
+    # @example Initializing Safire client with ClientConfig
+    #   config = Safire::ClientConfig.new(
+    #     base_url: 'https://fhir.example.com',
+    #     client_id: 'my_client_id',
+    #     redirect_uri: 'https://myapp.example.com/callback',
+    #     scopes: ['openid', 'profile', 'patient/*.read']
+    #   )
+    #   client = Safire::Client.new(config)
+    # @example Initializing Safire client with a Hash
+    #   config_hash = {
+    #     base_url: 'https://fhir.example.com',
+    #     client_id: 'my_client_id',
+    #     redirect_uri: 'https://myapp.example.com/callback',
+    #     scopes: ['openid', 'profile', 'patient/*.read']
+    #   }
+    #   client = Safire::Client.new(config_hash)
     def initialize(config)
-      @config = config
+      @config = build_config(config)
     end
 
     def smart_metadata
@@ -45,6 +62,12 @@ module Safire
     end
 
     private
+
+    def build_config(config)
+      return config if config.is_a?(Safire::ClientConfig)
+
+      Safire::ClientConfig.new(config)
+    end
 
     def public_client_config
       {

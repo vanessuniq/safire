@@ -31,14 +31,9 @@ module Safire
           validate!
         end
 
-        def current_pkce(code_verifier: nil)
-          @current_pkce ||= Safire::PKCE.new(code_verifier:)
-        end
-
         # This method builds the authorization URL to request an authorization code
         # @param launch [String, nil] optional launch parameter
         # @param custom_scopes [Array<String>, nil] optional custom scopes to override the configured ones
-        # @param code_verifier [String, nil] optional code verifier to use for PKCE
         # @return [Hash] a hash containing the authorization URL and state parameter (used for CSRF protection)
         #
         # @example Building authorization URL
@@ -53,24 +48,26 @@ module Safire
         #   auth_data = public_client.authorization_url
         #   puts auth_data[:auth_url]  # The authorization URL
         #   puts auth_data[:state]     # The state parameter (user should store to verify the state in the callback)
-        def authorization_url(launch: nil, custom_scopes: nil, code_verifier: nil)
+        #   puts auth_data[:code_verifier] # The code verifier (user should store to use in token request)
+        def authorization_url(launch: nil, custom_scopes: nil)
           validate_scopes_presence!(custom_scopes)
 
-          current_pkce(code_verifier:) # set up PKCE
           Safire.logger.info('Generating authorization URL for SMART Public Client...')
 
-          uri = Addressable::URI.parse(authorization_endpoint)
-          uri.query_values = authorization_params(launch:, custom_scopes:)
+          code_verifier = PKCE.generate_code_verifier
 
-          { auth_url: uri.to_s, state: uri.query_values['state'] }
+          uri = Addressable::URI.parse(authorization_endpoint)
+          uri.query_values = authorization_params(launch:, custom_scopes:, code_verifier:)
+
+          { auth_url: uri.to_s, state: uri.query_values['state'], code_verifier: }
         end
 
         # Exchanges the authorization code for an access token
         # @param code [String] the authorization code received from the authorization server
-        # @param code_verifier [String, nil] optional code verifier if not using the stored one
+        # @param code_verifier [String] code verifier used to generate the code challenge sent in authorization request
         # @return [Hash] the token response containing the access token and other details
         # @raise [Safire::Errors::AuthError] if the token request fails or the response is invalid
-        def request_access_token(code:, code_verifier: nil)
+        def request_access_token(code:, code_verifier:)
           Safire.logger.info('Requesting access token using authorization code...')
 
           response = @http_client.post(
@@ -78,8 +75,6 @@ module Safire
             params: request_access_token_params(code, code_verifier),
             headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }
           )
-
-          clear_pkce # Clear PKCE data after token request
 
           parse_token_response(response.body)
         rescue Faraday::ClientError => e
@@ -122,27 +117,27 @@ module Safire
                 'SMART Public Client auth flow requires scopes (Array)'
         end
 
-        def authorization_params(launch:, custom_scopes:)
-          params = {
+        def authorization_params(launch:, custom_scopes:, code_verifier:)
+          {
             response_type: 'code',
             client_id:,
             redirect_uri:,
             launch:,
             scope: [custom_scopes || scopes].flatten.join(' '),
             state: SecureRandom.hex(16),
-            aud: issuer.to_s
+            aud: issuer.to_s,
+            code_challenge_method: 'S256',
+            code_challenge: PKCE.generate_code_challenge(code_verifier)
           }.compact
-
-          params.merge(current_pkce.auth_params)
         end
 
-        def request_access_token_params(code, code_verifier = nil)
+        def request_access_token_params(code, code_verifier)
           {
             grant_type: 'authorization_code',
             code:,
             redirect_uri:,
             client_id:,
-            code_verifier: code_verifier.presence || current_pkce.code_verifier
+            code_verifier:
           }
         end
 
@@ -162,10 +157,6 @@ module Safire
           end
 
           token_response
-        end
-
-        def clear_pkce
-          @current_pkce = nil
         end
       end
     end

@@ -65,7 +65,7 @@ RSpec.describe Safire::Client do
   end
 
   describe 'Public client auth flow' do
-    it 'performs disccovery, authorization, and token exchange' do
+    it 'performs disccovery, authorization, and token exchange' do # rubocop:disable RSpec/MultipleExpectations
       # step 1: discovery
       metadata = client.smart_metadata
       smart_metadata.each do |k, v|
@@ -74,8 +74,9 @@ RSpec.describe Safire::Client do
 
       # step 2: build authorization URL
       public_client = client.public_client
-      public_client.authorization_url => { auth_url:, state: }
+      public_client.authorization_url => { auth_url:, state:, code_verifier: }
       expect(state).to be_present
+      expect(code_verifier).to be_present
       expect(auth_url).to include('response_type=code')
       expect(auth_url).to include("client_id=#{config.client_id}")
       expect(auth_url).to include("redirect_uri=#{CGI.escape(config.redirect_uri)}")
@@ -87,7 +88,7 @@ RSpec.describe Safire::Client do
       # In real app, the app would redirect user to auth_url and handle the callback
 
       # step 4: exchange authorization code for access token
-      token_response = public_client.request_access_token(code: authorization_code)
+      token_response = public_client.request_access_token(code: authorization_code, code_verifier:)
       expect(token_response).to be_a(Hash)
       expect(token_response).to eq(token_response_body.transform_keys(&:to_s))
     end

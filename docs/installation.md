@@ -8,7 +8,7 @@ nav_order: 2
 
 ## Requirements
 
-- **Ruby:** 3.3.6 or later
+- **Ruby:** 3.4.7 or later
 - **Bundler:** Latest version recommended
 - **OpenSSL:** For cryptographic operations
 

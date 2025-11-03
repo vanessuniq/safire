@@ -4,20 +4,20 @@
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-⚠️ **ALPHA SOFTWARE** - APIs will change! Not ready for production use.
+⚠️ Implementation is still **work in progress**.
 
-A lean Ruby gem that implements **SMART on FHIR** and **UDAP** protocols for both clients and servers.
+A lean Ruby gem that implements **SMART on FHIR** and **UDAP** protocols for clients.
 
 ## What Works
 
 ✅ **Discovery:**
 - SMART App Launch discovery (`/.well-known/smart-configuration`)
+- SMART App Launch for Public Client
 
 🚧 **Coming Soon:**
 - UDAP discovery (`/.well-known/udap`)
-- SMART client implementations (public, confidential, backend services)
+- SMART client implementations (confidential, backend services)
 - UDAP client implementations (JWT auth, DCR, Tiered OAuth)
-- Server tooling and Rails integration
 
 ## Installation
 
@@ -50,7 +50,7 @@ config = Safire::ClientConfig.new(base_url: '"https://launch.smarthealthit.org/v
 safire_client = Safire::Client.new(config)
 
 # Discovery SMART Configuration
-metadata = safire_client.smart_discovery
+metadata = safire_client.smart_metadata
 
 puts "Authorization endpoint: #{metadata.authorization_endpoint}"
 # Authorization endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/authorize
@@ -63,11 +63,12 @@ puts "Token endpoint: #{metadata.token_endpoint}"
 puts "Capabilities: #{metadata.capabilities}"
 # Capabilities: ["launch-ehr", "launch-standalone", "client-public", "client-confidential-symmetric", "client-confidential-asymmetric", "sso-openid-connect", "context-passthrough-banner", "context-passthrough-style", "context-ehr-patient", "context-ehr-encounter", "context-standalone-patient", "context-standalone-encounter", "permission-offline", "permission-patient", "permission-user", "permission-v1", "permission-v2", "authorize-post"]
 # => nil
+```
 
-# Once the SMART discovery endpoint has been fetched, you can also access the SMART metadata as follow:
-client.smart_metadata
+### SMART APP Lauch for Public Client
 
-puts "Token endpoint: #{client.smart_metadata.token_endpoint}"
+```ruby
+#
 ```
 
 ## Contributing

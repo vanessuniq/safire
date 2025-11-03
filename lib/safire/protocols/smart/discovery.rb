@@ -24,7 +24,7 @@ module Safire
 
           SmartMetadata.new(metadata)
         rescue StandardError => e
-          Safire.logger.error('SMART discovery failed', error: e.message, endpoint:)
+          Safire.logger.error("SMART discovery for enpoint `#{endpoint}` failed: #{e.message.inspect}")
           raise Errors::DiscoveryError, "Failed to discover SMART configuration: #{e.message.inspect}"
         end
 

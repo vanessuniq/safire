@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.authors               = ['Vanessa Fotso']
   spec.email                 = ['vanessuniq@gmail.com']
   spec.summary               = 'SMART on FHIR and UDAP implementation for Ruby'
-  spec.description           = 'A Ruby gem implementing SMART on FHIR and UDAP protocols for both clients and servers'
+  spec.description           = 'A Ruby gem implementing SMART on FHIR and UDAP protocols for clients.'
   spec.homepage              = 'https://github.com/vanessuniq/safire'
   spec.license               = 'Apache-2.0'
   spec.required_ruby_version = Gem::Requirement.new('>= 3.3.6')

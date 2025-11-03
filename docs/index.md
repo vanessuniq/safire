@@ -10,7 +10,7 @@ permalink: /
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 
-A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for both clients and servers.
+A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for clients.
 
 {: .warning }
 > **Inplementation** - Work in Progress

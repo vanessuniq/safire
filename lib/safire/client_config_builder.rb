@@ -20,6 +20,11 @@ module Safire
       self
     end
 
+    def client_secret(client_secret)
+      @config[:client_secret] = client_secret
+      self
+    end
+
     def redirect_uri(uri)
       @config[:redirect_uri] = uri
       self

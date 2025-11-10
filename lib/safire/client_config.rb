@@ -37,7 +37,7 @@ module Safire
   #
   # @see Safire::ClientConfigBuilder
   class ClientConfig < Entity
-    ATTRIBUTES = %i[base_url issuer client_id redirect_uri scopes].freeze
+    ATTRIBUTES = %i[base_url issuer client_id client_secret redirect_uri scopes].freeze
 
     attr_reader(*ATTRIBUTES)
 

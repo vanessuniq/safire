@@ -1,10 +1,22 @@
 require 'spec_helper'
 
-RSpec.describe Safire::Protocols::Smart::SmartMetadata do
+RSpec.describe Safire::Protocols::SmartMetadata do
   let(:smart_metadata) do
-    root = File.expand_path '../../..', File.dirname(File.absolute_path(__FILE__))
+    root = File.expand_path '../..', File.dirname(File.absolute_path(__FILE__))
     data = JSON.parse(File.read(File.join(root, 'fixtures', 'smart_config.json')))
     described_class.new(data)
+  end
+
+  describe '#valid?' do
+    it 'returns true if all required fields are present' do
+      expect(smart_metadata.valid?).to be(true)
+    end
+
+    it 'returns false if a required field is missing' do
+      smart_metadata = described_class.new({ authorization_endpoint: 'example.com' })
+
+      expect(smart_metadata.valid?).to be(false)
+    end
   end
 
   describe '#supports_ehr_launch?' do

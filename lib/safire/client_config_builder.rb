@@ -35,6 +35,16 @@ module Safire
       self
     end
 
+    def authorization_endpoint(authorization_endpoint)
+      @config[:authorization_endpoint] = authorization_endpoint
+      self
+    end
+
+    def token_endpoint(token_endpoint)
+      @config[:token_endpoint] = token_endpoint
+      self
+    end
+
     def build
       Safire::ClientConfig.new(@config)
     end

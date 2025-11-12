@@ -16,6 +16,13 @@ module Safire
   # @!attribute [r] scopes
   #   @return [Array<String>] list of OAuth2 scopes describing the app's desired access.
   #     Optionally provided.
+  # @!attribute [r] authorization_endpoint
+  #   @return [String] URL of the server’s OAuth2 Authorization Endpoint.
+  # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
+  # @!attribute [r] token_endpoint
+  # @!attribute [r] token_endpoint
+  #   @return [String] URL of the server’s OAuth2 Token Endpoint.
+  # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   #
   # @example Initializing a ClientConfig
   #   config = Safire::ClientConfig.new(
@@ -37,7 +44,10 @@ module Safire
   #
   # @see Safire::ClientConfigBuilder
   class ClientConfig < Entity
-    ATTRIBUTES = %i[base_url issuer client_id client_secret redirect_uri scopes].freeze
+    ATTRIBUTES = %i[
+      base_url issuer client_id client_secret redirect_uri
+      scopes authorization_endpoint token_endpoint
+    ].freeze
 
     attr_reader(*ATTRIBUTES)
 
@@ -57,9 +67,11 @@ module Safire
     private
 
     def validate_uris!
-      uri_attrs = %i[base_url redirect_uri issuer]
+      uri_attrs = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint]
       invalid_uris = uri_attrs.select do |attr|
         value = send(attr)
+        return false if value.nil? && %i[authorization_endpoint token_endpoint].include?(attr)
+
         begin
           uri = Addressable::URI.parse(value)
           !(uri.scheme && uri.host)

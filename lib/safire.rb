@@ -16,8 +16,6 @@ end
 
 require_relative 'safire/client_config_builder'
 require_relative 'safire/client_config'
-require_relative 'safire/protocols/smart/discovery'
-require_relative 'safire/protocols/smart/public_client'
 require_relative 'safire/client'
 
 # Main module for Safire gem

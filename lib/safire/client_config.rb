@@ -20,7 +20,6 @@ module Safire
   #   @return [String] URL of the server’s OAuth2 Authorization Endpoint.
   # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   # @!attribute [r] token_endpoint
-  # @!attribute [r] token_endpoint
   #   @return [String] URL of the server’s OAuth2 Token Endpoint.
   # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   #

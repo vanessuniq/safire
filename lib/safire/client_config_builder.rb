@@ -20,6 +20,11 @@ module Safire
       self
     end
 
+    def client_secret(client_secret)
+      @config[:client_secret] = client_secret
+      self
+    end
+
     def redirect_uri(uri)
       @config[:redirect_uri] = uri
       self
@@ -27,6 +32,16 @@ module Safire
 
     def scopes(scopes)
       @config[:scopes] = scopes
+      self
+    end
+
+    def authorization_endpoint(authorization_endpoint)
+      @config[:authorization_endpoint] = authorization_endpoint
+      self
+    end
+
+    def token_endpoint(token_endpoint)
+      @config[:token_endpoint] = token_endpoint
       self
     end
 

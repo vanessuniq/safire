@@ -10,7 +10,7 @@ module Safire
         key = var.to_s.delete_prefix('@').to_sym
         hash[key] = instance_variable_get(var)
       end
-      hash
+      hash.deep_symbolize_keys
     end
   end
 end

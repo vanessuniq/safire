@@ -36,14 +36,14 @@ module Safire
     #   if required configuration attributes are missing or invalid
     #
     # @example Initialize a public SMART client
-    #   smart_client = Safire::Protocols::Smart.new(
+    #   smart_client = Safire::Protocols::Smart.new({
     #     client_id: 'my_client_id',
     #     redirect_uri: 'https://myapp.example.com/callback',
     #     scopes: ['launch/patient', 'openid', 'fhirUser', 'patient/*.read'],
     #     issuer: 'https://fhir.example.com',
     #     authorization_endpoint: 'https://fhir.example.com/authorize',
     #     token_endpoint: 'https://fhir.example.com/token'
-    #   )
+    #   })
     #
     # @example Generate an authorization URL
     #   auth_data = smart_client.authorization_url

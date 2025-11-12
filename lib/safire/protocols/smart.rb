@@ -10,11 +10,12 @@ module Safire
     # Configuration is provided as a Hash and validated on initialization. All of the
     # following keys are required unless noted:
     #
+    # * :base_rul [String] FHIR server base URL
     # * :client_id [String] OAuth2 client identifier
     # * :client_secret [String, optional] client secret for confidential symmetric clients
     # * :redirect_uri [String] redirect URI registered with the authorization server
     # * :scopes [Array<String>, optional] default scopes requested during authorization
-    # * :issuer [String] FHIR server base URL / issuer identifier
+    # * :issuer [String, optional] issuer identifier. Default to base_url if not provided
     # * :authorization_endpoint [String, optional] SMART authorization endpoint URL
     # * :token_endpoint [String, optional] SMART token endpoint URL
     # authorization_endpoint and token_endpoint will be retrieved from the server's smart configuration if not provided.
@@ -65,7 +66,7 @@ module Safire
 
     class Smart < Entity
       ATTRIBUTES = %i[
-        client_id client_secret redirect_uri scopes issuer
+        base_url client_id client_secret redirect_uri scopes issuer
         authorization_endpoint token_endpoint
       ].freeze
 
@@ -78,6 +79,7 @@ module Safire
 
         @auth_type = auth_type.to_sym
         @http_client = Safire.http_client
+        @issuer ||= base_url
         @authorization_endpoint ||= well_known_config.authorization_endpoint
         @token_endpoint ||= well_known_config.token_endpoint
 
@@ -289,7 +291,7 @@ module Safire
       end
 
       def well_known_endpoint
-        "#{issuer.to_s.chomp('/')}#{WELL_KNOWN_PATH}"
+        "#{base_url.to_s.chomp('/')}#{WELL_KNOWN_PATH}"
       end
     end
   end

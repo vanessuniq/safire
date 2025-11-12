@@ -8,6 +8,7 @@ RSpec.describe Safire::Protocols::Smart do
       client_id: 'test_client_id',
       redirect_uri: 'https://app.example.com/callback',
       scopes: ['openid', 'profile', 'patient/*.read'],
+      base_url: 'https://fhir.example.com',
       issuer: 'https://fhir.example.com',
       authorization_endpoint: 'https://fhir.example.com/authorize',
       token_endpoint: 'https://fhir.example.com/token'
@@ -60,8 +61,8 @@ RSpec.describe Safire::Protocols::Smart do
     )
   end
 
-  def stub_well_known(issuer: config[:issuer], status: 200, body: smart_metadata_body)
-    well_known_url = "#{issuer.to_s.chomp('/')}#{described_class::WELL_KNOWN_PATH}"
+  def stub_well_known(base_url: config[:base_url], status: 200, body: smart_metadata_body)
+    well_known_url = "#{base_url.to_s.chomp('/')}#{described_class::WELL_KNOWN_PATH}"
     stub_request(:get, well_known_url).to_return(
       status: status, body: body.to_json, headers: { 'Content-Type' => 'application/json' }
     )
@@ -161,7 +162,7 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     it 'raises ConfigurationError when a required attribute is missing' do
-      %i[client_id redirect_uri issuer].each do |attr|
+      %i[client_id redirect_uri base_url].each do |attr|
         expect { described_class.new(config.except(attr)) }
           .to raise_error(Safire::Errors::ConfigurationError, /#{attr}/)
       end
@@ -178,7 +179,7 @@ RSpec.describe Safire::Protocols::Smart do
   # ---------- Well-known Discovery ----------
 
   describe '#well_known_config' do
-    let(:well_known_url) { "#{config[:issuer]}#{described_class::WELL_KNOWN_PATH}" }
+    let(:well_known_url) { "#{config[:base_url]}#{described_class::WELL_KNOWN_PATH}" }
 
     it 'fetches and exposes metadata' do
       stub_well_known
@@ -208,13 +209,13 @@ RSpec.describe Safire::Protocols::Smart do
         .to raise_error(Safire::Errors::DiscoveryError, /expected JSON object/)
     end
 
-    it 'handles issuer with or without trailing slash' do
-      stub_well_known(issuer: 'https://fhir.example.com/')
+    it 'handles base_url with or without trailing slash' do
+      stub_well_known(base_url: 'https://fhir.example.com/')
       expect do
-        described_class.new(config.merge(issuer: 'https://fhir.example.com/')).well_known_config
+        described_class.new(config.merge(base_url: 'https://fhir.example.com/')).well_known_config
       end.not_to raise_error
 
-      stub_well_known(issuer: 'https://fhir.example.com')
+      stub_well_known(base_url: 'https://fhir.example.com')
       expect { described_class.new(config).well_known_config }.not_to raise_error
     end
   end
@@ -238,7 +239,7 @@ RSpec.describe Safire::Protocols::Smart do
     shared_examples 'includes core oauth and pkce' do
       it 'includes response_type/client_id/redirect_uri/aud' do
         expect(query_params.values_at('response_type', 'client_id', 'redirect_uri', 'aud'))
-          .to eq(['code', config[:client_id], config[:redirect_uri], config[:issuer]])
+          .to eq(['code', config[:client_id], config[:redirect_uri], config[:base_url]])
       end
 
       it 'includes S256 challenge' do

@@ -62,6 +62,9 @@ RSpec.configure do |config|
   # The settings below are suggested to provide a good initial experience
   # with RSpec, but feel free to customize to your heart's content.
   #
+  # Skip live integration tests by default (run with --tag live to include them)
+  config.filter_run_excluding live: true
+
   # This allows you to limit a spec run to individual examples or groups
   # you care about by tagging them with `:focus` metadata. When nothing
   # is tagged with `:focus`, all examples get run. RSpec also provides

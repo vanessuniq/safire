@@ -14,7 +14,7 @@ require 'spec_helper'
 # Reference Server: https://launch.smarthealthit.org
 # Documentation: http://docs.smarthealthit.org/
 #
-RSpec.describe 'Public Client Flow (Live Server)', live: true, type: :integration do
+RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
   let(:base_url) { 'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir' }
   let(:client_id) { 'safire_test_client' }
   let(:redirect_uri) { 'https://example.com/callback' }
@@ -147,7 +147,7 @@ RSpec.describe 'Public Client Flow (Live Server)', live: true, type: :integratio
 
       # Display generated URL for manual testing
       puts "\n=== Generated Authorization URL ==="
-      puts "You can manually test this URL in a browser:"
+      puts 'You can manually test this URL in a browser:'
       puts auth_data[:auth_url]
       puts "\nState (save this): #{auth_data[:state]}"
       puts "Code Verifier (save this): #{auth_data[:code_verifier]}"
@@ -189,25 +189,25 @@ RSpec.describe 'Public Client Flow (Live Server)', live: true, type: :integratio
       client = Safire::Client.new(config, auth_type: :public)
 
       # Generate multiple auth URLs to verify uniqueness
-      auth_data_1 = client.authorize_url
-      auth_data_2 = client.authorize_url
+      first_auth_data = client.authorize_url
+      second_auth_data = client.authorize_url
 
       # Verify verifiers are unique
-      expect(auth_data_1[:code_verifier]).not_to eq(auth_data_2[:code_verifier])
+      expect(first_auth_data[:code_verifier]).not_to eq(second_auth_data[:code_verifier])
 
       # Verify states are unique
-      expect(auth_data_1[:state]).not_to eq(auth_data_2[:state])
+      expect(first_auth_data[:state]).not_to eq(second_auth_data[:state])
 
       # Verify code_challenge is properly derived from code_verifier
-      auth_uri_1 = URI.parse(auth_data_1[:auth_url])
-      auth_params_1 = URI.decode_www_form(auth_uri_1.query).to_h
+      first_auth_uri = URI.parse(first_auth_data[:auth_url])
+      first_auth_params = URI.decode_www_form(first_auth_uri.query).to_h
 
-      expected_challenge = Safire::PKCE.generate_code_challenge(auth_data_1[:code_verifier])
-      expect(auth_params_1['code_challenge']).to eq(expected_challenge)
+      expected_challenge = Safire::PKCE.generate_code_challenge(first_auth_data[:code_verifier])
+      expect(first_auth_params['code_challenge']).to eq(expected_challenge)
 
       # Verify URL-safe base64 encoding (no +, /, =)
-      expect(auth_data_1[:code_verifier]).not_to match(/[+\/=]/)
-      expect(auth_params_1['code_challenge']).not_to match(/[+\/=]/)
+      expect(first_auth_data[:code_verifier]).not_to match(%r{[+/=]})
+      expect(first_auth_params['code_challenge']).not_to match(%r{[+/=]})
     end
   end
 end

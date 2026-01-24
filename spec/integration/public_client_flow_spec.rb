@@ -24,13 +24,13 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
       'issuer' => base_url,
       'authorization_endpoint' => "#{base_url}/authorize",
       'token_endpoint' => "#{base_url}/token",
-      'grant_types_supported' => ['authorization_code', 'refresh_token'],
+      'grant_types_supported' => %w[authorization_code refresh_token],
       'code_challenge_methods_supported' => ['S256'],
-      'capabilities' => [
-        'launch-standalone',
-        'client-public',
-        'sso-openid-connect',
-        'context-standalone-patient'
+      'capabilities' => %w[
+        launch-standalone
+        client-public
+        sso-openid-connect
+        context-standalone-patient
       ],
       'scopes_supported' => scopes
     }

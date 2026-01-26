@@ -1,8 +1,9 @@
 ---
 layout: default
 title: SMART Discovery
-parent: Workflows
+parent: SMART on FHIR
 nav_order: 3
+has_toc: true
 ---
 
 # SMART Discovery
@@ -567,6 +568,6 @@ standalone_servers = registry.all_capable_of('launch-standalone')
 
 ## Next Steps
 
-- [Public Client Workflow]({% link workflows/public-client.md %})
-- [Confidential Symmetric Client Workflow]({% link workflows/confidential-symmetric.md %})
-- [Troubleshooting Guide]({% link troubleshooting.md %})
+- [Public Client Workflow]({{ site.baseurl }}{% link smart-on-fhir/public-client.md %})
+- [Confidential Symmetric Client Workflow]({{ site.baseurl }}{% link smart-on-fhir/confidential-symmetric.md %})
+- [Troubleshooting Guide]({{ site.baseurl }}{% link troubleshooting.md %})

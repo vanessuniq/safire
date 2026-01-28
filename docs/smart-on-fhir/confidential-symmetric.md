@@ -6,7 +6,7 @@ nav_order: 2
 has_toc: true
 ---
 
-# Confidential Symmetric Client Workflow (Rails)
+# Confidential Symmetric Client Workflow
 
 {: .no_toc }
 

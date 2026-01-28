@@ -6,7 +6,7 @@ nav_order: 1
 has_toc: true
 ---
 
-# Public Client Workflow (Rails)
+# Public Client Workflow
 
 {: .no_toc }
 

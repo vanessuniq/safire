@@ -1,4 +1,4 @@
-require:
+plugins:
   - rubocop-rspec
 
 AllCops:
@@ -34,12 +34,26 @@ Metrics/BlockLength:
 
 RSpec/ExampleLength:
   Max: 20
+  Exclude:
+    - 'spec/integration/**/*'
 
 RSpec/MultipleExpectations:
   Max: 10
+  Exclude:
+    - 'spec/integration/**/*'
 
 RSpec/MultipleMemoizedHelpers:
   Enabled: false
 
 RSpec/NestedGroups:
   Enabled: false
+
+# Integration tests describe workflows, not classes
+RSpec/DescribeClass:
+  Exclude:
+    - 'spec/integration/**/*'
+
+# Live integration tests need before(:all)/after(:all) for WebMock management
+RSpec/BeforeAfterAll:
+  Exclude:
+    - 'spec/integration/**/*'

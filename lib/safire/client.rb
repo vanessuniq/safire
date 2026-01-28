@@ -88,6 +88,28 @@ module Safire
       validate_auth_type
     end
 
+    # Changes the authentication type for this client.
+    #
+    # @param new_auth_type [Symbol] the new auth type (:public, :confidential_symmetric, :confidential_asymmetric)
+    # @return [Symbol] the new auth type
+    # @raise [ArgumentError] if the auth type is not supported
+    #
+    # @example Discover then switch auth type
+    #   client = Safire::Client.new(config)  # defaults to :public
+    #   metadata = client.smart_metadata
+    #
+    #   if metadata.supports_confidential_symmetric_clients?
+    #     client.auth_type = :confidential_symmetric
+    #   end
+    #
+    #   # Now token requests will use Basic auth
+    #   tokens = client.request_access_token(code: code, code_verifier: verifier)
+    def auth_type=(new_auth_type)
+      @auth_type = new_auth_type.to_sym
+      validate_auth_type
+      @smart_client = nil # Reset cached client to use new auth type
+    end
+
     def smart_metadata
       @smart_metadata ||= smart_client.well_known_config
     end

@@ -27,7 +27,7 @@ jobs:
       - name: Auto-approve PR
         uses: hmarr/auto-approve-action@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
 
       - name: Auto-merge PR
         uses: pascalgn/automerge-action@v0.16.4

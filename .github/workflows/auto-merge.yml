@@ -11,8 +11,8 @@ permissions:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
-    # Only run for Renovate PRs
-    if: github.actor == 'renovate[bot]' || github.actor == 'renovate'
+    # Only run for PRs opened by Renovate
+    if: github.event.pull_request.user.login == 'renovate[bot]'
 
     steps:
       - name: Wait for checks to pass
@@ -21,13 +21,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 30
-          running-workflow-name: 'Auto Merge Renovate PRs'
+          ignore-checks: auto-merge
           allowed-conclusions: success,skipped
 
       - name: Auto-approve PR
         uses: hmarr/auto-approve-action@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
 
       - name: Auto-merge PR
         uses: pascalgn/automerge-action@v0.16.4

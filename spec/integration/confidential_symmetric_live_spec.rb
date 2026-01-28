@@ -72,13 +72,6 @@ RSpec.describe 'Confidential Symmetric Client Flow (Live Server)', :live, type: 
         auth_methods.include?('client_secret_basic') ||
         auth_methods.include?('client_secret_post')
       ).to be true
-
-      # Display discovered metadata for verification
-      puts "\n=== Confidential Symmetric Support ==="
-      puts "Token Endpoint Auth Methods: #{auth_methods.join(', ')}"
-      puts "Supports Confidential Symmetric: #{metadata.supports_confidential_symmetric_clients?}"
-      puts "Supports Offline Access: #{metadata.scopes_supported&.include?('offline_access')}"
-      puts "======================================\n"
     end
   end
 
@@ -120,13 +113,6 @@ RSpec.describe 'Confidential Symmetric Client Flow (Live Server)', :live, type: 
       expect(auth_params['client_id']).to eq(client_id)
       expect(auth_params['redirect_uri']).to eq(redirect_uri)
       expect(auth_params['scope']).to include('offline_access')
-
-      # Display generated URL for manual testing
-      puts "\n=== Generated Authorization URL (Confidential) ==="
-      puts "URL: #{auth_data[:auth_url]}"
-      puts "\nState: #{auth_data[:state]}"
-      puts "Code Verifier: #{auth_data[:code_verifier]}"
-      puts "=================================================\n"
     end
   end
 

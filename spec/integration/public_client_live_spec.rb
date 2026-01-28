@@ -70,14 +70,6 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
       # Check for common SMART capabilities
       expect(metadata.supports_standalone_launch?).to be true
       expect(metadata.supports_public_clients?).to be true
-
-      # Display discovered metadata for verification
-      puts "\n=== SMART Metadata from Live Server ==="
-      puts "Authorization Endpoint: #{metadata.authorization_endpoint}"
-      puts "Token Endpoint: #{metadata.token_endpoint}"
-      puts "Capabilities: #{metadata.capabilities.join(', ')}"
-      puts "Scopes Supported: #{metadata.scopes_supported&.join(', ') || 'N/A'}"
-      puts "======================================\n"
     end
 
     it 'handles server metadata with optional fields' do
@@ -144,14 +136,6 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
       expect(auth_data[:state].length).to eq(32) # 16 bytes hex = 32 chars
       expect(auth_data[:code_verifier].length).to eq(128)
       expect(auth_params['code_challenge'].length).to eq(43) # SHA256 base64url
-
-      # Display generated URL for manual testing
-      puts "\n=== Generated Authorization URL ==="
-      puts 'You can manually test this URL in a browser:'
-      puts auth_data[:auth_url]
-      puts "\nState (save this): #{auth_data[:state]}"
-      puts "Code Verifier (save this): #{auth_data[:code_verifier]}"
-      puts "====================================\n"
     end
 
     it 'includes launch parameter when provided' do

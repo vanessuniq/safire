@@ -21,7 +21,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 30
-          running-workflow-name: 'Auto Merge Renovate PRs'
+          ignore-checks: auto-merge
           allowed-conclusions: success,skipped
 
       - name: Auto-approve PR

@@ -13,31 +13,27 @@ permalink: /
 A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for clients.
 
 {: .warning }
-> **Inplementation** - Work in Progress
+> **Implementation** - Work in Progress
 
 ## Quick Navigation
 
-<div class="grid">
-  <div class="grid-item">
-    <h3><a href="{{ site.baseurl }}/installation/">🚀 Getting Started</a></h3>
-    <p>Install Safire and quick start</p>
-  </div>
+| Section | Description |
+|---------|-------------|
+| [Getting Started]({{ site.baseurl }}/installation/) | Install Safire and quick start guide |
+| [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Discovery, Public clients, Confidential Symmetric clients |
+| [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
+| [Safire API Docs]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |
 
-  <div class="grid-item">
-    <h3><a href="{{ site.baseurl }}/protocols/smart/">🔐 SMART on FHIR</a></h3>
-    <p>Discovery, Public clients, confidential clients (symmetric, asymmetric), and backend services</p>
-  </div>
+## Current Features
 
-  <div class="grid-item">
-    <h3><a href="{{ site.baseurl }}/protocols/udap/">🔒 UDAP</a></h3>
-    <p>JWT client auth, dynamic registration, and tiered OAuth</p>
-  </div>
-
-  <div class="grid-item">
-    <h3><a href="{{ site.baseurl }}/api/" target="_blank">📚 Safire API Docs</a></h3>
-    <p>Complete Safire Ruby documentation and examples</p>
-  </div>
-</div>
+| Feature | Status |
+|---------|--------|
+| SMART Discovery | Implemented |
+| Public Client (PKCE) | Implemented |
+| Confidential Symmetric Client | Implemented |
+| Confidential Asymmetric Client | Planned |
+| SMART Backend Services | Planned |
+| UDAP Protocols | Planned |
 
 ## Community
 

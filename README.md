@@ -19,6 +19,7 @@ Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** cli
 
 **Planned:**
 - SMART on FHIR Confidential Asymmetric (private_key_jwt)
+- SMART Backend Services (client_credentials grant)
 - UDAP Discovery (`/.well-known/udap`)
 - UDAP Client Flows (JWT Auth, Dynamic Client Registration, Tiered OAuth)
 
@@ -52,16 +53,14 @@ bundle install
 ```ruby
 require 'safire'
 
-# Initialize client configuration
-config = Safire::ClientConfig.new(
+# Initialize Safire client with Hash config (simplest approach)
+# You can also use Safire::ClientConfig.new(...) if you prefer
+client = Safire::Client.new(
   base_url: 'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
   client_id: 'my_client_id',
   redirect_uri: 'https://myapp.example.com/callback',
   scopes: ['openid', 'profile', 'patient/*.read']
 )
-
-# Initialize Safire client
-client = Safire::Client.new(config)
 
 # Discover SMART metadata
 metadata = client.smart_metadata
@@ -70,10 +69,9 @@ puts "Authorization endpoint: #{metadata.authorization_endpoint}"
 puts "Token endpoint: #{metadata.token_endpoint}"
 puts "Capabilities: #{metadata.capabilities.join(', ')}"
 
-# Safire automatically retrieves the authorization_endpoint and token_endpoint from the SMART metadata, so you do not need to pass those in the config
+# Safire automatically retrieves endpoints from SMART metadata
 
 # Step 1 – /launch route (authorization request)
-client = Safire::Client.new(config, auth_type: :public)
 auth_data = client.authorize_url
 
 session[:state] = auth_data[:state]
@@ -83,19 +81,16 @@ redirect_to auth_data[:auth_url]
 # Step 2 – /callback route (token exchange)
 return head :unauthorized unless params[:state] == session[:state]
 
-client = Safire::Client.new(config, auth_type: :public)
 token_data = client.request_access_token(
   code: params[:code],
   code_verifier: session[:code_verifier]
 )
 
-# The data in the token data should be stored in a secure server-side store (session, DB, etc.)
+# Store tokens securely (session, DB, etc.)
 puts token_data["access_token"]
 
 # Refreshing an access token
-client = Safire::Client.new(config, auth_type: :public)
 new_tokens = client.refresh_token(refresh_token: stored_refresh_token)
-
 puts new_tokens["access_token"]
 ```
 

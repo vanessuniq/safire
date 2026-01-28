@@ -1,4 +1,41 @@
 // Custom styles for Safire documentation
+
+// Sticky footer - ensure footer stays at bottom of viewport
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-bar {
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content-wrap {
+  flex: 1 0 auto;
+}
+
+// Footer styling
+.site-footer {
+  flex-shrink: 0;
+  padding: 1rem;
+  margin-top: auto;
+  border-top: 1px solid #e1e4e8;
+  background: #f6f8fa;
+}
+
+// Grid layout for cards
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));

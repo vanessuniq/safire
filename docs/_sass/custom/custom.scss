@@ -1,27 +1,5 @@
 // Custom styles for Safire documentation
 
-// Inline TOC styling
-#markdown-toc {
-  background: #f6f8fa;
-  padding: 1rem 1rem 1rem 2rem;
-  border: 1px solid #e1e4e8;
-  border-radius: 6px;
-  margin: 1rem 0;
-
-  li {
-    margin: 0.4rem 0;
-
-    a {
-      color: #0366d6;
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-}
-
 // Sticky footer - ensure footer stays at bottom of viewport
 html {
   height: 100%;

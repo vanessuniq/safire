@@ -65,7 +65,7 @@ jobs:
           rm ~/.gem/credentials
 
       - name: Upload gem artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: safire-${{ steps.version.outputs.VERSION }}.gem
           path: safire-*.gem

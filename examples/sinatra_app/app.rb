@@ -3,6 +3,7 @@
 require 'sinatra/base'
 require 'sinatra/reloader'
 require 'securerandom'
+require 'safire'
 require_relative 'models/fhir_server'
 
 # Sinatra demo application for Safire gem
@@ -113,6 +114,26 @@ class SafireDemo < Sinatra::Base
     redirect '/'
   end
 
+  # ============================================
+  # Demo Routes
+  # ============================================
+
+  # SMART Discovery
+  get '/demo/:server_id/discovery' do
+    @server = FhirServer.find(params[:server_id])
+    halt 404, 'Server not found' unless @server
+
+    begin
+      client = build_safire_client(@server)
+      @metadata = client.smart_metadata
+    rescue Safire::Errors::Error => e
+      set_flash(:error, "Discovery failed: #{e.message}")
+      redirect "/servers/#{@server.id}"
+    end
+
+    erb :'demo/discovery'
+  end
+
   private
 
   def server_params
@@ -135,5 +156,17 @@ class SafireDemo < Sinatra::Base
 
   def parse_scopes(scopes_str)
     scopes_str.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
+  end
+
+  def build_safire_client(server, auth_type: :public)
+    config = {
+      base_url: server.base_url,
+      client_id: server.client_id,
+      redirect_uri: redirect_uri,
+      scopes: server.scopes
+    }
+    config[:client_secret] = server.client_secret if server.client_secret
+
+    Safire::Client.new(config, auth_type: auth_type)
   end
 end

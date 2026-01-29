@@ -3,10 +3,10 @@
 source 'https://rubygems.org'
 
 # Web framework
+gem 'puma', '~> 6.4'
+gem 'rackup', '~> 2.1'
 gem 'sinatra', '~> 4.0'
 gem 'sinatra-contrib', '~> 4.0'
-gem 'rackup', '~> 2.1'
-gem 'puma', '~> 6.4'
 
 # Safire gem (use local path for development)
 gem 'safire', path: '../..'

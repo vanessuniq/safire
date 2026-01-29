@@ -1,0 +1,60 @@
+<div class="page-header">
+  <h1><%= h(@server.name) %></h1>
+  <div class="page-actions">
+    <a href="/servers/<%= @server.id %>/edit" class="btn btn-secondary">Edit</a>
+    <form action="/servers/<%= @server.id %>" method="post" class="inline-form"
+          onsubmit="return confirm('Are you sure you want to delete this server?');">
+      <input type="hidden" name="_method" value="delete">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+</div>
+
+<section class="server-details">
+  <h2>Server Configuration</h2>
+  <dl class="details-list">
+    <dt>Base URL</dt>
+    <dd><code><%= h(@server.base_url) %></code></dd>
+
+    <dt>Client ID</dt>
+    <dd><code><%= h(@server.client_id) %></code></dd>
+
+    <dt>Client Secret</dt>
+    <dd><%= @server.confidential? ? '••••••••••••' : '<em>Not configured (public client)</em>' %></dd>
+
+    <dt>Scopes</dt>
+    <dd><%= @server.scopes.empty? ? '<em>None configured</em>' : h(@server.scopes_display) %></dd>
+
+    <dt>Callback URL</dt>
+    <dd><code><%= redirect_uri %></code></dd>
+  </dl>
+</section>
+
+<section class="demo-actions">
+  <h2>Demo Actions</h2>
+  <p>Select an action to demonstrate Safire's SMART on FHIR capabilities:</p>
+
+  <div class="action-cards">
+    <div class="action-card">
+      <h3>SMART Discovery</h3>
+      <p>Fetch the server's SMART configuration from <code>/.well-known/smart-configuration</code></p>
+      <a href="/demo/<%= @server.id %>/discovery" class="btn btn-primary">Run Discovery</a>
+    </div>
+
+    <div class="action-card">
+      <h3>Authorization Flow</h3>
+      <p>Start a SMART authorization flow to obtain access tokens.</p>
+      <p><em>Coming soon...</em></p>
+    </div>
+
+    <div class="action-card">
+      <h3>Token Management</h3>
+      <p>View current tokens and test token refresh.</p>
+      <p><em>Coming soon...</em></p>
+    </div>
+  </div>
+</section>
+
+<div class="back-link">
+  <a href="/">&larr; Back to Servers</a>
+</div>

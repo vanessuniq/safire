@@ -13,6 +13,31 @@
 </section>
 
 <section class="servers-section">
-  <h2>Configured Servers</h2>
-  <p><em>No servers configured yet. Server management coming soon.</em></p>
+  <div class="section-header">
+    <h2>Configured Servers</h2>
+    <a href="/servers/new" class="btn btn-primary">Add Server</a>
+  </div>
+
+  <% if @servers.empty? %>
+    <p class="empty-state">No servers configured yet. Click "Add Server" to get started.</p>
+  <% else %>
+    <div class="server-list">
+      <% @servers.each do |server| %>
+        <div class="server-card">
+          <div class="server-info">
+            <h3><a href="/servers/<%= server.id %>"><%= h(server.name) %></a></h3>
+            <p class="server-url"><%= h(server.base_url) %></p>
+            <p class="server-meta">
+              <% if server.confidential? %>
+                <span class="badge badge-info">Client Secret Configured</span>
+              <% end %>
+            </p>
+          </div>
+          <div class="server-actions">
+            <a href="/servers/<%= server.id %>" class="btn btn-small">View</a>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
 </section>

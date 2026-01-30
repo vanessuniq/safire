@@ -69,7 +69,14 @@ class FhirServer
 
     def find_by_base_url(url)
       normalized_url = normalize_url(url)
-      all.find { |s| normalize_url(s.base_url) == normalized_url }
+
+      # First try exact URL match
+      exact_match = all.find { |s| normalize_url(s.base_url) == normalized_url }
+      return exact_match if exact_match
+
+      # Fallback: try matching by origin (scheme + host) for EHR launch where iss path may differ
+      url_origin = extract_origin(url)
+      all.find { |s| extract_origin(s.base_url) == url_origin } if url_origin
     end
 
     def load_all
@@ -88,6 +95,15 @@ class FhirServer
 
     def normalize_url(url)
       url.to_s.strip.chomp('/')
+    end
+
+    def extract_origin(url)
+      uri = URI.parse(url.to_s)
+      return nil unless uri.host
+
+      "#{uri.scheme}://#{uri.host}"
+    rescue URI::InvalidURIError
+      nil
     end
 
     def ensure_data_dir

@@ -44,13 +44,19 @@
     <div class="action-card">
       <h3>Authorization Flow</h3>
       <p>Start a SMART authorization flow to obtain access tokens.</p>
-      <p><em>Coming soon...</em></p>
+      <a href="/demo/<%= @server.id %>/authorize" class="btn btn-primary">Start Authorization</a>
     </div>
 
     <div class="action-card">
-      <h3>Token Management</h3>
-      <p>View current tokens and test token refresh.</p>
-      <p><em>Coming soon...</em></p>
+      <h3>Token Refresh</h3>
+      <p>Test token refresh using a previously obtained refresh token.</p>
+      <% if session[:refresh_token] && session[:token_server_id] == @server.id %>
+        <a href="/demo/<%= @server.id %>/refresh" class="btn btn-primary">Refresh Token</a>
+      <% elsif session[:access_token] && session[:token_server_id] == @server.id && session[:refresh_token].blank?%>
+        <p class="disabled-note"><em>Server did not issue a refresh token during authorization. It may not support refresh tokens.</em></p>
+      <% else %>
+        <p class="disabled-note"><em>Complete authorization flow first to enable token refresh.</em></p>
+      <% end %>
     </div>
   </div>
 </section>

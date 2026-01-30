@@ -118,23 +118,175 @@ class SafireDemo < Sinatra::Base
   # Demo Routes
   # ============================================
 
-  # SMART Discovery
-  get '/demo/:server_id/discovery' do
+  # Before filter for demo routes that need server and metadata
+  before '/demo/:server_id/*' do
     @server = FhirServer.find(params[:server_id])
     halt 404, 'Server not found' unless @server
 
     begin
-      client = build_safire_client(@server)
-      @metadata = client.smart_metadata
+      @safire_client = build_safire_client(@server)
+      @metadata = @safire_client.smart_metadata
     rescue Safire::Errors::Error => e
-      set_flash(:error, "Discovery failed: #{e.message}")
+      set_flash(:error, "Server connection failed: #{e.message}")
       redirect "/servers/#{@server.id}"
     end
+  end
 
+  # SMART Discovery
+  get '/demo/:server_id/discovery' do
     erb :'demo/discovery'
   end
 
+  # Authorization flow - configuration form
+  get '/demo/:server_id/authorize' do
+    erb :'demo/authorize'
+  end
+
+  # Start authorization flow
+  post '/demo/:server_id/authorize' do
+    auth_type = params[:auth_type]&.to_sym || :public
+    launch_type = params[:launch_type] || 'provider_standalone'
+
+    begin
+      @safire_client.auth_type = auth_type
+      scopes = build_scopes_for_launch(launch_type, @server.scopes)
+      auth_data = @safire_client.authorize_url(custom_scopes: scopes)
+
+      store_oauth_session(auth_data, auth_type, launch_type)
+      redirect auth_data[:auth_url]
+    rescue Safire::Errors::Error => e
+      set_flash(:error, "Authorization failed: #{e.message}")
+      redirect "/servers/#{@server.id}"
+    end
+  end
+
+  # EHR/Portal Launch endpoint
+  # The EHR/Portal calls this URL with `launch` and `iss` parameters
+  get '/launch' do
+    launch_token = params[:launch]
+    iss = params[:iss]
+
+    unless launch_token && iss
+      set_flash(:error, 'Missing required parameters: launch and iss are required for EHR launch')
+      redirect '/'
+      return
+    end
+
+    @server = FhirServer.find_by_base_url(iss)
+    unless @server
+      set_flash(:error, "No server configured for issuer: #{iss}. Please add the server first.")
+      redirect '/'
+      return
+    end
+
+    begin
+      client = build_safire_client(@server)
+      scopes = build_scopes_for_launch('ehr_launch', @server.scopes)
+      auth_data = client.authorize_url(launch: launch_token, custom_scopes: scopes)
+
+      store_oauth_session(auth_data, :public, 'ehr_launch')
+      redirect auth_data[:auth_url]
+    rescue Safire::Errors::Error => e
+      set_flash(:error, "EHR launch failed: #{e.message}")
+      redirect "/servers/#{@server.id}"
+    end
+  end
+
+  # OAuth callback
+  get '/callback' do
+    return handle_invalid_state unless params[:state] == session[:oauth_state]
+    return handle_oauth_error if params[:error]
+
+    @server = FhirServer.find(session[:oauth_server_id])
+    halt 404, 'Server not found' unless @server
+
+    process_token_exchange
+  end
+
+  OAUTH_SESSION_KEYS = %i[
+    oauth_state oauth_code_verifier oauth_server_id oauth_auth_type oauth_launch_type
+  ].freeze
+
+  TOKEN_RESPONSE_KEYS = %i[
+    token_server_id access_token refresh_token token_type expires_in scope patient encounter id_token
+  ].freeze
+
   private
+
+  def handle_invalid_state
+    set_flash(:error, 'Invalid state parameter - possible CSRF attack')
+    redirect '/'
+  end
+
+  def process_token_exchange
+    load_oauth_session_vars
+    @token_response = exchange_code_for_token
+
+    store_token_session(@token_response)
+    clear_oauth_session
+
+    erb :'demo/tokens'
+  rescue Safire::Errors::Error => e
+    set_flash(:error, "Token exchange failed: #{e.message}")
+    redirect "/servers/#{@server.id}"
+  end
+
+  def load_oauth_session_vars
+    @auth_type = session[:oauth_auth_type]&.to_sym || :public
+    @launch_type = session[:oauth_launch_type]
+  end
+
+  def exchange_code_for_token
+    client = build_safire_client(@server, auth_type: @auth_type)
+    client.request_access_token(
+      code: params[:code],
+      code_verifier: session[:oauth_code_verifier]
+    )
+  end
+
+  def store_oauth_session(auth_data, auth_type, launch_type)
+    oauth_data = {
+      oauth_state: auth_data[:state],
+      oauth_code_verifier: auth_data[:code_verifier],
+      oauth_server_id: @server.id,
+      oauth_auth_type: auth_type.to_s,
+      oauth_launch_type: launch_type
+    }
+    oauth_data.each { |key, value| session[key] = value }
+  end
+
+  def clear_oauth_session
+    OAUTH_SESSION_KEYS.each { |key| session.delete(key) }
+  end
+
+  def store_token_session(token_response)
+    TOKEN_RESPONSE_KEYS.each { |key| session[key] = token_response[key.to_s] }
+    session[:token_server_id] = @server.id
+  end
+
+  def clear_token_session
+    TOKEN_RESPONSE_KEYS.each { |key| session.delete(key) }
+  end
+
+  def handle_oauth_error
+    error_msg = "Authorization denied: #{params[:error]}"
+    error_msg += " - #{params[:error_description]}" if params[:error_description]
+    set_flash(:error, error_msg)
+    redirect "/servers/#{session[:oauth_server_id]}"
+  end
+
+  def build_scopes_for_launch(launch_type, server_scopes)
+    base_scopes = server_scopes.dup
+
+    case launch_type
+    when 'provider_standalone', 'patient_standalone'
+      base_scopes << 'launch/patient' unless base_scopes.include?('launch/patient')
+    when 'ehr_launch'
+      base_scopes << 'launch' unless base_scopes.include?('launch')
+    end
+
+    base_scopes
+  end
 
   def server_params
     {

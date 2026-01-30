@@ -1,0 +1,102 @@
+<div class="page-header">
+  <h1>Authorization Complete</h1>
+</div>
+
+<section class="token-results">
+  <h2>Server: <%= h(@server.name) %></h2>
+  <p class="server-url"><code><%= h(@server.base_url) %></code></p>
+
+  <div class="success-box">
+    Successfully obtained access token!
+  </div>
+
+  <div class="token-meta">
+    <dl class="details-list">
+      <dt>Launch Type</dt>
+      <dd><span class="badge badge-info"><%= @launch_type.tr('_', ' ').capitalize %></span></dd>
+
+      <dt>Auth Type</dt>
+      <dd><span class="badge badge-info"><%= @auth_type.to_s.tr('_', ' ').capitalize %></span></dd>
+    </dl>
+  </div>
+
+  <div class="token-section">
+    <h3>Access Token</h3>
+    <div class="token-display">
+      <code class="token-value"><%= @token_response['access_token'] %></code>
+    </div>
+  </div>
+
+  <% if @token_response['refresh_token'] %>
+    <div class="token-section">
+      <h3>Refresh Token</h3>
+      <div class="token-display">
+        <code class="token-value"><%= @token_response['refresh_token'] %></code>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @token_response['id_token'] %>
+    <div class="token-section">
+      <h3>ID Token</h3>
+      <div class="token-display">
+        <code class="token-value"><%= @token_response['id_token'] %></code>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="token-section">
+    <h3>Token Details</h3>
+    <dl class="details-list">
+      <dt>Token Type</dt>
+      <dd><%= @token_response['token_type'] || 'Not specified' %></dd>
+
+      <dt>Expires In</dt>
+      <dd><%= @token_response['expires_in'] ? "#{@token_response['expires_in']} seconds" : 'Not specified' %></dd>
+
+      <dt>Scope</dt>
+      <dd>
+        <% if @token_response['scope'] %>
+          <% @token_response['scope'].split(' ').each do |scope| %>
+            <span class="badge badge-scope"><%= scope %></span>
+          <% end %>
+        <% else %>
+          <em>Not specified</em>
+        <% end %>
+      </dd>
+    </dl>
+  </div>
+
+  <% if @token_response['patient'] || @token_response['encounter'] %>
+    <div class="token-section">
+      <h3>Context</h3>
+      <dl class="details-list">
+        <% if @token_response['patient'] %>
+          <dt>Patient ID</dt>
+          <dd><code><%= @token_response['patient'] %></code></dd>
+        <% end %>
+
+        <% if @token_response['encounter'] %>
+          <dt>Encounter ID</dt>
+          <dd><code><%= @token_response['encounter'] %></code></dd>
+        <% end %>
+      </dl>
+    </div>
+  <% end %>
+
+  <div class="token-section">
+    <h3>Full Response</h3>
+    <pre class="json-display"><%= JSON.pretty_generate(@token_response) %></pre>
+  </div>
+
+  <div class="form-actions">
+    <% if @token_response['refresh_token'] %>
+      <a href="/demo/<%= @server.id %>/refresh" class="btn btn-primary">Test Token Refresh</a>
+    <% end %>
+    <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Back to Server</a>
+  </div>
+</section>
+
+<div class="back-link">
+  <a href="/servers/<%= @server.id %>">&larr; Back to Server</a>
+</div>

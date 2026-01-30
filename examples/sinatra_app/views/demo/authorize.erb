@@ -1,0 +1,122 @@
+<div class="page-header">
+  <h1>Authorization Flow</h1>
+</div>
+
+<section class="auth-config">
+  <h2>Server: <%= h(@server.name) %></h2>
+  <p class="server-url"><code><%= h(@server.base_url) %></code></p>
+
+  <form action="/demo/<%= @server.id %>/authorize" method="post" class="auth-form">
+    <div class="form-section">
+      <h3>Launch Type</h3>
+      <p class="form-help">Select the type of SMART launch to demonstrate:</p>
+
+      <div class="radio-group">
+        <% if @metadata.supports_standalone_launch? %>
+          <label class="radio-option">
+            <input type="radio" name="launch_type" value="provider_standalone" checked>
+            <span class="radio-label">Provider Standalone Launch</span>
+            <span class="radio-description">
+              Launch initiated by a healthcare provider outside of an EHR session.
+              Requests <code>launch/patient</code> scope to allow patient selection.
+            </span>
+          </label>
+
+          <label class="radio-option">
+            <input type="radio" name="launch_type" value="patient_standalone">
+            <span class="radio-label">Patient Standalone Launch</span>
+            <span class="radio-description">
+              Launch initiated by a patient accessing their own data.
+              The patient context is determined by the authenticated user.
+            </span>
+          </label>
+        <% else %>
+          <div class="warning-box">
+            This server does not support standalone launch.
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <% if @metadata.supports_ehr_launch? %>
+      <div class="form-section">
+        <h3>EHR/Portal Launch</h3>
+        <p class="form-help">
+          To test EHR or Patient Portal launches, register this app's launch URL with your EHR/Portal:
+        </p>
+        <div class="launch-url-box">
+          <code><%= request.scheme %>://<%= request.host_with_port %>/launch</code>
+        </div>
+        <p class="form-note">
+          The EHR/Portal will call this URL with <code>launch</code> and <code>iss</code> parameters
+          when launching the app. The app will automatically initiate the authorization flow.
+        </p>
+      </div>
+    <% end %>
+
+    <div class="form-section">
+      <h3>Client Authentication Type</h3>
+      <p class="form-help">Select how the client should authenticate with the authorization server:</p>
+
+      <div class="radio-group">
+        <% if @metadata.supports_public_clients? %>
+          <label class="radio-option">
+            <input type="radio" name="auth_type" value="public" checked>
+            <span class="radio-label">Public Client</span>
+            <span class="radio-description">
+              No client authentication. Client ID is sent in token requests.
+              Suitable for browser-based applications.
+            </span>
+          </label>
+        <% end %>
+
+        <% if @metadata.supports_confidential_symmetric_clients? %>
+          <label class="radio-option <%= 'disabled' unless @server.confidential? %>">
+            <input type="radio" name="auth_type" value="confidential_symmetric"
+                   <%= 'checked' unless @metadata.supports_public_clients? %>
+                   <%= 'disabled' unless @server.confidential? %>>
+            <span class="radio-label">Confidential Symmetric</span>
+            <span class="radio-description">
+              Client authenticates using client_id and client_secret (HTTP Basic Auth).
+              <% unless @server.confidential? %>
+                <br><strong>Note:</strong> No client secret configured for this server.
+              <% end %>
+            </span>
+          </label>
+        <% end %>
+
+        <% unless @metadata.supports_public_clients? || @metadata.supports_confidential_symmetric_clients? %>
+          <div class="warning-box">
+            This server does not support public or confidential symmetric clients.
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>Scopes</h3>
+      <p class="form-help">The following scopes will be requested:</p>
+      <div class="scope-preview">
+        <% @server.scopes.each do |scope| %>
+          <span class="badge badge-scope"><%= scope %></span>
+        <% end %>
+        <span class="badge badge-scope badge-added">+ launch/patient</span>
+      </div>
+      <p class="form-note">
+        <em>Note: <code>launch/patient</code> scope will be added for standalone launches.</em>
+      </p>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary"
+              <%= 'disabled' unless @metadata.supports_standalone_launch? %>>
+        Start Authorization
+      </button>
+      <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</section>
+
+<div class="back-link">
+  <a href="/servers/<%= @server.id %>">&larr; Back to Server</a>
+</div>

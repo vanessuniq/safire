@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Start the Safire demo application
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEMO_DIR="$SCRIPT_DIR/../examples/sinatra_app"
+
+if [ ! -d "$DEMO_DIR" ]; then
+  echo "Demo app directory not found: $DEMO_DIR" >&2
+  exit 1
+fi
+
+cd "$DEMO_DIR"
+
+# Check if dependencies are installed
+if [ ! -f "Gemfile.lock" ]; then
+  echo "Installing demo app dependencies..."
+  bundle install
+fi
+
+PORT="${PORT:-4567}"
+
+echo ""
+echo "╔══════════════════════════════════════════════════╗"
+echo "║           Safire Demo Application                ║"
+echo "╠══════════════════════════════════════════════════╣"
+echo "║  Starting server on http://localhost:$PORT       ║"
+echo "║  Press Ctrl+C to stop                            ║"
+echo "╚══════════════════════════════════════════════════╝"
+echo ""
+
+exec bundle exec puma config.ru -p "$PORT"

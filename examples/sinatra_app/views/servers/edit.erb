@@ -1,0 +1,12 @@
+<h1>Edit Server: <%= h(@server.name) %></h1>
+
+<form action="/servers/<%= @server.id %>" method="post" class="server-form">
+  <input type="hidden" name="_method" value="put">
+
+  <%= erb :'servers/_form' %>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Update Server</button>
+    <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>

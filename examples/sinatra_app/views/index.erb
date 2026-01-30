@@ -1,0 +1,43 @@
+<h1>Welcome to Safire Demo</h1>
+
+<p>This application demonstrates the features of the <strong>Safire</strong> gem - a SMART on FHIR & UDAP Ruby library.</p>
+
+<section class="info-box">
+  <h2>Getting Started</h2>
+  <p>To use this demo:</p>
+  <ol>
+    <li>Choose an existing FHIR server from the list below, or add a new one</li>
+    <li>To add a new server, first register this demo client with your FHIR server to obtain credentials (client_id, client_secret, etc.)</li>
+    <li>Use this callback URL when registering: <code><%= redirect_uri %></code></li>
+  </ol>
+</section>
+
+<section class="servers-section">
+  <div class="section-header">
+    <h2>Configured Servers</h2>
+    <a href="/servers/new" class="btn btn-primary">Add Server</a>
+  </div>
+
+  <% if @servers.empty? %>
+    <p class="empty-state">No servers configured yet. Click "Add Server" to get started.</p>
+  <% else %>
+    <div class="server-list">
+      <% @servers.each do |server| %>
+        <div class="server-card">
+          <div class="server-info">
+            <h3><a href="/servers/<%= server.id %>"><%= h(server.name) %></a></h3>
+            <p class="server-url"><%= h(server.base_url) %></p>
+            <p class="server-meta">
+              <% if server.confidential? %>
+                <span class="badge badge-info">Client Secret Configured</span>
+              <% end %>
+            </p>
+          </div>
+          <div class="server-actions">
+            <a href="/servers/<%= server.id %>" class="btn btn-small">View</a>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</section>

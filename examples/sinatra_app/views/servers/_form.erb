@@ -1,0 +1,38 @@
+<div class="form-group">
+  <label for="name">Server Name *</label>
+  <input type="text" id="name" name="name" value="<%= h(@server.name) %>" required
+         placeholder="e.g., SMART Health IT Sandbox">
+</div>
+
+<div class="form-group">
+  <label for="base_url">FHIR Base URL *</label>
+  <input type="url" id="base_url" name="base_url" value="<%= h(@server.base_url) %>" required
+         placeholder="e.g., https://launch.smarthealthit.org/v/r4/fhir">
+  <small>The base URL of the FHIR server (without trailing slash)</small>
+</div>
+
+<div class="form-group">
+  <label for="client_id">Client ID *</label>
+  <input type="text" id="client_id" name="client_id" value="<%= h(@server.client_id) %>" required
+         placeholder="Your registered client ID">
+</div>
+
+<div class="form-group">
+  <label for="client_secret">Client Secret</label>
+  <input type="password" id="client_secret" name="client_secret" value="<%= h(@server.client_secret) %>"
+         placeholder="Leave blank for public clients">
+  <small>Required only for confidential symmetric clients</small>
+</div>
+
+<div class="form-group">
+  <label for="scopes">Scopes</label>
+  <input type="text" id="scopes" name="scopes" value="<%= h(@server.scopes_display) %>"
+         placeholder="e.g., openid profile launch/patient patient/*.read">
+  <small>Space or comma separated list of OAuth scopes</small>
+</div>
+
+<div class="form-group">
+  <label>Callback URL</label>
+  <input type="text" value="<%= redirect_uri %>" readonly class="readonly-input">
+  <small>Use this URL when registering your client with the FHIR server</small>
+</div>

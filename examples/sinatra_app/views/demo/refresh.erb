@@ -1,0 +1,72 @@
+<div class="page-header">
+  <h1>Token Refreshed</h1>
+</div>
+
+<section class="token-results">
+  <h2>Server: <%= h(@server.name) %></h2>
+  <p class="server-url"><code><%= h(@server.base_url) %></code></p>
+
+  <div class="success-box">
+    Successfully refreshed access token!
+  </div>
+
+  <div class="token-section">
+    <h3>Previous Access Token</h3>
+    <div class="token-display">
+      <code class="token-value token-expired"><%= @old_access_token %></code>
+    </div>
+  </div>
+
+  <div class="token-section">
+    <h3>New Access Token</h3>
+    <div class="token-display">
+      <code class="token-value"><%= @token_response['access_token'] %></code>
+    </div>
+  </div>
+
+  <% if @token_response['refresh_token'] %>
+    <div class="token-section">
+      <h3>New Refresh Token</h3>
+      <div class="token-display">
+        <code class="token-value"><%= @token_response['refresh_token'] %></code>
+      </div>
+      <p class="form-note">Note: The server issued a new refresh token. The previous refresh token may no longer be valid.</p>
+    </div>
+  <% end %>
+
+  <div class="token-section">
+    <h3>Token Details</h3>
+    <dl class="details-list">
+      <dt>Token Type</dt>
+      <dd><%= @token_response['token_type'] || 'Not specified' %></dd>
+
+      <dt>Expires In</dt>
+      <dd><%= @token_response['expires_in'] ? "#{@token_response['expires_in']} seconds" : 'Not specified' %></dd>
+
+      <dt>Scope</dt>
+      <dd>
+        <% if @token_response['scope'] %>
+          <% @token_response['scope'].split(' ').each do |scope| %>
+            <span class="badge badge-scope"><%= scope %></span>
+          <% end %>
+        <% else %>
+          <em>Not specified</em>
+        <% end %>
+      </dd>
+    </dl>
+  </div>
+
+  <div class="token-section">
+    <h3>Full Response</h3>
+    <pre class="json-display"><%= JSON.pretty_generate(@token_response) %></pre>
+  </div>
+
+  <div class="form-actions">
+    <a href="/demo/<%= @server.id %>/refresh" class="btn btn-primary">Refresh Again</a>
+    <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Back to Server</a>
+  </div>
+</section>
+
+<div class="back-link">
+  <a href="/servers/<%= @server.id %>">&larr; Back to Server</a>
+</div>

@@ -1,0 +1,12 @@
+---
+969f5485-9ed5-47fe-819c-a387a1ef828f:
+  id: 969f5485-9ed5-47fe-819c-a387a1ef828f
+  name: SMART Health IT RI
+  base_url: https://launch.smarthealthit.org/v/r4/sim/WzMsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0/fhir
+  client_id: m9sNGLR9ajY091Dcv86S3llXna8boDsm
+  client_secret: p9POCMDF6deWoYzDPDOMQmpxHSR3F8E1Q4UMSERqICNbIHJI
+  scopes:
+  - openid
+  - fhirUser
+  - launch/patient
+  - patient/*.read

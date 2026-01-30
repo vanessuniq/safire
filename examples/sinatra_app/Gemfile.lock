@@ -85,7 +85,7 @@ GEM
       byebug (~> 13.0)
       pry (>= 0.13, < 0.17)
     public_suffix (7.0.2)
-    puma (6.6.1)
+    puma (7.2.0)
       nio4r (~> 2.0)
     rack (3.2.4)
     rack-protection (4.2.1)
@@ -138,7 +138,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  puma (~> 6.4)
+  puma (~> 7.0)
   rack-session (~> 2.0)
   rackup (~> 2.1)
   rerun (~> 0.14)

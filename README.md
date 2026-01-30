@@ -96,6 +96,23 @@ puts new_tokens["access_token"]
 
 To see additional examples for confidential clients, visit the [Safire Docs](https://vanessuniq.github.io/safire/).
 
+## Demo Application
+
+A Sinatra-based demo application is included in [`examples/sinatra_app/`](examples/sinatra_app/) that demonstrates all SMART on FHIR features:
+
+- **Server Management**: Add, edit, and remove FHIR server configurations
+- **SMART Discovery**: View server capabilities from `/.well-known/smart-configuration`
+- **Authorization Flows**: Test provider standalone, patient standalone, and EHR launch flows
+- **Token Refresh**: Test token refresh functionality
+
+To run the demo:
+
+```bash
+bin/demo
+```
+
+Then visit http://localhost:4567 in your browser. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for more details.
+
 ## Development
 
 After checking out the repo, run:

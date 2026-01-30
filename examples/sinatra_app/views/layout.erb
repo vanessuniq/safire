@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Safire Demo</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/" class="logo">Safire Demo</a>
+    </nav>
+  </header>
+
+  <main>
+    <% if @flash[:message] %>
+      <div class="flash flash-<%= @flash[:type] %>">
+        <%= @flash[:message] %>
+      </div>
+    <% end %>
+
+    <%= yield %>
+  </main>
+
+  <footer>
+    <p>Powered by <a href="https://github.com/vanessuniq/safire" target="_blank">Safire</a> - SMART on FHIR Ruby Client</p>
+  </footer>
+</body>
+</html>

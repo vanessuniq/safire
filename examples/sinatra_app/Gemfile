@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+# Web framework
+gem 'puma', '~> 7.0'
+gem 'rackup', '~> 2.1'
+gem 'sinatra', '~> 4.0'
+gem 'sinatra-contrib', '~> 4.0'
+
+# Safire gem (use local path for development)
+gem 'safire', path: '../..'
+
+# Session management
+gem 'rack-session', '~> 2.0'
+
+group :development do
+  gem 'rerun', '~> 0.14'
+end

@@ -1,0 +1,138 @@
+<div class="page-header">
+  <h1>SMART Discovery</h1>
+</div>
+
+<section class="discovery-results">
+  <h2>Server: <%= h(@server.name) %></h2>
+  <p class="server-url"><code><%= h(@server.base_url) %></code></p>
+
+  <div class="metadata-section">
+    <h3>Core Endpoints</h3>
+    <dl class="details-list">
+      <dt>Authorization Endpoint</dt>
+      <dd><code><%= @metadata.authorization_endpoint || 'Not provided' %></code></dd>
+
+      <dt>Token Endpoint</dt>
+      <dd><code><%= @metadata.token_endpoint || 'Not provided' %></code></dd>
+
+      <% if @metadata.registration_endpoint %>
+        <dt>Registration Endpoint</dt>
+        <dd><code><%= @metadata.registration_endpoint %></code></dd>
+      <% end %>
+
+      <% if @metadata.introspection_endpoint %>
+        <dt>Introspection Endpoint</dt>
+        <dd><code><%= @metadata.introspection_endpoint %></code></dd>
+      <% end %>
+
+      <% if @metadata.revocation_endpoint %>
+        <dt>Revocation Endpoint</dt>
+        <dd><code><%= @metadata.revocation_endpoint %></code></dd>
+      <% end %>
+
+      <% if @metadata.management_endpoint %>
+        <dt>Management Endpoint</dt>
+        <dd><code><%= @metadata.management_endpoint %></code></dd>
+      <% end %>
+    </dl>
+  </div>
+
+  <% if @metadata.supports_openid_connect? %>
+    <div class="metadata-section">
+      <h3>OpenID Connect</h3>
+      <dl class="details-list">
+        <dt>Issuer</dt>
+        <dd><code><%= @metadata.issuer %></code></dd>
+
+        <dt>JWKS URI</dt>
+        <dd><code><%= @metadata.jwks_uri %></code></dd>
+      </dl>
+    </div>
+  <% end %>
+
+  <div class="metadata-section">
+    <h3>Supported Capabilities</h3>
+    <div class="capability-badges">
+      <% (@metadata.capabilities || []).each do |cap| %>
+        <span class="badge badge-capability"><%= cap %></span>
+      <% end %>
+    </div>
+
+    <div class="capability-summary">
+      <h4>Launch Types</h4>
+      <ul>
+        <li>Standalone Launch: <%= @metadata.supports_standalone_launch? ? 'Yes' : 'No' %></li>
+        <li>EHR Launch: <%= @metadata.supports_ehr_launch? ? 'Yes' : 'No' %></li>
+      </ul>
+
+      <h4>Client Types</h4>
+      <ul>
+        <li>Public Clients: <%= @metadata.supports_public_clients? ? 'Yes' : 'No' %></li>
+        <li>Confidential Symmetric: <%= @metadata.supports_confidential_symmetric_clients? ? 'Yes' : 'No' %></li>
+        <li>Confidential Asymmetric: <%= @metadata.supports_confidential_asymmetric_clients? ? 'Yes' : 'No' %></li>
+      </ul>
+
+      <h4>Other Features</h4>
+      <ul>
+        <li>OpenID Connect SSO: <%= @metadata.supports_openid_connect? ? 'Yes' : 'No' %></li>
+        <li>POST-based Authorization: <%= @metadata.supports_post_based_authorization? ? 'Yes' : 'No' %></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="metadata-section">
+    <h3>OAuth2 Configuration</h3>
+    <dl class="details-list">
+      <dt>Grant Types Supported</dt>
+      <dd>
+        <% (@metadata.grant_types_supported || []).each do |grant| %>
+          <span class="badge badge-info"><%= grant %></span>
+        <% end %>
+      </dd>
+
+      <dt>Response Types Supported</dt>
+      <dd>
+        <% if @metadata.response_types_supported&.any? %>
+          <% @metadata.response_types_supported.each do |rt| %>
+            <span class="badge badge-info"><%= rt %></span>
+          <% end %>
+        <% else %>
+          <em>Not specified</em>
+        <% end %>
+      </dd>
+
+      <dt>Token Auth Methods</dt>
+      <dd>
+        <% if @metadata.token_endpoint_auth_methods_supported&.any? %>
+          <% @metadata.token_endpoint_auth_methods_supported.each do |method| %>
+            <span class="badge badge-info"><%= method %></span>
+          <% end %>
+        <% else %>
+          <em>Not specified</em>
+        <% end %>
+      </dd>
+
+      <dt>PKCE Code Challenge Methods</dt>
+      <dd>
+        <% (@metadata.code_challenge_methods_supported || []).each do |method| %>
+          <span class="badge badge-info"><%= method %></span>
+        <% end %>
+      </dd>
+    </dl>
+  </div>
+
+  <% if @metadata.scopes_supported&.any? %>
+    <div class="metadata-section">
+      <h3>Supported Scopes</h3>
+      <div class="scope-list">
+        <% @metadata.scopes_supported.each do |scope| %>
+          <span class="badge badge-scope"><%= scope %></span>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</section>
+
+<div class="back-link">
+  <a href="/servers/<%= @server.id %>">&larr; Back to Server</a>
+</div>

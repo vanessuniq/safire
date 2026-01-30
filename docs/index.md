@@ -35,6 +35,18 @@ A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for client
 | SMART Backend Services | Planned |
 | UDAP Protocols | Planned |
 
+## Demo Application
+
+A Sinatra-based demo app is included to help you explore Safire's features:
+
+```bash
+bin/demo
+```
+
+Visit http://localhost:4567 to test SMART discovery, authorization flows, and token management.
+
+See [`examples/sinatra_app/README.md`](https://github.com/vanessuniq/safire/tree/main/examples/sinatra_app) for details.
+
 ## Community
 
 - [GitHub Repository](https://github.com/vanessuniq/safire)

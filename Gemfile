@@ -10,7 +10,6 @@ group :development, :test do
   gem 'rspec', '~> 3.12'
   gem 'rubocop', '~> 1.57'
   gem 'rubocop-rspec', '~> 3.0', require: false
-  gem 'sinatra'
   gem 'timecop', '~> 0.9'
 end
 

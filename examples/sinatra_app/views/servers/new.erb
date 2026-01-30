@@ -1,0 +1,12 @@
+<h1>Add New Server</h1>
+
+<p>Configure a new FHIR server for testing SMART on FHIR authorization flows.</p>
+
+<form action="/servers" method="post" class="server-form">
+  <%= erb :'servers/_form' %>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Create Server</button>
+    <a href="/" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>

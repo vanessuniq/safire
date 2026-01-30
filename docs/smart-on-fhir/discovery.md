@@ -156,18 +156,22 @@ metadata.valid?
 
 ## Capability Checks
 
-Safire provides convenience methods to check server capabilities:
+Safire provides convenience methods to check server capabilities. These methods verify both the capability flag and any required associated fields.
 
 ### Launch Modes
 
 ```ruby
 # EHR-initiated launch
 metadata.supports_ehr_launch?
-# => true (if capabilities include "launch-ehr")
+# => true when:
+#    - capabilities include "launch-ehr"
+#    - AND authorization_endpoint is present
 
 # Standalone launch
 metadata.supports_standalone_launch?
-# => true (if capabilities include "launch-standalone")
+# => true when:
+#    - capabilities include "launch-standalone"
+#    - AND authorization_endpoint is present
 
 # POST-based authorization
 metadata.supports_post_based_authorization?
@@ -194,7 +198,10 @@ metadata.supports_confidential_asymmetric_clients?
 
 ```ruby
 metadata.supports_openid_connect?
-# => true (if capabilities include "sso-openid-connect")
+# => true when:
+#    - capabilities include "sso-openid-connect"
+#    - AND issuer is present
+#    - AND jwks_uri is present
 ```
 
 ---

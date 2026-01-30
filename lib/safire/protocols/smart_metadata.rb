@@ -86,42 +86,66 @@ module Safire
         missing_attrs.empty?
       end
 
+      # Launch type support checks - requires both capability and authorization_endpoint
+
       def supports_ehr_launch?
-        capabilities&.include?('launch-ehr')
+        ehr_launch_capability? && authorization_endpoint.present?
       end
 
       def supports_standalone_launch?
-        capabilities&.include?('launch-standalone')
+        standalone_launch_capability? && authorization_endpoint.present?
       end
 
-      def supports_post_based_authorization?
-        capabilities&.include?('authorize-post')
-      end
+      # Client type support checks
 
       def supports_public_clients?
-        capabilities&.include?('client-public')
+        capability?('client-public')
       end
 
       def supports_confidential_symmetric_clients?
-        capabilities&.include?('client-confidential-symmetric')
+        capability?('client-confidential-symmetric')
       end
 
       def supports_confidential_asymmetric_clients?
-        capabilities&.include?('client-confidential-asymmetric')
+        capability?('client-confidential-asymmetric')
+      end
+
+      # Feature support checks
+
+      def supports_post_based_authorization?
+        capability?('authorize-post')
       end
 
       def supports_openid_connect?
-        capabilities&.include?('sso-openid-connect')
+        openid_connect_capability? && issuer.present? && jwks_uri.present?
+      end
+
+      # Capability-only checks (does not verify required fields are present)
+
+      def ehr_launch_capability?
+        capability?('launch-ehr')
+      end
+
+      def standalone_launch_capability?
+        capability?('launch-standalone')
+      end
+
+      def openid_connect_capability?
+        capability?('sso-openid-connect')
       end
 
       private
 
+      def capability?(name)
+        capabilities&.include?(name)
+      end
+
       def issuer_and_jwks_uri_required?
-        capabilities&.include?('sso-openid-connect')
+        openid_connect_capability?
       end
 
       def authorization_endpoint_required?
-        capabilities&.include?('launch-ehr') || capabilities&.include?('launch-standalone')
+        ehr_launch_capability? || standalone_launch_capability?
       end
     end
   end

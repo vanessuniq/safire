@@ -75,6 +75,10 @@ To test EHR launch with the SMART sandbox:
 5. Click "Launch"
 6. The demo app will handle the authorization flow automatically
 
+**Optional:** Specify authentication type by appending `auth_type` parameter:
+- `http://localhost:4567/launch?auth_type=public` - Public client (default)
+- `http://localhost:4567/launch?auth_type=confidential_symmetric` - Confidential client with Basic Auth
+
 ### Token Refresh
 
 After completing an authorization flow, if the server issued a refresh token:

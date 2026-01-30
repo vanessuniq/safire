@@ -74,8 +74,6 @@ GEM
     method_source (1.1.0)
     minitest (6.0.1)
       prism (~> 1.5)
-    mustermann (3.0.4)
-      ruby2_keywords (~> 0.0.1)
     net-http (0.6.0)
       uri
     parallel (1.27.0)

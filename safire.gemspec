@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.description           = 'A Ruby gem implementing SMART on FHIR and UDAP protocols for clients.'
   spec.homepage              = 'https://github.com/vanessuniq/safire'
   spec.license               = 'Apache-2.0'
-  spec.required_ruby_version = Gem::Requirement.new('>= 3.4.7')
+  spec.required_ruby_version = Gem::Requirement.new('>= 4.0.1')
 
   spec.metadata['homepage_uri']      = spec.homepage
   spec.metadata['source_code_uri']   = spec.homepage

@@ -18,7 +18,7 @@ nav_order: 2
 
 ## Requirements
 
-- **Ruby:** 3.4.7 or later
+- **Ruby:** 4.0.1 or later
 - **Bundler:** Latest version recommended
 - **OpenSSL:** For cryptographic operations
 
@@ -110,7 +110,7 @@ If you encounter version compatibility issues:
 # Check your Ruby version
 ruby --version
 
-# Install Ruby 3.4.7 or later using rbenv, rvm, or asdf
+# Install Ruby 4.0.1 or later using rbenv, rvm, or asdf
 # then set that version as default
 ```
 

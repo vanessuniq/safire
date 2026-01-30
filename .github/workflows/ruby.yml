@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ruby-version: ['3.4.7']
+        ruby-version: ['4.0.1']
 
     steps:
     - uses: actions/checkout@v6
@@ -33,25 +33,3 @@ jobs:
 
     - name: Security audit
       run: bundle exec bundler-audit check --update
-
-  # build:
-  #   runs-on: ubuntu-latest
-  #   needs: test
-
-  #   steps:
-  #   - uses: actions/checkout@v4
-
-  #   - name: Set up Ruby
-  #     uses: ruby/setup-ruby@v1
-  #     with:
-  #       ruby-version: '3.4.7'
-  #       bundler-cache: true
-
-    # - name: Build gem
-    #   run: gem build safire.gemspec
-
-    # - name: Upload gem artifact
-    #   uses: actions/upload-artifact@v3
-    #   with:
-    #     name: safire-gem
-    #     path: safire-*.gem

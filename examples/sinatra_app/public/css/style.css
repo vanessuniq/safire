@@ -714,3 +714,9 @@ section {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* Expired/old token styling */
+.token-expired {
+  opacity: 0.6;
+  text-decoration: line-through;
+}

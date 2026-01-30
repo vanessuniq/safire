@@ -160,6 +160,27 @@ class SafireDemo < Sinatra::Base
     end
   end
 
+  # Token refresh
+  get '/demo/:server_id/refresh' do
+    unless session[:refresh_token] && session[:token_server_id] == @server.id
+      set_flash(:error, 'No refresh token available for this server.')
+      redirect "/servers/#{@server.id}"
+      return
+    end
+
+    begin
+      @old_access_token = session[:access_token]
+      @token_response = @safire_client.refresh_access_token(refresh_token: session[:refresh_token])
+
+      store_token_session(@token_response)
+
+      erb :'demo/refresh'
+    rescue Safire::Errors::Error => e
+      set_flash(:error, "Token refresh failed: #{e.message}")
+      redirect "/servers/#{@server.id}"
+    end
+  end
+
   # EHR/Portal Launch endpoint
   # The EHR/Portal calls this URL with `launch` and `iss` parameters
   get '/launch' do

@@ -555,6 +555,18 @@ section {
   margin-top: 0.5rem;
 }
 
+.form-note-list {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin: 0.5rem 0 0 0;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+
+.form-note-list li {
+  margin-bottom: 0.25rem;
+}
+
 .radio-group {
   display: flex;
   flex-direction: column;

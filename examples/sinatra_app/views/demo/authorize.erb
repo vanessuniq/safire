@@ -51,6 +51,13 @@
           The EHR/Portal will call this URL with <code>launch</code> and <code>iss</code> parameters
           when launching the app. The app will automatically initiate the authorization flow.
         </p>
+        <p class="form-note">
+          <strong>Optional:</strong> Append <code>auth_type</code> parameter to specify authentication type:
+        </p>
+        <ul class="form-note-list">
+          <li><code>auth_type=public</code> - Public client (default)</li>
+          <li><code>auth_type=confidential_symmetric</code> - Confidential client with Basic Auth</li>
+        </ul>
       </div>
     <% end %>
 

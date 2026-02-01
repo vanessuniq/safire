@@ -34,7 +34,7 @@ This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participatin
 
 ### Requirements
 
-- Ruby 3.4.7 or later
+- Ruby 4.0.1 or later
 - Bundler
 
 ### Setup

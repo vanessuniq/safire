@@ -183,9 +183,11 @@ class SafireDemo < Sinatra::Base
 
   # EHR/Portal Launch endpoint
   # The EHR/Portal calls this URL with `launch` and `iss` parameters
+  # Optional: `auth_type` param to specify authentication type (public or confidential_symmetric)
   get '/launch' do
     launch_token = params[:launch]
     iss = params[:iss]
+    auth_type = parse_auth_type(params[:auth_type])
 
     unless launch_token && iss
       set_flash(:error, 'Missing required parameters: launch and iss are required for EHR launch')
@@ -201,11 +203,11 @@ class SafireDemo < Sinatra::Base
     end
 
     begin
-      client = build_safire_client(@server)
+      client = build_safire_client(@server, auth_type: auth_type)
       scopes = build_scopes_for_launch('ehr_launch', @server.scopes)
       auth_data = client.authorize_url(launch: launch_token, custom_scopes: scopes)
 
-      store_oauth_session(auth_data, :public, 'ehr_launch')
+      store_oauth_session(auth_data, auth_type, 'ehr_launch')
       redirect auth_data[:auth_url]
     rescue Safire::Errors::Error => e
       set_flash(:error, "EHR launch failed: #{e.message}")
@@ -329,6 +331,13 @@ class SafireDemo < Sinatra::Base
 
   def parse_scopes(scopes_str)
     scopes_str.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
+  end
+
+  def parse_auth_type(auth_type_param)
+    return :public if auth_type_param.to_s.strip.empty?
+
+    auth_type = auth_type_param.to_s.strip.to_sym
+    %i[public confidential_symmetric].include?(auth_type) ? auth_type : :public
   end
 
   def build_safire_client(server, auth_type: :public)

@@ -2,7 +2,7 @@
 layout: default
 title: Public Client Workflow
 parent: SMART on FHIR
-nav_order: 1
+nav_order: 2
 has_toc: true
 ---
 
@@ -686,6 +686,6 @@ end
 
 ## Next Steps
 
-- [Confidential Symmetric Client Workflow]({{ site.baseurl }}{% link smart-on-fhir/confidential-symmetric.md %})
-- [SMART Discovery Details]({{ site.baseurl }}{% link smart-on-fhir/discovery.md %})
-- [Troubleshooting Guide]({{ site.baseurl }}{% link troubleshooting.md %})
+- [Confidential Symmetric Client Workflow]({% link smart-on-fhir/confidential-symmetric.md %})
+- [SMART Discovery Details]({% link smart-on-fhir/discovery.md %})
+- [Troubleshooting Guide]({% link troubleshooting.md %})

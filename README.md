@@ -123,6 +123,17 @@ bin/console          # Interactive prompt
 bundle exec rspec    # Run tests
 ```
 
+### Documentation
+
+To serve the documentation site locally:
+
+```bash
+bin/docs                                        # Generate YARD API docs
+cd docs && bundle install && bundle exec jekyll serve
+```
+
+Then visit http://localhost:4000/safire/ in your browser.
+
 ## Contributing
 
 Bug reports and pull requests are welcome on this [GitHub repo](https://github.com/vanessuniq/safire).

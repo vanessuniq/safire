@@ -217,7 +217,12 @@ end
    bundle exec yard doc
    ```
 
-4. Rebase on latest main:
+4. Verify Jekyll docs build (if you modified docs/):
+   ```bash
+   cd docs && bundle install && bundle exec jekyll build
+   ```
+
+5. Rebase on latest main:
    ```bash
    git fetch upstream
    git rebase upstream/main

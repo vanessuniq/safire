@@ -45,6 +45,26 @@ module Safire
       self
     end
 
+    def private_key(private_key)
+      @config[:private_key] = private_key
+      self
+    end
+
+    def kid(kid)
+      @config[:kid] = kid
+      self
+    end
+
+    def jwt_algorithm(jwt_algorithm)
+      @config[:jwt_algorithm] = jwt_algorithm
+      self
+    end
+
+    def jwks_uri(jwks_uri)
+      @config[:jwks_uri] = jwks_uri
+      self
+    end
+
     def build
       Safire::ClientConfig.new(@config)
     end

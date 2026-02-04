@@ -20,8 +20,20 @@ module Safire
   #   @return [String] URL of the server’s OAuth2 Authorization Endpoint.
   # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   # @!attribute [r] token_endpoint
-  #   @return [String] URL of the server’s OAuth2 Token Endpoint.
+  #   @return [String] URL of the server's OAuth2 Token Endpoint.
   # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
+  # @!attribute [r] private_key
+  #   @return [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil] the private key for signing
+  #     JWT assertions in confidential asymmetric auth. Can be an OpenSSL key object or PEM string.
+  # @!attribute [r] kid
+  #   @return [String, nil] the key ID matching the public key registered with the authorization server.
+  #     Required for confidential asymmetric authentication.
+  # @!attribute [r] jwt_algorithm
+  #   @return [String, nil] the JWT signing algorithm (RS384 or ES384).
+  #     Optional, auto-detected from key type if not provided.
+  # @!attribute [r] jwks_uri
+  #   @return [String, nil] URL to the client's JWKS containing the public key.
+  #     Optional, included as jku header in JWT assertions when provided.
   #
   # @example Initializing a ClientConfig
   #   config = Safire::ClientConfig.new(
@@ -46,6 +58,7 @@ module Safire
     ATTRIBUTES = %i[
       base_url issuer client_id client_secret redirect_uri
       scopes authorization_endpoint token_endpoint
+      private_key kid jwt_algorithm jwks_uri
     ].freeze
 
     attr_reader(*ATTRIBUTES)
@@ -66,10 +79,12 @@ module Safire
     private
 
     def validate_uris!
-      uri_attrs = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint]
+      uri_attrs = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint jwks_uri]
+      optional_uri_attrs = %i[authorization_endpoint token_endpoint jwks_uri]
+
       invalid_uris = uri_attrs.select do |attr|
         value = send(attr)
-        return false if value.nil? && %i[authorization_endpoint token_endpoint].include?(attr)
+        next false if value.nil? && optional_uri_attrs.include?(attr)
 
         begin
           uri = Addressable::URI.parse(value)

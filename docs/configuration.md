@@ -115,7 +115,7 @@ client = Safire::Client.new(config)
 metadata = client.smart_metadata
 
 # Switch to confidential_symmetric based on server capabilities
-if metadata.supports_confidential_symmetric_clients?
+if metadata.supports_symmetric_auth?
   client.auth_type = :confidential_symmetric
 end
 ```

@@ -19,6 +19,9 @@ module Safire
     # @!attribute [r] token_endpoint_auth_methods_supported
     #   @return [Array<String>] list of client authentication methods supported at the token endpoint.
     #     Optionally provided.
+    # @!attribute [r] token_endpoint_auth_signing_alg_values_supported
+    #   @return [Array<String>] list of signing algorithms supported for JWT-based client authentication.
+    #     Optionally provided. Used for confidential asymmetric authentication.
     # @!attribute [r] registration_endpoint
     #   @return [String] URL of the server’s OAuth2 Dynamic Client Registration Endpoint. Optionally provided.
     # @!attribute [r] associated_endpoints
@@ -57,6 +60,7 @@ module Safire
         jwks_uri
         authorization_endpoint
         token_endpoint_auth_methods_supported
+        token_endpoint_auth_signing_alg_values_supported
         registration_endpoint
         associated_endpoints
         user_access_brand_bundle
@@ -69,6 +73,9 @@ module Safire
       ].freeze
 
       ATTRIBUTES = (REQUIRED_ATTRIBUTES | OPTIONAL_ATTRIBUTES).freeze
+
+      # Supported asymmetric signing algorithms (required by SMART spec)
+      SUPPORTED_ASYMMETRIC_ALGORITHMS = %w[RS384 ES384].freeze
 
       attr_reader(*ATTRIBUTES)
 
@@ -96,18 +103,38 @@ module Safire
         standalone_launch_capability? && authorization_endpoint.present?
       end
 
-      # Client type support checks
+      # Authentication type support checks
 
-      def supports_public_clients?
+      # Checks if the server supports public client authentication.
+      # @return [Boolean] true if server has client-public capability
+      def supports_public_auth?
         capability?('client-public')
       end
 
-      def supports_confidential_symmetric_clients?
-        capability?('client-confidential-symmetric')
+      # Checks if the server supports confidential symmetric authentication.
+      # @return [Boolean] true if server has capability and auth methods not advertised or includes client_secret_basic
+      def supports_symmetric_auth?
+        capability?('client-confidential-symmetric') &&
+          (token_endpoint_auth_methods_supported.blank? ||
+           token_endpoint_auth_methods_supported.include?('client_secret_basic'))
       end
 
-      def supports_confidential_asymmetric_clients?
-        capability?('client-confidential-asymmetric')
+      # Checks if the server supports confidential asymmetric authentication.
+      # @return [Boolean] true if server has capability, auth methods not advertised or includes private_key_jwt,
+      #   and has supported algorithms
+      def supports_asymmetric_auth?
+        capability?('client-confidential-asymmetric') &&
+          (token_endpoint_auth_methods_supported.blank? ||
+           token_endpoint_auth_methods_supported.include?('private_key_jwt')) &&
+          asymmetric_signing_algorithms_supported.any?
+      end
+
+      # Returns the asymmetric signing algorithms supported by both client and server.
+      # If the server doesn't advertise algorithms, assumes it supports the required ones (RS384, ES384).
+      # @return [Array<String>] list of supported algorithms
+      def asymmetric_signing_algorithms_supported
+        server_algs = token_endpoint_auth_signing_alg_values_supported.presence
+        (server_algs || SUPPORTED_ASYMMETRIC_ALGORITHMS) & SUPPORTED_ASYMMETRIC_ALGORITHMS
       end
 
       # Feature support checks

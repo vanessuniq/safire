@@ -67,9 +67,9 @@
 
       <h4>Client Types</h4>
       <ul>
-        <li>Public Clients: <%= @metadata.supports_public_clients? ? 'Yes' : 'No' %></li>
-        <li>Confidential Symmetric: <%= @metadata.supports_confidential_symmetric_clients? ? 'Yes' : 'No' %></li>
-        <li>Confidential Asymmetric: <%= @metadata.supports_confidential_asymmetric_clients? ? 'Yes' : 'No' %></li>
+        <li>Public Clients: <%= @metadata.supports_public_auth? ? 'Yes' : 'No' %></li>
+        <li>Confidential Symmetric: <%= @metadata.supports_symmetric_auth? ? 'Yes' : 'No' %></li>
+        <li>Confidential Asymmetric: <%= @metadata.supports_asymmetric_auth? ? 'Yes' : 'No' %></li>
       </ul>
 
       <h4>Other Features</h4>

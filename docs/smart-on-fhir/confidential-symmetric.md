@@ -98,7 +98,7 @@ end
 def check_server_capabilities
   metadata = @client.smart_metadata
 
-  unless metadata.supports_confidential_symmetric_clients?
+  unless metadata.supports_symmetric_auth?
     raise "Server does not support confidential symmetric clients"
   end
 
@@ -435,7 +435,7 @@ def validate_server_before_registration
   metadata = client.smart_metadata
 
   {
-    supports_confidential_symmetric: metadata.supports_confidential_symmetric_clients?,
+    supports_confidential_symmetric: metadata.supports_symmetric_auth?,
     token_auth_methods: metadata.token_endpoint_auth_methods_supported,
     supports_basic_auth: metadata.token_endpoint_auth_methods_supported&.include?('client_secret_basic')
   }

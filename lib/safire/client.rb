@@ -98,7 +98,7 @@ module Safire
     #   client = Safire::Client.new(config)  # defaults to :public
     #   metadata = client.smart_metadata
     #
-    #   if metadata.supports_confidential_symmetric_clients?
+    #   if metadata.supports_symmetric_auth?
     #     client.auth_type = :confidential_symmetric
     #   end
     #

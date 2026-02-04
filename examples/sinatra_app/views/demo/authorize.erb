@@ -66,7 +66,7 @@
       <p class="form-help">Select how the client should authenticate with the authorization server:</p>
 
       <div class="radio-group">
-        <% if @metadata.supports_public_clients? %>
+        <% if @metadata.supports_public_auth? %>
           <label class="radio-option">
             <input type="radio" name="auth_type" value="public" checked>
             <span class="radio-label">Public Client</span>
@@ -77,10 +77,10 @@
           </label>
         <% end %>
 
-        <% if @metadata.supports_confidential_symmetric_clients? %>
+        <% if @metadata.supports_symmetric_auth? %>
           <label class="radio-option <%= 'disabled' unless @server.confidential? %>">
             <input type="radio" name="auth_type" value="confidential_symmetric"
-                   <%= 'checked' unless @metadata.supports_public_clients? %>
+                   <%= 'checked' unless @metadata.supports_public_auth? %>
                    <%= 'disabled' unless @server.confidential? %>>
             <span class="radio-label">Confidential Symmetric</span>
             <span class="radio-description">
@@ -92,7 +92,7 @@
           </label>
         <% end %>
 
-        <% unless @metadata.supports_public_clients? || @metadata.supports_confidential_symmetric_clients? %>
+        <% unless @metadata.supports_public_auth? || @metadata.supports_symmetric_auth? %>
           <div class="warning-box">
             This server does not support public or confidential symmetric clients.
           </div>

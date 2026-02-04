@@ -90,7 +90,7 @@ def show_capabilities
     authorization_endpoint: metadata.authorization_endpoint,
     token_endpoint: metadata.token_endpoint,
     capabilities: metadata.capabilities,
-    supports_public_clients: metadata.supports_public_clients?,
+    supports_public_clients: metadata.supports_public_auth?,
     supports_pkce: metadata.code_challenge_methods_supported.include?('S256')
   }
 end

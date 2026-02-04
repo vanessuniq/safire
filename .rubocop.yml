@@ -32,6 +32,9 @@ Metrics/BlockLength:
     - 'spec/**/*'
     - '*.gemspec'
 
+Metrics/ParameterLists:
+  CountKeywordArgs: false
+
 RSpec/ExampleLength:
   Max: 20
   Exclude:

@@ -92,7 +92,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
       expect(metadata.authorization_endpoint).to eq("#{base_url}/authorize")
       expect(metadata.token_endpoint).to eq("#{base_url}/token")
       expect(metadata.code_challenge_methods_supported).to include('S256')
-      expect(metadata.supports_public_clients?).to be true
+      expect(metadata.supports_public_auth?).to be true
       expect(metadata.supports_standalone_launch?).to be true
 
       # =====================================================

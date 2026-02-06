@@ -101,7 +101,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
       expect(metadata.authorization_endpoint).to eq("#{base_url}/authorize")
       expect(metadata.token_endpoint).to eq("#{base_url}/token")
-      expect(metadata.supports_confidential_symmetric_clients?).to be true
+      expect(metadata.supports_symmetric_auth?).to be true
       expect(metadata.token_endpoint_auth_methods_supported).to include('client_secret_basic')
 
       # =====================================================

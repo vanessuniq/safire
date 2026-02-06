@@ -65,36 +65,86 @@ RSpec.describe Safire::Protocols::SmartMetadata do
     end
   end
 
-  describe '#supports_public_clients?' do
+  describe '#supports_public_auth?' do
     it 'returns true if "client-public" is in capabilities' do
-      expect(smart_metadata.supports_public_clients?).to be(true)
+      expect(smart_metadata.supports_public_auth?).to be(true)
     end
 
     it 'returns false if "client-public" is not in capabilities' do
       smart_metadata.capabilities.delete('client-public')
-      expect(smart_metadata.supports_public_clients?).to be(false)
+      expect(smart_metadata.supports_public_auth?).to be(false)
     end
   end
 
-  describe '#supports_confidential_symmetric_clients?' do
-    it 'returns true if "client-confidential-symmetric" is in capabilities' do
-      expect(smart_metadata.supports_confidential_symmetric_clients?).to be(true)
+  describe '#supports_symmetric_auth?' do
+    it 'returns true if capability present and auth methods not advertised' do
+      data = full_metadata.except('token_endpoint_auth_methods_supported')
+      metadata = described_class.new(data)
+      expect(metadata.supports_symmetric_auth?).to be(true)
+    end
+
+    it 'returns true if capability present and client_secret_basic in auth methods' do
+      expect(smart_metadata.supports_symmetric_auth?).to be(true)
     end
 
     it 'returns false if "client-confidential-symmetric" is not in capabilities' do
       smart_metadata.capabilities.delete('client-confidential-symmetric')
-      expect(smart_metadata.supports_confidential_symmetric_clients?).to be(false)
+      expect(smart_metadata.supports_symmetric_auth?).to be(false)
+    end
+
+    it 'returns false if auth methods advertised but client_secret_basic not included' do
+      data = full_metadata.merge('token_endpoint_auth_methods_supported' => ['private_key_jwt'])
+      metadata = described_class.new(data)
+      expect(metadata.supports_symmetric_auth?).to be(false)
     end
   end
 
-  describe '#supports_confidential_asymmetric_clients?' do
-    it 'returns true if "client-confidential-asymmetric" is in capabilities' do
-      expect(smart_metadata.supports_confidential_asymmetric_clients?).to be(true)
+  describe '#supports_asymmetric_auth?' do
+    it 'returns true if capability present and auth methods not advertised' do
+      data = full_metadata.except('token_endpoint_auth_methods_supported')
+      metadata = described_class.new(data)
+      expect(metadata.supports_asymmetric_auth?).to be(true)
+    end
+
+    it 'returns true if capability present and private_key_jwt in auth methods' do
+      expect(smart_metadata.supports_asymmetric_auth?).to be(true)
     end
 
     it 'returns false if "client-confidential-asymmetric" is not in capabilities' do
       smart_metadata.capabilities.delete('client-confidential-asymmetric')
-      expect(smart_metadata.supports_confidential_asymmetric_clients?).to be(false)
+      expect(smart_metadata.supports_asymmetric_auth?).to be(false)
+    end
+
+    it 'returns false if auth methods advertised but private_key_jwt not included' do
+      data = full_metadata.merge('token_endpoint_auth_methods_supported' => ['client_secret_basic'])
+      metadata = described_class.new(data)
+      expect(metadata.supports_asymmetric_auth?).to be(false)
+    end
+
+    it 'returns false if no supported algorithms available' do
+      data = full_metadata.merge('token_endpoint_auth_signing_alg_values_supported' => ['RS256'])
+      metadata = described_class.new(data)
+      expect(metadata.supports_asymmetric_auth?).to be(false)
+    end
+  end
+
+  describe '#asymmetric_signing_algorithms_supported' do
+    it 'returns intersection of server and supported algorithms' do
+      data = full_metadata.merge('token_endpoint_auth_signing_alg_values_supported' => %w[RS384 RS256 ES384])
+      metadata = described_class.new(data)
+      expect(metadata.asymmetric_signing_algorithms_supported).to eq(%w[RS384 ES384])
+    end
+
+    it 'returns supported algorithms when server does not advertise any' do
+      data = full_metadata.except('token_endpoint_auth_signing_alg_values_supported')
+      metadata = described_class.new(data)
+      expect(metadata.asymmetric_signing_algorithms_supported).to eq(%w[RS384 ES384])
+    end
+
+    it 'returns empty array when no algorithms match' do
+      data = full_metadata.merge('token_endpoint_auth_signing_alg_values_supported' => ['RS256'])
+      metadata = described_class.new(data)
+      expect(metadata.asymmetric_signing_algorithms_supported).to eq([])
     end
   end
 

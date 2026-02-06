@@ -15,6 +15,15 @@ RSpec.describe Safire::Protocols::Smart do
     }
   end
   let(:confidential_config) { config.merge(client_secret: 'test_client_secret') }
+  let(:rsa_private_key) { OpenSSL::PKey::RSA.generate(2048) }
+  let(:asymmetric_config) do
+    config.merge(
+      private_key: rsa_private_key,
+      kid: 'test-key-id',
+      jwt_algorithm: 'RS384',
+      jwks_uri: 'https://app.example.com/.well-known/jwks.json'
+    )
+  end
 
   let(:smart_metadata_body) do
     {
@@ -50,9 +59,9 @@ RSpec.describe Safire::Protocols::Smart do
     Addressable::URI.parse(url).query_values
   end
 
-  def stub_token_post(body_params:, status:, body:, headers: {})
+  def stub_token_post(body_matcher:, status:, body:, headers: {})
     stub_request(:post, config[:token_endpoint]).with(
-      body: body_params,
+      body: body_matcher,
       headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }.merge(headers)
     ).to_return(
       status: status,
@@ -110,6 +119,18 @@ RSpec.describe Safire::Protocols::Smart do
         # no client_id
       }
     end
+
+    # Asymmetric auth code body includes client_assertion_type and client_assertion
+    let(:asymmetric_auth_code_body_matcher) do
+      hash_including(
+        'grant_type' => 'authorization_code',
+        'code' => authorization_code,
+        'redirect_uri' => config[:redirect_uri],
+        'code_verifier' => code_verifier,
+        'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+        'client_assertion' => kind_of(String)
+      )
+    end
   end
 
   shared_context 'with refresh bodies' do
@@ -130,6 +151,16 @@ RSpec.describe Safire::Protocols::Smart do
         # no client_id
       }
     end
+
+    # Asymmetric refresh body includes client_assertion_type and client_assertion
+    let(:asymmetric_refresh_body_matcher) do
+      hash_including(
+        'grant_type' => 'refresh_token',
+        'refresh_token' => refresh_token_value,
+        'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+        'client_assertion' => kind_of(String)
+      )
+    end
   end
 
   # ---------- Initialization ----------
@@ -145,6 +176,15 @@ RSpec.describe Safire::Protocols::Smart do
       client = described_class.new(confidential_config, auth_type: :confidential_symmetric)
       expect(client.auth_type).to eq(:confidential_symmetric)
       expect(client.client_secret).to eq(confidential_config[:client_secret])
+    end
+
+    it 'creates a confidential asymmetric client' do
+      client = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+      expect(client.auth_type).to eq(:confidential_asymmetric)
+      expect(client.private_key).to eq(asymmetric_config[:private_key])
+      expect(client.kid).to eq(asymmetric_config[:kid])
+      expect(client.jwt_algorithm).to eq(asymmetric_config[:jwt_algorithm])
+      expect(client.jwks_uri).to eq(asymmetric_config[:jwks_uri])
     end
 
     it 'defaults auth_type to public' do
@@ -311,7 +351,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
 
       before do
-        stub_token_post(body_params: public_auth_code_body, status: 200, body: token_response_body)
+        stub_token_post(body_matcher: public_auth_code_body, status: 200, body: token_response_body)
       end
 
       it_behaves_like 'returns token response'
@@ -341,7 +381,7 @@ RSpec.describe Safire::Protocols::Smart do
 
       before do
         stub_token_post(
-          body_params: confidential_auth_code_body,
+          body_matcher: confidential_auth_code_body,
           status: 200,
           body: token_response_body,
           headers: { 'Authorization' => auth_header }
@@ -358,10 +398,68 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when confidential_asymmetric' do
+      subject(:token_response) do
+        described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+                       .request_access_token(code: authorization_code, code_verifier: code_verifier)
+      end
+
+      before do
+        stub_token_post(body_matcher: asymmetric_auth_code_body_matcher, status: 200, body: token_response_body)
+      end
+
+      it_behaves_like 'returns token response'
+
+      it 'includes client_assertion_type and client_assertion, omits client_id' do
+        token_response
+        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+          body = URI.decode_www_form(req.body).to_h
+          body['client_assertion_type'] == 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
+            body['client_assertion'].present? &&
+            body_excludes_keys(:client_id).matches?(req)
+        end)
+      end
+
+      it 'sends a valid JWT assertion' do
+        token_response
+        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+          body = URI.decode_www_form(req.body).to_h
+          jwt = body['client_assertion']
+          decoded = JWT.decode(jwt, rsa_private_key.public_key, true, algorithm: 'RS384')
+          decoded[0]['iss'] == config[:client_id] &&
+            decoded[0]['sub'] == config[:client_id] &&
+            decoded[0]['aud'] == config[:token_endpoint] &&
+            decoded[1]['kid'] == asymmetric_config[:kid]
+        end)
+      end
+
+      it 'does not include Authorization header' do
+        token_response
+        expect(WebMock).to(have_requested(:post, config[:token_endpoint])
+          .with { |req| !req.headers.key?('Authorization') })
+      end
+    end
+
+    context 'when confidential_asymmetric with missing credentials' do
+      it 'raises AuthError when private_key is missing' do
+        expect do
+          described_class.new(config.merge(kid: 'key-id'), auth_type: :confidential_asymmetric)
+                         .request_access_token(code: authorization_code, code_verifier: code_verifier)
+        end.to raise_error(Safire::Errors::AuthError, /Missing required asymmetric credentials/)
+      end
+
+      it 'raises AuthError when kid is missing' do
+        expect do
+          described_class.new(config.merge(private_key: rsa_private_key), auth_type: :confidential_asymmetric)
+                         .request_access_token(code: authorization_code, code_verifier: code_verifier)
+        end.to raise_error(Safire::Errors::AuthError, /Missing required asymmetric credentials/)
+      end
+    end
+
     context 'when invalid response (missing access_token)' do
       it 'raises AuthError' do
         stub_token_post(
-          body_params: {
+          body_matcher: {
             'grant_type' => 'authorization_code',
             'code' => 'auth_code_abc123',
             'redirect_uri' => config[:redirect_uri],
@@ -381,7 +479,7 @@ RSpec.describe Safire::Protocols::Smart do
     context 'when server OAuth error' do
       it 'raises AuthError' do
         stub_token_post(
-          body_params: {
+          body_matcher: {
             'grant_type' => 'authorization_code',
             'code' => 'bad',
             'redirect_uri' => config[:redirect_uri],
@@ -417,7 +515,7 @@ RSpec.describe Safire::Protocols::Smart do
     context 'when public client' do
       before do
         stub_token_post(
-          body_params: public_refresh_body,
+          body_matcher: public_refresh_body,
           status: 200,
           body: refreshed_token_response_body
         )
@@ -435,7 +533,7 @@ RSpec.describe Safire::Protocols::Smart do
 
       before do
         stub_token_post(
-          body_params: public_refresh_body.merge('scope' => custom_scopes.join(' ')),
+          body_matcher: public_refresh_body.merge('scope' => custom_scopes.join(' ')),
           status: 200,
           body: refreshed_token_response_body
         )
@@ -453,7 +551,7 @@ RSpec.describe Safire::Protocols::Smart do
 
       before do
         stub_token_post(
-          body_params: confidential_refresh_body,
+          body_matcher: confidential_refresh_body,
           status: 200,
           body: refreshed_token_response_body,
           headers: { 'Authorization' => auth_header }
@@ -471,9 +569,28 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when confidential_asymmetric' do
+      before do
+        stub_token_post(body_matcher: asymmetric_refresh_body_matcher, status: 200, body: refreshed_token_response_body)
+      end
+
+      it 'returns refreshed tokens with JWT assertion' do
+        res = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+                             .refresh_token(refresh_token: refresh_token_value)
+        expect(res).to eq(refreshed_token_response_body)
+
+        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+          body = URI.decode_www_form(req.body).to_h
+          body['client_assertion_type'] == 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
+            body['client_assertion'].present? &&
+            body_excludes_keys(:client_id).matches?(req)
+        end)
+      end
+    end
+
     it 'raises AuthError on invalid refresh token' do
       stub_token_post(
-        body_params: { 'grant_type' => 'refresh_token', 'refresh_token' => 'bad', 'client_id' => config[:client_id] },
+        body_matcher: { 'grant_type' => 'refresh_token', 'refresh_token' => 'bad', 'client_id' => config[:client_id] },
         status: 400,
         body: { 'error' => 'invalid_grant' }
       )
@@ -484,7 +601,7 @@ RSpec.describe Safire::Protocols::Smart do
 
     it 'raises AuthError when access_token missing' do
       stub_token_post(
-        body_params: { 'grant_type' => 'refresh_token', 'refresh_token' => 'x', 'client_id' => config[:client_id] },
+        body_matcher: { 'grant_type' => 'refresh_token', 'refresh_token' => 'x', 'client_id' => config[:client_id] },
         status: 200,
         body: { 'token_type' => 'Bearer' }
       )

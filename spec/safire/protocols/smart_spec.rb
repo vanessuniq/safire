@@ -344,7 +344,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
-    context 'when public lcient' do
+    context 'when public client' do
       subject(:token_response) do
         described_class.new(config, auth_type: :public)
                        .request_access_token(code: authorization_code, code_verifier: code_verifier)

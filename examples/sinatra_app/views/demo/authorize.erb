@@ -57,6 +57,7 @@
         <ul class="form-note-list">
           <li><code>auth_type=public</code> - Public client (default)</li>
           <li><code>auth_type=confidential_symmetric</code> - Confidential client with Basic Auth</li>
+          <li><code>auth_type=confidential_asymmetric</code> - Confidential client with JWT assertion</li>
         </ul>
       </div>
     <% end %>
@@ -92,9 +93,25 @@
           </label>
         <% end %>
 
-        <% unless @metadata.supports_public_auth? || @metadata.supports_symmetric_auth? %>
+        <% if @metadata.supports_asymmetric_auth? %>
+          <label class="radio-option <%= 'disabled' unless asymmetric_credentials_configured? %>">
+            <input type="radio" name="auth_type" value="confidential_asymmetric"
+                   <%= 'checked' unless @metadata.supports_public_auth? || @metadata.supports_symmetric_auth? %>
+                   <%= 'disabled' unless asymmetric_credentials_configured? %>>
+            <span class="radio-label">Confidential Asymmetric</span>
+            <span class="radio-description">
+              Client authenticates using a signed JWT assertion (private_key_jwt).
+              More secure than shared secrets.
+              <% unless asymmetric_credentials_configured? %>
+                <br><strong>Note:</strong> No asymmetric credentials configured. Set ASYMMETRIC_PRIVATE_KEY_PEM and ASYMMETRIC_KID environment variables.
+              <% end %>
+            </span>
+          </label>
+        <% end %>
+
+        <% unless @metadata.supports_public_auth? || @metadata.supports_symmetric_auth? || @metadata.supports_asymmetric_auth? %>
           <div class="warning-box">
-            This server does not support public or confidential symmetric clients.
+            This server does not support any recognized authentication methods.
           </div>
         <% end %>
       </div>

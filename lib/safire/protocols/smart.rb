@@ -115,8 +115,12 @@ module Safire
 
         @well_known_config = SmartMetadata.new(metadata)
       rescue StandardError => e
-        Safire.logger.error("SMART discovery for enpoint `#{well_known_endpoint}` failed: #{e.message.inspect}")
-        raise Errors::DiscoveryError, "Failed to discover SMART configuration: #{e.message.inspect}"
+        msg = "Failed to discover SMART configuration: #{e.message.inspect}"
+        details = e.try(:details)
+        log_msg = "SMART discovery for endpoint `#{well_known_endpoint}` failed: #{msg}"
+        log_msg += " (details: #{details.inspect})" if details
+        Safire.logger.error(log_msg)
+        raise Errors::DiscoveryError.new(msg, details: details)
       end
 
       # Builds the authorization URL to request an authorization code.
@@ -171,10 +175,10 @@ module Safire
         )
 
         parse_token_response(response.body)
-      rescue Faraday::ClientError => e
-        raise Errors::AuthError, "Failed to obtain access token: #{e.response[:body].inspect}"
       rescue StandardError => e
-        raise Errors::AuthError, "Failed to obtain access token: #{e.message.inspect}"
+        msg = "Failed to obtain access token: #{e.message.inspect}"
+        details = e.try(:details)
+        raise Errors::AuthError.new(msg, details: details)
       end
 
       # Exchanges a refresh token for a new access token.
@@ -200,10 +204,10 @@ module Safire
         )
 
         parse_token_response(response.body)
-      rescue Faraday::ClientError => e
-        raise Errors::AuthError, "Failed to refresh access token: #{e.response[:body].inspect}"
       rescue StandardError => e
-        raise Errors::AuthError, "Failed to refresh access token: #{e.message.inspect}"
+        msg = "Failed to refresh access token: #{e.message.inspect}"
+        details = e.try(:details)
+        raise Errors::AuthError.new(msg, details: details)
       end
 
       private

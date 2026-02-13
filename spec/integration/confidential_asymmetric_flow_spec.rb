@@ -145,11 +145,11 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
           headers: {
             'Content-Type' => 'application/x-www-form-urlencoded'
           }
-        ) { |req|
+        ) do |req|
           # Verify client_assertion is present and valid
           body = URI.decode_www_form(req.body).to_h
           body['client_assertion'].present?
-        }
+        end
         .to_return(
           status: 200,
           body: token_response.to_json,
@@ -191,10 +191,10 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
           headers: {
             'Content-Type' => 'application/x-www-form-urlencoded'
           }
-        ) { |req|
+        ) do |req|
           body = URI.decode_www_form(req.body).to_h
           body['client_assertion'].present?
-        }
+        end
         .to_return(
           status: 200,
           body: refreshed_token_response.to_json,
@@ -229,11 +229,11 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
       captured_jwt = nil
 
       stub_request(:post, "#{base_url}/token")
-        .with { |req|
+        .with do |req|
           body = URI.decode_www_form(req.body).to_h
           captured_jwt = body['client_assertion']
           true
-        }
+        end
         .to_return(
           status: 200,
           body: token_response.to_json,
@@ -280,11 +280,11 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
       captured_jwt = nil
 
       stub_request(:post, "#{base_url}/token")
-        .with { |req|
+        .with do |req|
           body = URI.decode_www_form(req.body).to_h
           captured_jwt = body['client_assertion']
           true
-        }
+        end
         .to_return(
           status: 200,
           body: token_response.to_json,
@@ -376,13 +376,13 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
       client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
 
       expect(WebMock).to(have_requested(:post, "#{base_url}/token")
-        .with { |req|
+        .with do |req|
           body = URI.decode_www_form(req.body).to_h
           !body.key?('client_id') &&
             body['client_assertion_type'] == 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
             body['client_assertion'].present? &&
             !req.headers.key?('Authorization')
-        })
+        end)
     end
   end
 

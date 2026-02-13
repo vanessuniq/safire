@@ -1,8 +1,13 @@
 # frozen_string_literal: true
 
+require 'pry-byebug' if ENV['RACK_ENV'] == 'development'
+require 'dotenv/load'
 require 'sinatra/base'
 require 'sinatra/reloader'
 require 'securerandom'
+require 'openssl'
+require 'json'
+require 'base64'
 require 'safire'
 require_relative 'models/fhir_server'
 
@@ -20,7 +25,7 @@ class SafireDemo < Sinatra::Base
     set :method_override, true
   end
 
-  helpers do
+  helpers do # rubocop:disable Metrics/BlockLength
     def redirect_uri
       "#{request.scheme}://#{request.host_with_port}/callback"
     end
@@ -40,11 +45,71 @@ class SafireDemo < Sinatra::Base
     def h(text)
       Rack::Utils.escape_html(text.to_s)
     end
+
+    def flash_error_message(context, error)
+      msg = "#{context}: #{error.message}"
+      msg += " — #{format_error_details(error.details)}" if error.respond_to?(:details) && error.details.present?
+      msg
+    end
+
+    def format_error_details(details)
+      return details.to_s unless details.is_a?(Hash)
+
+      parts = []
+      parts << "HTTP #{details[:status]}" if details[:status]
+      parts << extract_body_message(details[:body])
+      parts.compact.join(' — ')
+    end
+
+    def extract_body_message(body)
+      body = JSON.parse(body) if body.is_a?(String)
+      return body['error_description'] || body['error'] if body.is_a?(Hash)
+
+      body.presence&.to_s&.truncate(200)
+    rescue JSON::ParserError
+      body.to_s.truncate(200)
+    end
+
+    def asymmetric_credentials_configured?
+      ENV.fetch('ASYMMETRIC_PRIVATE_KEY_PEM', '').strip.length.positive? &&
+        ENV.fetch('ASYMMETRIC_KID', '').strip.length.positive?
+    end
+
+    def asymmetric_private_key
+      return nil unless asymmetric_credentials_configured?
+
+      pem = ENV.fetch('ASYMMETRIC_PRIVATE_KEY_PEM', nil)
+      OpenSSL::PKey.read(pem)
+    rescue OpenSSL::PKey::PKeyError
+      nil
+    end
+
+    def jwks_uri
+      "#{request.scheme}://#{request.host_with_port}/.well-known/jwks.json"
+    end
   end
 
   before do
     @flash = flash
     clear_flash
+  end
+
+  # ============================================
+  # JWKS Endpoint for Asymmetric Authentication
+  # ============================================
+
+  # Serve the client's public key as a JWKS
+  # Authorization servers fetch this to verify JWT assertions
+  get '/.well-known/jwks.json' do
+    content_type 'application/json'
+
+    halt 404, { error: 'No asymmetric credentials configured' }.to_json unless asymmetric_credentials_configured?
+
+    key = asymmetric_private_key
+    halt 500, { error: 'Invalid private key configuration' }.to_json unless key
+
+    jwk = build_jwk(key, ENV.fetch('ASYMMETRIC_KID', nil))
+    { keys: [jwk] }.to_json
   end
 
   # Home - list all servers
@@ -127,7 +192,7 @@ class SafireDemo < Sinatra::Base
       @safire_client = build_safire_client(@server)
       @metadata = @safire_client.smart_metadata
     rescue Safire::Errors::Error => e
-      set_flash(:error, "Server connection failed: #{e.message}")
+      set_flash(:error, flash_error_message('Server connection failed', e))
       redirect "/servers/#{@server.id}"
     end
   end
@@ -155,7 +220,7 @@ class SafireDemo < Sinatra::Base
       store_oauth_session(auth_data, auth_type, launch_type)
       redirect auth_data[:auth_url]
     rescue Safire::Errors::Error => e
-      set_flash(:error, "Authorization failed: #{e.message}")
+      set_flash(:error, flash_error_message('Authorization failed', e))
       redirect "/servers/#{@server.id}"
     end
   end
@@ -170,20 +235,21 @@ class SafireDemo < Sinatra::Base
 
     begin
       @old_access_token = session[:access_token]
-      @token_response = @safire_client.refresh_access_token(refresh_token: session[:refresh_token])
+      @token_response = @safire_client.refresh_token(refresh_token: session[:refresh_token])
 
       store_token_session(@token_response)
 
       erb :'demo/refresh'
     rescue Safire::Errors::Error => e
-      set_flash(:error, "Token refresh failed: #{e.message}")
+      set_flash(:error, flash_error_message('Token refresh failed', e))
       redirect "/servers/#{@server.id}"
     end
   end
 
   # EHR/Portal Launch endpoint
   # The EHR/Portal calls this URL with `launch` and `iss` parameters
-  # Optional: `auth_type` param to specify authentication type (public or confidential_symmetric)
+  # Optional: `auth_type` param to specify authentication type
+  # (public, confidential_symmetric, or confidential_asymmetric)
   get '/launch' do
     launch_token = params[:launch]
     iss = params[:iss]
@@ -210,7 +276,7 @@ class SafireDemo < Sinatra::Base
       store_oauth_session(auth_data, auth_type, 'ehr_launch')
       redirect auth_data[:auth_url]
     rescue Safire::Errors::Error => e
-      set_flash(:error, "EHR launch failed: #{e.message}")
+      set_flash(:error, flash_error_message('EHR launch failed', e))
       redirect "/servers/#{@server.id}"
     end
   end
@@ -250,7 +316,7 @@ class SafireDemo < Sinatra::Base
 
     erb :'demo/tokens'
   rescue Safire::Errors::Error => e
-    set_flash(:error, "Token exchange failed: #{e.message}")
+    set_flash(:error, flash_error_message('Token exchange failed', e))
     redirect "/servers/#{@server.id}"
   end
 
@@ -337,7 +403,7 @@ class SafireDemo < Sinatra::Base
     return :public if auth_type_param.to_s.strip.empty?
 
     auth_type = auth_type_param.to_s.strip.to_sym
-    %i[public confidential_symmetric].include?(auth_type) ? auth_type : :public
+    %i[public confidential_symmetric confidential_asymmetric].include?(auth_type) ? auth_type : :public
   end
 
   def build_safire_client(server, auth_type: :public)
@@ -347,8 +413,66 @@ class SafireDemo < Sinatra::Base
       redirect_uri: redirect_uri,
       scopes: server.scopes
     }
-    config[:client_secret] = server.client_secret if server.client_secret
+
+    case auth_type
+    when :confidential_symmetric
+      config[:client_secret] = server.client_secret
+    when :confidential_asymmetric
+      config[:private_key] = ENV.fetch('ASYMMETRIC_PRIVATE_KEY_PEM', nil)
+      config[:kid] = ENV.fetch('ASYMMETRIC_KID', nil)
+      config[:jwks_uri] = jwks_uri unless ENV['RACK_ENV'] == 'development'
+    end
 
     Safire::Client.new(config, auth_type: auth_type)
+  end
+
+  # Build a JWK from an OpenSSL key for the JWKS endpoint
+  def build_jwk(key, kid)
+    case key
+    when OpenSSL::PKey::RSA
+      build_rsa_jwk(key, kid)
+    when OpenSSL::PKey::EC
+      build_ec_jwk(key, kid)
+    else
+      raise ArgumentError, "Unsupported key type: #{key.class}"
+    end
+  end
+
+  def build_rsa_jwk(key, kid)
+    public_key = key.public_key
+    {
+      kty: 'RSA',
+      kid: kid,
+      use: 'sig',
+      alg: 'RS384',
+      n: base64url_encode(public_key.n.to_s(2)),
+      e: base64url_encode(public_key.e.to_s(2))
+    }
+  end
+
+  def build_ec_jwk(key, kid)
+    public_key = key.public_key
+    # Get the public key point coordinates
+    point = public_key.public_key
+    bn = point.to_bn(:uncompressed)
+    # For P-384 curve, coordinates are 48 bytes each
+    coord_size = 48
+    key_bytes = bn.to_s(2)[1..] # Skip the 0x04 prefix
+    x = key_bytes[0, coord_size]
+    y = key_bytes[coord_size, coord_size]
+
+    {
+      kty: 'EC',
+      kid: kid,
+      use: 'sig',
+      alg: 'ES384',
+      crv: 'P-384',
+      x: base64url_encode(x),
+      y: base64url_encode(y)
+    }
+  end
+
+  def base64url_encode(data)
+    Base64.urlsafe_encode64(data, padding: false)
   end
 end

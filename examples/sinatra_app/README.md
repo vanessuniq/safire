@@ -16,6 +16,7 @@ A Sinatra-based web application that demonstrates the features of the Safire gem
   - Confidential Symmetric (client_secret with Basic Auth)
   - Confidential Asymmetric (private_key_jwt with JWT assertion)
 - **Token Management**: View obtained tokens and test token refresh functionality
+- **Session Reset**: Clear all OAuth and token session data via the "Reset Session" button in the navigation bar
 - **JWKS Endpoint**: Serves the app's public key at `/.well-known/jwks.json` for asymmetric auth
 
 ## Quick Start
@@ -133,6 +134,14 @@ After completing an authorization flow, if the server issued a refresh token:
 2. Click "Test Token Refresh"
 3. View the refreshed tokens
 
+### Resetting Session
+
+Click the **"Reset Session"** button in the top navigation bar to clear all OAuth and token data from the current session. This is useful when:
+
+- Switching between authentication types or servers
+- Recovering from stale session state (e.g., after restarting the app)
+- Starting a fresh authorization flow
+
 ## File Structure
 
 ```
@@ -169,6 +178,7 @@ examples/sinatra_app/
 | `/.well-known/jwks.json` | JWKS endpoint serving the app's public key |
 | `/launch` | EHR/Portal launch endpoint |
 | `/callback` | OAuth2 callback handler |
+| `POST /reset-session` | Clears all OAuth and token session data |
 
 ## License
 

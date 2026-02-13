@@ -281,6 +281,14 @@ class SafireDemo < Sinatra::Base
     end
   end
 
+  # Reset session - clear all OAuth and token data
+  post '/reset-session' do
+    clear_oauth_session
+    clear_token_session
+    set_flash(:success, 'Session cleared successfully.')
+    redirect '/'
+  end
+
   # OAuth callback
   get '/callback' do
     return handle_invalid_state unless params[:state] == session[:oauth_state]

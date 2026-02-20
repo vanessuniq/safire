@@ -169,11 +169,11 @@ Safire::Errors::ConfigurationError: SMART Client auth flow requires scopes (Arra
 
 ## Token Exchange Errors
 
-### AuthError: Failed to obtain access token
+### TokenError: Failed to obtain access token
 
 **Symptoms:**
 ```ruby
-Safire::Errors::AuthError: Failed to obtain access token: "{\"error\":\"invalid_grant\"}"
+Safire::Errors::TokenError: Failed to obtain access token: "{\"error\":\"invalid_grant\"}"
 ```
 
 **Common Causes and Solutions:**
@@ -208,11 +208,11 @@ Safire::Errors::AuthError: Failed to obtain access token: "{\"error\":\"invalid_
    )
    ```
 
-### AuthError: Missing access token in response
+### TokenError: Missing access token in response
 
 **Symptoms:**
 ```ruby
-Safire::Errors::AuthError: Missing access token in response: {...}
+Safire::Errors::TokenError: Missing access token in response: {...}
 ```
 
 **Causes:**
@@ -221,13 +221,16 @@ Safire::Errors::AuthError: Missing access token in response: {...}
 
 **Solutions:**
 
-1. Inspect the actual response:
+1. Inspect the actual response using the `details` attribute:
    ```ruby
    begin
      tokens = client.request_access_token(code: code, code_verifier: verifier)
-   rescue Safire::Errors::AuthError => e
-     Rails.logger.error("Token response: #{e.message}")
-     # Check if there's an error field in the response
+   rescue Safire::Errors::TokenError => e
+     Rails.logger.error("Token error: #{e.message}")
+     if e.details
+       Rails.logger.error("HTTP status: #{e.details[:status]}")
+       Rails.logger.error("Response body: #{e.details[:body]}")
+     end
    end
    ```
 
@@ -309,11 +312,11 @@ Safire::Errors::ConfigurationError: client_secret is needed to request access to
 
 ## Refresh Token Errors
 
-### AuthError: Failed to refresh access token
+### TokenError: Failed to refresh access token
 
 **Symptoms:**
 ```ruby
-Safire::Errors::AuthError: Failed to refresh access token: "{\"error\":\"invalid_grant\"}"
+Safire::Errors::TokenError: Failed to refresh access token: "{\"error\":\"invalid_grant\"}"
 ```
 
 **Causes:**
@@ -328,8 +331,11 @@ Safire::Errors::AuthError: Failed to refresh access token: "{\"error\":\"invalid
    def refresh_access_token
      new_tokens = client.refresh_token(refresh_token: stored_refresh_token)
      # Update stored tokens
-   rescue Safire::Errors::AuthError => e
-     if e.message.include?('invalid_grant')
+   rescue Safire::Errors::TokenError => e
+     Rails.logger.error("Refresh failed: #{e.message}")
+
+     # Check the server's OAuth error in e.details
+     if e.details&.dig(:body)&.include?('invalid_grant')
        # Refresh token is no longer valid
        clear_session
        redirect_to launch_path, alert: 'Session expired. Please sign in again.'
@@ -497,16 +503,21 @@ def smart_auth_callback
   )
   # Store tokens...
 rescue Safire::Errors::ConfigurationError => e
-  # Client misconfiguration
+  # Client misconfiguration (missing credentials, invalid config)
   Rails.logger.error("Configuration error: #{e.message}")
   render plain: 'Server configuration error', status: :internal_server_error
-rescue Safire::Errors::AuthError => e
-  # Authorization/token errors
-  Rails.logger.error("Auth error: #{e.message}")
+rescue Safire::Errors::TokenError => e
+  # Token exchange/refresh errors (invalid grant, expired code, server rejection)
+  Rails.logger.error("Token error: #{e.message}")
+  # Access HTTP status and raw response body via e.details
+  if e.details
+    Rails.logger.error("HTTP #{e.details[:status]}: #{e.details[:body]}")
+  end
   redirect_to launch_path, alert: 'Authorization failed. Please try again.'
 rescue Safire::Errors::NetworkError => e
-  # Network/connection errors
+  # Network/connection errors (timeout, connection refused)
   Rails.logger.error("Network error: #{e.message}")
+  Rails.logger.error("Details: #{e.details.inspect}") if e.details
   render plain: 'Server temporarily unavailable', status: :service_unavailable
 end
 ```
@@ -520,8 +531,10 @@ def ensure_valid_token
   begin
     new_tokens = client.refresh_token(refresh_token: session[:refresh_token])
     update_tokens(new_tokens)
-  rescue Safire::Errors::AuthError
+  rescue Safire::Errors::TokenError => e
     # Refresh token invalid - need to re-authenticate
+    Rails.logger.error("Refresh failed: #{e.message}")
+    Rails.logger.error("Server response: #{e.details[:body]}") if e.details
     clear_session
     redirect_to launch_path
   end

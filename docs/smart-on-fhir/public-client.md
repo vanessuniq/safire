@@ -216,8 +216,9 @@ def callback
   session.delete(:code_verifier)
 
   redirect_to patient_path(session[:patient_id])
-rescue Safire::Errors::AuthError => e
+rescue Safire::Errors::TokenError => e
   Rails.logger.error("Token exchange failed: #{e.message}")
+  Rails.logger.error("Server response: #{e.details[:body]}") if e.details
   render plain: 'Authorization failed', status: :unauthorized
 end
 ```
@@ -306,8 +307,9 @@ module SmartAuthentication
     session[:refresh_token] = new_tokens['refresh_token'] if new_tokens['refresh_token']
 
     Rails.logger.info("Access token refreshed successfully")
-  rescue Safire::Errors::AuthError => e
+  rescue Safire::Errors::TokenError => e
     Rails.logger.error("Token refresh failed: #{e.message}")
+    Rails.logger.error("Server response: #{e.details[:body]}") if e.details
 
     # Clear invalid tokens
     clear_auth_session
@@ -509,8 +511,11 @@ def callback
   )
 
   # ... store tokens ...
-rescue Safire::Errors::AuthError => e
-  case e.message
+rescue Safire::Errors::TokenError => e
+  # Access the server's error response via e.details
+  body = e.details&.dig(:body)
+
+  case body
   when /invalid_grant/
     # Authorization code expired or was already used
     redirect_to launch_path, alert: 'Authorization code expired. Please try again.'
@@ -530,8 +535,9 @@ end
 The automatic refresh concern handles errors gracefully:
 
 ```ruby
-rescue Safire::Errors::AuthError => e
+rescue Safire::Errors::TokenError => e
   Rails.logger.error("Token refresh failed: #{e.message}")
+  Rails.logger.error("Server response: #{e.details[:body]}") if e.details
 
   # Clear invalid session state
   clear_auth_session
@@ -653,7 +659,7 @@ class SmartAuthController < ApplicationController
     session.delete(:launch_started_at)
 
     redirect_to patient_path(session[:patient_id])
-  rescue Safire::Errors::AuthError => e
+  rescue Safire::Errors::TokenError => e
     Rails.logger.error("Token exchange failed: #{e.message}")
     render plain: 'Authorization failed', status: :unauthorized
   end

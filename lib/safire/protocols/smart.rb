@@ -33,7 +33,7 @@ module Safire
     #
     # Token responses returned by {#request_access_token} and {#refresh_token} are
     # parsed JSON objects with **string keys**, and are validated to include
-    # `"access_token"`; otherwise a {Safire::Errors::AuthError} is raised.
+    # `"access_token"`; otherwise a {Safire::Errors::TokenError} is raised.
     #
     # @raise [Safire::Errors::ConfigurationError]
     #   if required configuration attributes are missing or invalid
@@ -107,6 +107,7 @@ module Safire
       #   Parsed SMART configuration metadata object.
       # @raise [Safire::Errors::DiscoveryError]
       #   If the discovery request fails or the response is not valid JSON.
+      #   The error's {Safire::Errors::Error#details details} may contain +:status+ and +:body+.
       def well_known_config
         return @well_known_config if @well_known_config
 
@@ -163,7 +164,8 @@ module Safire
       #   * "refresh_token"           [String] refresh token, if issued (optional)
       #   * "authorization_details"   [Hash] additional authorization details, if provided (optional)
       #   * Context parameters such as "patient" or "encounter" MAY be present, depending on server behavior.
-      # @raise [Safire::Errors::AuthError] if the request fails or response is invalid
+      # @raise [Safire::Errors::TokenError] if the request fails or response is invalid.
+      #   The error's {Safire::Errors::Error#details details} may contain +:status+ and +:body+.
       def request_access_token(code:, code_verifier:, client_secret: self.client_secret,
                                private_key: self.private_key, kid: self.kid)
         Safire.logger.info('Requesting access token using authorization code...')
@@ -178,7 +180,7 @@ module Safire
       rescue StandardError => e
         msg = "Failed to obtain access token: #{e.message.inspect}"
         details = e.try(:details)
-        raise Errors::AuthError.new(msg, details: details)
+        raise Errors::TokenError.new(msg, details: details)
       end
 
       # Exchanges a refresh token for a new access token.
@@ -192,7 +194,8 @@ module Safire
       # @return [Hash] token response parsed from the authorization server.
       #   See {Safire::Protocols::Smart#request_access_token} for token response format.
       #
-      # @raise [Safire::Errors::AuthError] if the refresh request fails or the response is invalid
+      # @raise [Safire::Errors::TokenError] if the refresh request fails or the response is invalid.
+      #   The error's {Safire::Errors::Error#details details} may contain +:status+ and +:body+.
       def refresh_token(refresh_token:, scopes: nil, client_secret: self.client_secret,
                         private_key: self.private_key, kid: self.kid)
         Safire.logger.info('Refreshing access token...')
@@ -207,7 +210,7 @@ module Safire
       rescue StandardError => e
         msg = "Failed to refresh access token: #{e.message.inspect}"
         details = e.try(:details)
-        raise Errors::AuthError.new(msg, details: details)
+        raise Errors::TokenError.new(msg, details: details)
       end
 
       private
@@ -243,9 +246,9 @@ module Safire
       end
 
       def parse_token_response(token_response)
-        parse_json_response(token_response, Errors::AuthError, 'token response').tap do |parsed|
+        parse_json_response(token_response, Errors::TokenError, 'token response').tap do |parsed|
           unless parsed['access_token'].present?
-            raise Errors::AuthError, "Missing access token in response: #{parsed.inspect}"
+            raise Errors::TokenError, "Missing access token in response: #{parsed.inspect}"
           end
         end
       end

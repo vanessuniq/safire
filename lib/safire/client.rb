@@ -25,7 +25,7 @@ module Safire
   #
   # Token responses returned by {.request_access_token} and {.refresh_token} are parsed
   # JSON objects with **string keys** and are validated to include `"access_token"`.
-  # On failure, a {Safire::Errors::AuthError} is raised.
+  # On failure, a {Safire::Errors::TokenError} is raised.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration

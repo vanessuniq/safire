@@ -36,6 +36,10 @@ Safire accepts configuration either as a Hash or a `Safire::ClientConfig` object
 | `scopes` | Array | Default scopes for authorization requests |
 | `authorization_endpoint` | String | Override discovered endpoint |
 | `token_endpoint` | String | Override discovered endpoint |
+| `private_key` | OpenSSL::PKey, String | RSA/EC private key for asymmetric clients (PEM string also accepted) |
+| `kid` | String | Key ID matching the public key registered with the server |
+| `jwt_algorithm` | String | JWT signing algorithm: RS384 or ES384 (auto-detected from key type) |
+| `jwks_uri` | String | URL to client's JWKS, included as `jku` in JWT header |
 
 ---
 
@@ -105,6 +109,23 @@ client = Safire::Client.new(
 )
 ```
 
+### Confidential Asymmetric Client
+
+```ruby
+client = Safire::Client.new(
+  {
+    base_url: 'https://fhir.example.com/r4',
+    client_id: 'my_client_id',
+    redirect_uri: 'https://myapp.com/callback',
+    scopes: ['openid', 'profile', 'patient/*.read'],
+    private_key: OpenSSL::PKey::RSA.new(File.read(ENV['SMART_PRIVATE_KEY_PATH'])),
+    kid: ENV['SMART_KEY_ID'],
+    jwks_uri: ENV['SMART_JWKS_URI']  # Optional
+  },
+  auth_type: :confidential_asymmetric
+)
+```
+
 ### Changing Auth Type
 
 You can change the auth type after initialization:
@@ -114,8 +135,10 @@ You can change the auth type after initialization:
 client = Safire::Client.new(config)
 metadata = client.smart_metadata
 
-# Switch to confidential_symmetric based on server capabilities
-if metadata.supports_symmetric_auth?
+# Switch based on server capabilities
+if metadata.supports_asymmetric_auth?
+  client.auth_type = :confidential_asymmetric
+elsif metadata.supports_symmetric_auth?
   client.auth_type = :confidential_symmetric
 end
 ```
@@ -128,7 +151,7 @@ end
 |-----------|-------------|----------------------|
 | `:public` | Public client using PKCE | `client_id` in request body |
 | `:confidential_symmetric` | Confidential client with secret | HTTP Basic auth header |
-| `:confidential_asymmetric` | Confidential client with JWT | JWT assertion (planned) |
+| `:confidential_asymmetric` | Confidential client with key pair | JWT assertion (RS384/ES384) |
 
 ---
 

@@ -308,6 +308,68 @@ Safire::Errors::ConfigurationError: client_secret is needed to request access to
    end
    ```
 
+### TokenError: Missing required asymmetric credentials
+
+**Symptoms:**
+```ruby
+Safire::Errors::TokenError: Failed to obtain access token: "Missing required asymmetric credentials: private_key"
+```
+
+**Causes:**
+- Using `:confidential_asymmetric` auth type without providing `private_key` or `kid`
+
+**Solutions:**
+
+1. Provide both `private_key` and `kid` in config:
+   ```ruby
+   config = Safire::ClientConfig.new(
+     base_url: 'https://fhir.example.com',
+     client_id: 'my_client',
+     redirect_uri: 'https://myapp.com/callback',
+     scopes: ['openid', 'profile'],
+     private_key: OpenSSL::PKey::RSA.new(File.read('private.pem')),
+     kid: 'my-key-id'
+   )
+
+   client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+   ```
+
+### 401 Unauthorized with JWT Assertion
+
+**Symptoms:**
+- Token exchange fails with 401 `invalid_client`
+- Server rejects the JWT assertion
+
+**Causes:**
+- Private key does not match the public key registered with the server
+- Wrong `kid` value
+- JWT expired (clock skew between client and server)
+- Server does not support `private_key_jwt`
+
+**Solutions:**
+
+1. Verify the public key is correctly registered:
+   ```ruby
+   # Ensure the kid matches what the server expects
+   kid: ENV['SMART_KEY_ID']  # Must match the server's registered key ID
+   ```
+
+2. Check for clock skew (JWT `exp` is max 5 minutes from `iat`):
+   ```bash
+   # Compare server time with local time
+   date -u
+   ```
+
+3. Verify server supports `private_key_jwt`:
+   ```ruby
+   metadata = client.smart_metadata
+   methods = metadata.token_endpoint_auth_methods_supported
+
+   unless methods.include?('private_key_jwt')
+     raise "Server doesn't support private_key_jwt"
+   end
+   ```
+
 ---
 
 ## Refresh Token Errors

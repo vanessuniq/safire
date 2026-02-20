@@ -693,5 +693,6 @@ end
 ## Next Steps
 
 - [Confidential Symmetric Client Workflow]({% link smart-on-fhir/confidential-symmetric.md %})
+- [Confidential Asymmetric Client Workflow]({% link smart-on-fhir/confidential-asymmetric.md %})
 - [SMART Discovery Details]({% link smart-on-fhir/discovery.md %})
 - [Troubleshooting Guide]({% link troubleshooting.md %})

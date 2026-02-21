@@ -11,12 +11,14 @@ Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** cli
 ## Features
 
 **Working:**
+
 - SMART App Launch Discovery (`/.well-known/smart-configuration`)
 - SMART on FHIR Public Client (PKCE)
 - SMART on FHIR Confidential Symmetric Client (client_secret + Basic Auth)
 - SMART on FHIR Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
 
 **Planned:**
+
 - SMART Backend Services (client_credentials grant)
 - UDAP Discovery (`/.well-known/udap`)
 - UDAP Client Flows (JWT Auth, Dynamic Client Registration, Tiered OAuth)

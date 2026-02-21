@@ -80,9 +80,9 @@ class SmartAuthController < ApplicationController
 
   def initialize_client
     config = Safire::ClientConfig.new(
-      base_url: ENV['FHIR_BASE_URL'],
-      client_id: ENV['SMART_CLIENT_ID'],
-      client_secret: ENV['SMART_CLIENT_SECRET'],  # Required for confidential
+      base_url: ENV.fetch('FHIR_BASE_URL'),
+      client_id: ENV.fetch('SMART_CLIENT_ID'),
+      client_secret: ENV.fetch('SMART_CLIENT_SECRET'),  # Required for confidential
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
@@ -304,9 +304,9 @@ module SmartAuthentication
 
   def build_smart_client
     config = Safire::ClientConfig.new(
-      base_url: ENV['FHIR_BASE_URL'],
-      client_id: ENV['SMART_CLIENT_ID'],
-      client_secret: ENV['SMART_CLIENT_SECRET'],
+      base_url: ENV.fetch('FHIR_BASE_URL'),
+      client_id: ENV.fetch('SMART_CLIENT_ID'),
+      client_secret: ENV.fetch('SMART_CLIENT_SECRET'),
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
@@ -669,9 +669,9 @@ class SmartAuthController < ApplicationController
 
   def initialize_client
     config = Safire::ClientConfig.new(
-      base_url: ENV['FHIR_BASE_URL'],
-      client_id: ENV['SMART_CLIENT_ID'],
-      client_secret: ENV['SMART_CLIENT_SECRET'],
+      base_url: ENV.fetch('FHIR_BASE_URL'),
+      client_id: ENV.fetch('SMART_CLIENT_ID'),
+      client_secret: ENV.fetch('SMART_CLIENT_SECRET'),
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )

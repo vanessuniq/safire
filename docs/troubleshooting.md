@@ -255,7 +255,7 @@ Safire::Errors::ConfigurationError: client_secret is needed to request access to
    config = Safire::ClientConfig.new(
      base_url: 'https://fhir.example.com',
      client_id: 'my_client',
-     client_secret: ENV['SMART_CLIENT_SECRET'],  # Required
+     client_secret: ENV.fetch('SMART_CLIENT_SECRET'),  # Required
      redirect_uri: 'https://myapp.com/callback',
      scopes: ['openid', 'profile']
    )
@@ -268,7 +268,7 @@ Safire::Errors::ConfigurationError: client_secret is needed to request access to
    tokens = client.request_access_token(
      code: code,
      code_verifier: verifier,
-     client_secret: ENV['SMART_CLIENT_SECRET']
+     client_secret: ENV.fetch('SMART_CLIENT_SECRET')
    )
    ```
 
@@ -288,8 +288,8 @@ Safire::Errors::ConfigurationError: client_secret is needed to request access to
 1. Verify credentials are correct:
    ```ruby
    # Check for typos or extra whitespace
-   client_id: ENV['SMART_CLIENT_ID'].strip
-   client_secret: ENV['SMART_CLIENT_SECRET'].strip
+   client_id: ENV.fetch('SMART_CLIENT_ID').strip
+   client_secret: ENV.fetch('SMART_CLIENT_SECRET').strip
    ```
 
 2. Special characters are handled automatically by Safire:
@@ -351,7 +351,7 @@ Safire::Errors::TokenError: Failed to obtain access token: "Missing required asy
 1. Verify the public key is correctly registered:
    ```ruby
    # Ensure the kid matches what the server expects
-   kid: ENV['SMART_KEY_ID']  # Must match the server's registered key ID
+   kid: ENV.fetch('SMART_KEY_ID')  # Must match the server's registered key ID
    ```
 
 2. Check for clock skew (JWT `exp` is max 5 minutes from `iat`):

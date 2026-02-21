@@ -87,13 +87,13 @@ client = Safire::Client.new(
 metadata = client.smart_metadata
 
 puts "Authorization endpoint: #{metadata.authorization_endpoint}"
-# => https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/authorize
+# => Authorization endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/authorize
 
 puts "Token endpoint: #{metadata.token_endpoint}"
-# => https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/token
+# => Token endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/token
 
 puts "Capabilities: #{metadata.capabilities.join(', ')}"
-# => launch-ehr, launch-standalone, client-public, ...
+# => Capabilities: launch-ehr, launch-standalone, client-public, ...
 ```
 
 ---

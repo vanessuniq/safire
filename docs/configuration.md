@@ -101,7 +101,7 @@ client = Safire::Client.new(
   {
     base_url: 'https://fhir.example.com/r4',
     client_id: 'my_client_id',
-    client_secret: ENV['SMART_CLIENT_SECRET'],
+    client_secret: ENV.fetch('SMART_CLIENT_SECRET'),
     redirect_uri: 'https://myapp.com/callback',
     scopes: ['openid', 'profile', 'patient/*.read']
   },
@@ -118,9 +118,9 @@ client = Safire::Client.new(
     client_id: 'my_client_id',
     redirect_uri: 'https://myapp.com/callback',
     scopes: ['openid', 'profile', 'patient/*.read'],
-    private_key: OpenSSL::PKey::RSA.new(File.read(ENV['SMART_PRIVATE_KEY_PATH'])),
-    kid: ENV['SMART_KEY_ID'],
-    jwks_uri: ENV['SMART_JWKS_URI']  # Optional
+    private_key: OpenSSL::PKey::RSA.new(File.read(ENV.fetch('SMART_PRIVATE_KEY_PATH'))),
+    kid: ENV.fetch('SMART_KEY_ID'),
+    jwks_uri: ENV.fetch('SMART_JWKS_URI')  # Optional
   },
   auth_type: :confidential_asymmetric
 )
@@ -215,7 +215,7 @@ class SmartClientService
       {
         base_url: ENV.fetch('FHIR_BASE_URL'),
         client_id: ENV.fetch('SMART_CLIENT_ID'),
-        client_secret: ENV['SMART_CLIENT_SECRET'],
+        client_secret: ENV.fetch('SMART_CLIENT_SECRET'),
         redirect_uri: Rails.application.routes.url_helpers.smart_callback_url,
         scopes: ENV.fetch('SMART_SCOPES', 'openid profile patient/*.read').split
       },

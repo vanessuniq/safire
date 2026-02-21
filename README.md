@@ -1,10 +1,8 @@
-# Safire (WIP)
+# Safire
 
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
-
-Implementation is still **work in progress**.
 
 Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** client protocols for healthcare applications.
 

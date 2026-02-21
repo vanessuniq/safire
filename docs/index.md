@@ -12,15 +12,12 @@ permalink: /
 
 A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for clients.
 
-{: .warning }
-> **Implementation** - Work in Progress
-
 ## Quick Navigation
 
 | Section | Description |
 |---------|-------------|
 | [Getting Started]({{ site.baseurl }}/installation/) | Install Safire and quick start guide |
-| [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Discovery, Public clients, Confidential Symmetric clients |
+| [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Discovery, Public clients, Confidential clients |
 | [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
 | [Safire API Docs]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |
 
@@ -31,7 +28,7 @@ A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for client
 | SMART Discovery | Implemented |
 | Public Client (PKCE) | Implemented |
 | Confidential Symmetric Client | Implemented |
-| Confidential Asymmetric Client | Planned |
+| Confidential Asymmetric Client | Implemented |
 | SMART Backend Services | Planned |
 | UDAP Protocols | Planned |
 

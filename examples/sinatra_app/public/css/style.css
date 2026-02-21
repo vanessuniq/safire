@@ -51,6 +51,27 @@ header .logo {
   font-weight: bold;
 }
 
+.nav-form {
+  margin: 0;
+}
+
+.btn-nav {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-nav:hover {
+  color: white;
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Main content */
 main {
   flex: 1;

@@ -101,7 +101,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
       expect(metadata.authorization_endpoint).to eq("#{base_url}/authorize")
       expect(metadata.token_endpoint).to eq("#{base_url}/token")
-      expect(metadata.supports_confidential_symmetric_clients?).to be true
+      expect(metadata.supports_symmetric_auth?).to be true
       expect(metadata.token_endpoint_auth_methods_supported).to include('client_secret_basic')
 
       # =====================================================
@@ -315,7 +315,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
   end
 
   describe 'Error Handling' do
-    it 'raises AuthError when client credentials are invalid' do
+    it 'raises TokenError when client credentials are invalid' do
       config = Safire::ClientConfig.new(
         base_url:,
         client_id:,
@@ -338,10 +338,10 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
 
       expect do
         client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
-      end.to raise_error(Safire::Errors::AuthError, /Failed to obtain access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Failed to obtain access token/)
     end
 
-    it 'raises AuthError when refresh token is invalid' do
+    it 'raises TokenError when refresh token is invalid' do
       config = Safire::ClientConfig.new(
         base_url:,
         client_id:,
@@ -364,7 +364,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
 
       expect do
         client.refresh_token(refresh_token: 'expired_token')
-      end.to raise_error(Safire::Errors::AuthError, /Failed to refresh access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Failed to refresh access token/)
     end
   end
 end

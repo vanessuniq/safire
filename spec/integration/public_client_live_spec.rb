@@ -69,7 +69,7 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
 
       # Check for common SMART capabilities
       expect(metadata.supports_standalone_launch?).to be true
-      expect(metadata.supports_public_clients?).to be true
+      expect(metadata.supports_public_auth?).to be true
     end
 
     it 'handles server metadata with optional fields' do

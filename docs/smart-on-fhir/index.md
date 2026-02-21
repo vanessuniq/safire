@@ -17,15 +17,21 @@ This section provides step-by-step guides for implementing SMART on FHIR authori
 | [SMART Discovery]({% link smart-on-fhir/discovery.md %}) | Fetching and using SMART configuration metadata |
 | [Public Client]({% link smart-on-fhir/public-client.md %}) | Authorization flow for browser-based and mobile applications |
 | [Confidential Symmetric Client]({% link smart-on-fhir/confidential-symmetric.md %}) | Authorization flow for server-side applications with client secrets |
+| [Confidential Asymmetric Client]({% link smart-on-fhir/confidential-asymmetric.md %}) | Authorization flow using private_key_jwt (RSA/EC key pair) |
 
 ## Choosing a Client Type
 
 ```
 Is your application a server-side web application
-that can securely store a client secret?
+that can securely store credentials?
         │
-        ├── YES → Confidential Symmetric Client
-        │         (Uses client_secret with HTTP Basic auth)
+        ├── YES → Can you use asymmetric key pairs (RSA/EC)?
+        │         │
+        │         ├── YES → Confidential Asymmetric Client
+        │         │         (Uses private_key_jwt with signed JWT assertions)
+        │         │
+        │         └── NO  → Confidential Symmetric Client
+        │                   (Uses client_secret with HTTP Basic auth)
         │
         └── NO  → Public Client
                   (Uses PKCE only, no client secret)

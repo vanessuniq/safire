@@ -182,15 +182,15 @@ metadata.supports_post_based_authorization?
 
 ```ruby
 # Public clients (browser apps, mobile)
-metadata.supports_public_clients?
+metadata.supports_public_auth?
 # => true (if capabilities include "client-public")
 
 # Confidential symmetric clients (server-side with client_secret)
-metadata.supports_confidential_symmetric_clients?
+metadata.supports_symmetric_auth?
 # => true (if capabilities include "client-confidential-symmetric")
 
 # Confidential asymmetric clients (JWT assertion)
-metadata.supports_confidential_asymmetric_clients?
+metadata.supports_asymmetric_auth?
 # => true (if capabilities include "client-confidential-asymmetric")
 ```
 
@@ -218,7 +218,7 @@ client = Safire::Client.new(config)
 metadata = client.smart_metadata
 
 # Switch to confidential_symmetric based on server capabilities
-if metadata.supports_confidential_symmetric_clients?
+if metadata.supports_symmetric_auth?
   client.auth_type = :confidential_symmetric
 end
 
@@ -237,11 +237,11 @@ tokens = client.request_access_token(code: code, code_verifier: verifier)
 def configure_auth_type(client)
   metadata = client.smart_metadata
 
-  if metadata.supports_confidential_asymmetric_clients?
+  if metadata.supports_asymmetric_auth?
     client.auth_type = :confidential_asymmetric
-  elsif metadata.supports_confidential_symmetric_clients?
+  elsif metadata.supports_symmetric_auth?
     client.auth_type = :confidential_symmetric
-  elsif metadata.supports_public_clients?
+  elsif metadata.supports_public_auth?
     client.auth_type = :public
   else
     raise "Server does not support any known client types"
@@ -577,4 +577,5 @@ standalone_servers = registry.all_capable_of('launch-standalone')
 
 - [Public Client Workflow]({% link smart-on-fhir/public-client.md %})
 - [Confidential Symmetric Client Workflow]({% link smart-on-fhir/confidential-symmetric.md %})
+- [Confidential Asymmetric Client Workflow]({% link smart-on-fhir/confidential-asymmetric.md %})
 - [Troubleshooting Guide]({% link troubleshooting.md %})

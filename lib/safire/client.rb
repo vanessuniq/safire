@@ -12,18 +12,20 @@ module Safire
   # * :redirect_uri [String] redirect URI registered with the authorization server
   # * :scopes [Array<String>] default scopes requested during authorization
   # * :client_secret [String, optional] required for confidential symmetric clients if not managed externally
+  # * :private_key [OpenSSL::PKey, String, optional] private key for confidential asymmetric clients
+  # * :kid [String, optional] key ID matching the registered public key for asymmetric clients
+  # * :jwt_algorithm [String, optional] JWT signing algorithm (RS384 or ES384). Auto-detected if not provided
+  # * :jwks_uri [String, optional] URL to client's JWKS for jku header in JWT assertions
   #
   # The `auth_type` controls how the underlying SMART client authenticates:
   #
   # * :public                - Public client; `client_id` is sent in token and refresh requests.
-  # * :confidential_symmetric - Confidential client using client_secret (e.g., HTTP Basic).
-  # * :confidential_asymmetric - Reserved for future support (e.g., private_key_jwt).
+  # * :confidential_symmetric - Confidential client using client_secret with HTTP Basic auth.
+  # * :confidential_asymmetric - Confidential client using private_key_jwt authentication (JWT assertion).
   #
   # Token responses returned by {.request_access_token} and {.refresh_token} are parsed
   # JSON objects with **string keys** and are validated to include `"access_token"`.
-  # On failure, a {Safire::Errors::AuthError} is raised.
-  #
-  # UDAP-based and additional asymmetric client flows are planned for a future iteration.
+  # On failure, a {Safire::Errors::TokenError} is raised.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration
@@ -98,7 +100,7 @@ module Safire
     #   client = Safire::Client.new(config)  # defaults to :public
     #   metadata = client.smart_metadata
     #
-    #   if metadata.supports_confidential_symmetric_clients?
+    #   if metadata.supports_symmetric_auth?
     #     client.auth_type = :confidential_symmetric
     #   end
     #
@@ -118,12 +120,14 @@ module Safire
       smart_client.authorization_url(launch:, custom_scopes:)
     end
 
-    def request_access_token(code:, code_verifier:, client_secret: config.client_secret)
-      smart_client.request_access_token(code:, code_verifier:, client_secret:)
+    def request_access_token(code:, code_verifier:, client_secret: config.client_secret,
+                             private_key: config.private_key, kid: config.kid)
+      smart_client.request_access_token(code:, code_verifier:, client_secret:, private_key:, kid:)
     end
 
-    def refresh_token(refresh_token:, scopes: nil, client_secret: config.client_secret)
-      smart_client.refresh_token(refresh_token:, scopes:, client_secret:)
+    def refresh_token(refresh_token:, scopes: nil, client_secret: config.client_secret,
+                      private_key: config.private_key, kid: config.kid)
+      smart_client.refresh_token(refresh_token:, scopes:, client_secret:, private_key:, kid:)
     end
 
     private

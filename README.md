@@ -1,10 +1,8 @@
-# Safire (WIP)
+# Safire
 
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
-
-Implementation is still **work in progress**.
 
 Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** client protocols for healthcare applications.
 
@@ -13,12 +11,14 @@ Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** cli
 ## Features
 
 **Working:**
+
 - SMART App Launch Discovery (`/.well-known/smart-configuration`)
 - SMART on FHIR Public Client (PKCE)
 - SMART on FHIR Confidential Symmetric Client (client_secret + Basic Auth)
+- SMART on FHIR Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
 
 **Planned:**
-- SMART on FHIR Confidential Asymmetric (private_key_jwt)
+
 - SMART Backend Services (client_credentials grant)
 - UDAP Discovery (`/.well-known/udap`)
 - UDAP Client Flows (JWT Auth, Dynamic Client Registration, Tiered OAuth)
@@ -44,7 +44,7 @@ bundle install
 | -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ | ---------- |
 | `:public`                  | Public client using PKCE (no secret)                       | `client_id` in token/refresh requests                  | ✅          |
 | `:confidential_symmetric`  | Confidential client using client_secret with Basic auth    | `Authorization: Basic base64(client_id:client_secret)` | ✅          |
-| `:confidential_asymmetric` | Confidential client using asymmetric key (private_key_jwt) | JWT assertion                                          | Planned |
+| `:confidential_asymmetric` | Confidential client using asymmetric key (private_key_jwt) | JWT assertion (RS384/ES384)                            | ✅          |
 | `:udap`                    | UDAP client using X.509 certificate and JWT-based auth     | Tiered OAuth (RFC 9126)                                | Planned |
 
 
@@ -94,7 +94,33 @@ new_tokens = client.refresh_token(refresh_token: stored_refresh_token)
 puts new_tokens["access_token"]
 ```
 
-To see additional examples for confidential clients, visit the [Safire Docs](https://vanessuniq.github.io/safire/).
+### Confidential Asymmetric Client (private_key_jwt)
+
+```ruby
+require 'safire'
+
+# Load your RSA or EC private key
+private_key = OpenSSL::PKey::RSA.new(File.read('private_key.pem'))
+
+client = Safire::Client.new(
+  {
+    base_url: 'https://fhir.example.com',
+    client_id: 'my_client_id',
+    redirect_uri: 'https://myapp.example.com/callback',
+    scopes: ['openid', 'profile', 'patient/*.read'],
+    private_key: private_key,
+    kid: 'my-key-id-123',          # Key ID registered with the server
+    jwks_uri: 'https://myapp.example.com/.well-known/jwks.json'  # Optional
+  },
+  auth_type: :confidential_asymmetric
+)
+
+# Usage is the same — Safire handles JWT assertion automatically
+auth_data = client.authorize_url
+token_data = client.request_access_token(code: '...', code_verifier: '...')
+```
+
+To see additional examples for all client types, visit the [Safire Docs](https://vanessuniq.github.io/safire/).
 
 ## Demo Application
 

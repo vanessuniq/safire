@@ -62,7 +62,7 @@ RSpec.describe 'Confidential Symmetric Client Flow (Live Server)', :live, type: 
       expect(metadata.valid?).to be true
 
       # Verify confidential symmetric support
-      expect(metadata.supports_confidential_symmetric_clients?).to be true
+      expect(metadata.supports_symmetric_auth?).to be true
 
       # Verify token endpoint auth methods include client_secret_basic
       auth_methods = metadata.token_endpoint_auth_methods_supported

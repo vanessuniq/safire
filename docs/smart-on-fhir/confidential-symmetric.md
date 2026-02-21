@@ -80,9 +80,9 @@ class SmartAuthController < ApplicationController
 
   def initialize_client
     config = Safire::ClientConfig.new(
-      base_url: ENV['FHIR_BASE_URL'],
-      client_id: ENV['SMART_CLIENT_ID'],
-      client_secret: ENV['SMART_CLIENT_SECRET'],  # Required for confidential
+      base_url: ENV.fetch('FHIR_BASE_URL'),
+      client_id: ENV.fetch('SMART_CLIENT_ID'),
+      client_secret: ENV.fetch('SMART_CLIENT_SECRET'),  # Required for confidential
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
@@ -98,7 +98,7 @@ end
 def check_server_capabilities
   metadata = @client.smart_metadata
 
-  unless metadata.supports_confidential_symmetric_clients?
+  unless metadata.supports_symmetric_auth?
     raise "Server does not support confidential symmetric clients"
   end
 
@@ -198,8 +198,9 @@ def callback
   session.delete(:code_verifier)
 
   redirect_to patient_path(session[:patient_id])
-rescue Safire::Errors::AuthError => e
+rescue Safire::Errors::TokenError => e
   Rails.logger.error("Token exchange failed: #{e.message}")
+  Rails.logger.error("Server response: #{e.details[:body]}") if e.details
   render plain: 'Authorization failed', status: :unauthorized
 end
 ```
@@ -283,8 +284,9 @@ module SmartAuthentication
     session[:refresh_token] = new_tokens['refresh_token'] if new_tokens['refresh_token']
 
     Rails.logger.info("Access token refreshed successfully")
-  rescue Safire::Errors::AuthError => e
+  rescue Safire::Errors::TokenError => e
     Rails.logger.error("Token refresh failed: #{e.message}")
+    Rails.logger.error("Server response: #{e.details[:body]}") if e.details
 
     # Clear invalid tokens
     clear_auth_session
@@ -302,9 +304,9 @@ module SmartAuthentication
 
   def build_smart_client
     config = Safire::ClientConfig.new(
-      base_url: ENV['FHIR_BASE_URL'],
-      client_id: ENV['SMART_CLIENT_ID'],
-      client_secret: ENV['SMART_CLIENT_SECRET'],
+      base_url: ENV.fetch('FHIR_BASE_URL'),
+      client_id: ENV.fetch('SMART_CLIENT_ID'),
+      client_secret: ENV.fetch('SMART_CLIENT_SECRET'),
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
@@ -435,7 +437,7 @@ def validate_server_before_registration
   metadata = client.smart_metadata
 
   {
-    supports_confidential_symmetric: metadata.supports_confidential_symmetric_clients?,
+    supports_confidential_symmetric: metadata.supports_symmetric_auth?,
     token_auth_methods: metadata.token_endpoint_auth_methods_supported,
     supports_basic_auth: metadata.token_endpoint_auth_methods_supported&.include?('client_secret_basic')
   }
@@ -451,8 +453,8 @@ module SmartSecretRotation
     begin
       # Try primary secret
       create_client(primary_secret)
-    rescue Safire::Errors::AuthError => e
-      if e.message.include?('invalid_client')
+    rescue Safire::Errors::TokenError => e
+      if e.details&.dig(:body)&.include?('invalid_client')
         # Fall back to secondary during rotation
         create_client(secondary_secret)
       else
@@ -483,8 +485,11 @@ def callback
     code: params[:code],
     code_verifier: session[:code_verifier]
   )
-rescue Safire::Errors::AuthError => e
-  case e.message
+rescue Safire::Errors::TokenError => e
+  # Check the server's OAuth error via e.details
+  body = e.details&.dig(:body)
+
+  case body
   when /invalid_client/
     # Client credentials are wrong
     Rails.logger.error("Invalid client credentials - check client_id and client_secret")
@@ -506,8 +511,8 @@ end
 def refresh_access_token
   new_tokens = client.refresh_token(refresh_token: session[:refresh_token])
   # ...
-rescue Safire::Errors::AuthError => e
-  if e.message.include?('invalid_grant')
+rescue Safire::Errors::TokenError => e
+  if e.details&.dig(:body)&.include?('invalid_grant')
     # Refresh token expired - user must re-authorize
     Rails.logger.info("Refresh token expired for user")
     clear_auth_session
@@ -651,8 +656,8 @@ class SmartAuthController < ApplicationController
     session.delete(:launch_started_at)
 
     redirect_to patient_path(session[:patient_id])
-  rescue Safire::Errors::AuthError => e
-    handle_auth_error(e)
+  rescue Safire::Errors::TokenError => e
+    handle_token_error(e)
   end
 
   def logout
@@ -664,9 +669,9 @@ class SmartAuthController < ApplicationController
 
   def initialize_client
     config = Safire::ClientConfig.new(
-      base_url: ENV['FHIR_BASE_URL'],
-      client_id: ENV['SMART_CLIENT_ID'],
-      client_secret: ENV['SMART_CLIENT_SECRET'],
+      base_url: ENV.fetch('FHIR_BASE_URL'),
+      client_id: ENV.fetch('SMART_CLIENT_ID'),
+      client_secret: ENV.fetch('SMART_CLIENT_SECRET'),
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
@@ -674,15 +679,17 @@ class SmartAuthController < ApplicationController
     @client = Safire::Client.new(config, auth_type: :confidential_symmetric)
   end
 
-  def handle_auth_error(error)
-    case error.message
+  def handle_token_error(error)
+    body = error.details&.dig(:body)
+
+    case body
     when /invalid_client/
       Rails.logger.error("Invalid client credentials")
       render plain: 'Configuration error', status: :internal_server_error
     when /invalid_grant/
       redirect_to launch_path, alert: 'Authorization expired. Please try again.'
     else
-      Rails.logger.error("Auth error: #{error.message}")
+      Rails.logger.error("Token error: #{error.message}")
       render plain: 'Authorization failed', status: :unauthorized
     end
   end
@@ -703,6 +710,7 @@ end
 
 ## Next Steps
 
+- [Confidential Asymmetric Client Workflow]({% link smart-on-fhir/confidential-asymmetric.md %})
 - [Public Client Workflow]({% link smart-on-fhir/public-client.md %})
 - [SMART Discovery Details]({% link smart-on-fhir/discovery.md %})
 - [Troubleshooting Guide]({% link troubleshooting.md %})

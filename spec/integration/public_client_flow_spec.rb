@@ -92,7 +92,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
       expect(metadata.authorization_endpoint).to eq("#{base_url}/authorize")
       expect(metadata.token_endpoint).to eq("#{base_url}/token")
       expect(metadata.code_challenge_methods_supported).to include('S256')
-      expect(metadata.supports_public_clients?).to be true
+      expect(metadata.supports_public_auth?).to be true
       expect(metadata.supports_standalone_launch?).to be true
 
       # =====================================================
@@ -278,7 +278,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
       expect { client.smart_metadata }.to raise_error(Safire::Errors::DiscoveryError)
     end
 
-    it 'raises AuthError when token exchange fails' do
+    it 'raises TokenError when token exchange fails' do
       config = Safire::ClientConfig.new(
         base_url:,
         client_id:,
@@ -301,10 +301,10 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
 
       expect do
         client.request_access_token(code: 'invalid_code', code_verifier: 'test_verifier')
-      end.to raise_error(Safire::Errors::AuthError, /Failed to obtain access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Failed to obtain access token/)
     end
 
-    it 'raises AuthError when refresh token is invalid' do
+    it 'raises TokenError when refresh token is invalid' do
       config = Safire::ClientConfig.new(
         base_url:,
         client_id:,
@@ -327,7 +327,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
 
       expect do
         client.refresh_token(refresh_token: 'invalid_refresh_token')
-      end.to raise_error(Safire::Errors::AuthError, /Failed to refresh access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Failed to refresh access token/)
     end
   end
 end

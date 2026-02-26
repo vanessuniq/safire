@@ -78,25 +78,68 @@ module Safire
 
     private
 
+    URI_ATTRS = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint jwks_uri].freeze
+    OPTIONAL_URI_ATTRS = %i[authorization_endpoint token_endpoint jwks_uri].freeze
+    private_constant :URI_ATTRS, :OPTIONAL_URI_ATTRS
+
+    # Validates all URI attributes for structure and HTTPS requirement.
+    #
+    # Per SMART App Launch 2.2.0 (§App Protection, §Confidential Asymmetric),
+    # all exchanges involving sensitive data SHALL use TLS. All endpoint URIs
+    # must therefore use the `https` scheme.
+    #
+    # Exception: `http` is permitted when the host is `localhost` or `127.0.0.1`
+    # to support local development without a TLS termination proxy.
+    #
+    # @raise [Errors::ConfigurationError] if any URI is malformed or uses HTTP on a non-localhost host
     def validate_uris!
-      uri_attrs = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint jwks_uri]
-      optional_uri_attrs = %i[authorization_endpoint token_endpoint jwks_uri]
+      invalid_uris, non_https_uris = collect_uri_violations
+      messages = build_uri_error_messages(invalid_uris, non_https_uris)
+      raise Errors::ConfigurationError, messages.join('. ') if messages.any?
+    end
 
-      invalid_uris = uri_attrs.select do |attr|
+    def collect_uri_violations
+      invalid_uris = []
+      non_https_uris = []
+
+      URI_ATTRS.each do |attr|
         value = send(attr)
-        next false if value.nil? && optional_uri_attrs.include?(attr)
+        next if value.nil? && OPTIONAL_URI_ATTRS.include?(attr)
 
-        begin
-          uri = Addressable::URI.parse(value)
-          !(uri.scheme && uri.host)
-        rescue Addressable::URI::InvalidURIError
-          true
+        case classify_uri(value)
+        when :invalid   then invalid_uris << attr
+        when :non_https then non_https_uris << attr
         end
       end
-      return if invalid_uris.empty?
 
-      raise Errors::ConfigurationError,
-            "Client configuration has invalid URIs for attributes: #{invalid_uris.to_sentence}"
+      [invalid_uris, non_https_uris]
+    end
+
+    def classify_uri(value)
+      uri = Addressable::URI.parse(value)
+      return :invalid unless uri.scheme && uri.host
+
+      :non_https if uri.scheme != 'https' && !localhost_host?(uri.host)
+    rescue Addressable::URI::InvalidURIError
+      :invalid
+    end
+
+    def build_uri_error_messages(invalid_uris, non_https_uris)
+      messages = []
+      if invalid_uris.any?
+        messages << "Client configuration has invalid URIs for attributes: #{invalid_uris.to_sentence}"
+      end
+      if non_https_uris.any?
+        messages << "Client configuration requires HTTPS for: #{non_https_uris.to_sentence} " \
+                    '(SMART App Launch 2.2.0 requires TLS; HTTP is only allowed for localhost)'
+      end
+      messages
+    end
+
+    # Returns true when the host is a local loopback address.
+    # HTTP is permitted for localhost to support development environments.
+    def localhost_host?(host)
+      %w[localhost 127.0.0.1].include?(host)
     end
 
     def validate!

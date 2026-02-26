@@ -43,6 +43,54 @@ Safire accepts configuration either as a Hash or a `Safire::ClientConfig` object
 
 ---
 
+## URI Validation and HTTPS Enforcement
+
+`ClientConfig` validates all URI parameters at initialization time and raises a `Safire::Errors::ConfigurationError` for any violation.
+
+### Rules
+
+- All URI attributes must be well-formed (scheme + host required)
+- All URIs must use `https` — enforced per SMART App Launch 2.2.0, which requires TLS for all exchanges involving sensitive data
+- **Exception:** `http` is permitted when the host is `localhost` or `127.0.0.1`, to support local development without a TLS termination proxy
+
+### Validated Attributes
+
+| Attribute | Required? |
+|-----------|-----------|
+| `base_url` | Always |
+| `redirect_uri` | Always |
+| `issuer` | When provided (defaults to `base_url`) |
+| `authorization_endpoint` | When provided |
+| `token_endpoint` | When provided |
+| `jwks_uri` | When provided |
+
+### Examples
+
+```ruby
+# Valid — HTTPS on production host
+Safire::ClientConfig.new(
+  base_url: 'https://fhir.example.com',
+  client_id: 'my_client',
+  redirect_uri: 'https://myapp.example.com/callback'
+)
+
+# Valid — HTTP allowed for localhost
+Safire::ClientConfig.new(
+  base_url: 'http://localhost:3000/fhir',
+  client_id: 'my_client',
+  redirect_uri: 'http://localhost:3000/callback'
+)
+
+# Raises ConfigurationError — HTTP on non-localhost host
+Safire::ClientConfig.new(
+  base_url: 'http://fhir.example.com',  # => ConfigurationError
+  client_id: 'my_client',
+  redirect_uri: 'https://myapp.example.com/callback'
+)
+```
+
+---
+
 ## Creating a Client
 
 ### Using a Hash (Recommended)

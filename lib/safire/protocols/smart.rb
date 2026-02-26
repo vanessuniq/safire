@@ -124,28 +124,34 @@ module Safire
         raise Errors::DiscoveryError.new(msg, details: details)
       end
 
-      # Builds the authorization URL to request an authorization code.
+      # Builds the authorization request data for the authorization code flow.
       #
       # See {Safire::Protocols::Smart} for configuration details and supported auth types.
       #
       # @param launch [String, nil] optional launch parameter
       # @param custom_scopes [Array<String>, nil] optional custom scopes to override the configured ones
+      # @param method [Symbol, String] authorization request method; +:get+ (default) or +:post+.
+      #   Both symbol and string forms are accepted (e.g. +method: :post+ or +method: 'post'+).
+      #   * +:get+  — builds a redirect URL with all parameters in the query string (standard flow)
+      #   * +:post+ — returns the endpoint and parameters separately for POST-based authorization
+      #     (SMART App Launch 2.2.0 +authorize-post+ capability)
       # @return [Hash] containing:
-      #   * :auth_url [String] the authorization URL to redirect the user to
-      #   * :state [String] the state parameter for CSRF protection
-      #   * :code_verifier [String] the PKCE code verifier for the token exchange
-      # @raise [Errors::ConfigurationError] if no scopes are configured or provided
-      def authorization_url(launch: nil, custom_scopes: nil)
+      #   * :auth_url [String] authorization URL (GET) or bare endpoint URL (POST)
+      #   * :state [String] state parameter for CSRF protection; store and verify on callback
+      #   * :code_verifier [String] PKCE code verifier for the token exchange
+      #   * :params [Hash] (POST only) authorization parameters to submit as the request body
+      # @raise [Errors::ConfigurationError] if no scopes are configured or if method is invalid
+      def authorization_url(launch: nil, custom_scopes: nil, method: :get)
+        method = method.to_sym
         validate_presence_of_scopes(custom_scopes)
+        validate_authorization_method(method)
 
-        Safire.logger.info("Generating authorization URL for SMART #{auth_type}...")
+        Safire.logger.info("Generating authorization URL for SMART #{auth_type} (method: #{method})...")
 
         code_verifier = PKCE.generate_code_verifier
+        params = authorization_params(launch:, custom_scopes:, code_verifier:)
 
-        uri = Addressable::URI.parse(authorization_endpoint)
-        uri.query_values = authorization_params(launch:, custom_scopes:, code_verifier:)
-
-        { auth_url: uri.to_s, state: uri.query_values['state'], code_verifier: }
+        build_authorization_response(method, params, code_verifier)
       end
 
       # Exchanges the authorization code for an access token.
@@ -221,6 +227,23 @@ module Safire
 
         raise Errors::ConfigurationError,
               "SMART Client configuration missing attributes: #{missing.to_sentence}"
+      end
+
+      def validate_authorization_method(method)
+        return if %i[get post].include?(method)
+
+        raise Errors::ConfigurationError,
+              "Invalid authorization method: #{method.inspect}. Supported methods are :get and :post"
+      end
+
+      def build_authorization_response(method, params, code_verifier)
+        if method == :post
+          { auth_url: authorization_endpoint, params:, state: params[:state], code_verifier: }
+        else
+          uri = Addressable::URI.parse(authorization_endpoint)
+          uri.query_values = params
+          { auth_url: uri.to_s, state: uri.query_values['state'], code_verifier: }
+        end
       end
 
       def validate_presence_of_scopes(custom_scopes = nil)

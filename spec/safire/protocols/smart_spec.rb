@@ -328,6 +328,58 @@ RSpec.describe Safire::Protocols::Smart do
       data2 = described_class.new(cfg2).authorization_url
       expect(data2[:auth_url]).to include(CGI.escape(cfg2[:redirect_uri]))
     end
+
+    context 'when method: :post' do
+      let(:post_auth_data) { described_class.new(config).authorization_url(method: :post) }
+
+      it 'returns auth_url, params, state, and code_verifier' do
+        expect(post_auth_data.keys).to contain_exactly(:auth_url, :params, :state, :code_verifier)
+      end
+
+      it 'auth_url is the bare authorization endpoint with no query string' do
+        expect(post_auth_data[:auth_url]).to eq(config[:authorization_endpoint])
+        expect(post_auth_data[:auth_url]).not_to include('?')
+      end
+
+      it 'params contains all required oauth and pkce fields' do
+        p = post_auth_data[:params]
+        expect(p).to include(
+          response_type: 'code',
+          client_id: config[:client_id],
+          redirect_uri: config[:redirect_uri],
+          aud: config[:base_url],
+          code_challenge_method: 'S256'
+        )
+        expect(p[:code_challenge]).to match(/\A[A-Za-z0-9_-]{43}\z/)
+        expect(p[:code_challenge]).to eq(Safire::PKCE.generate_code_challenge(post_auth_data[:code_verifier]))
+      end
+
+      it 'state in response matches state in params' do
+        expect(post_auth_data[:state]).to eq(post_auth_data[:params][:state])
+        expect(post_auth_data[:state]).to match(/\A[a-f0-9]{32}\z/)
+      end
+    end
+
+    context 'when method is provided as a string' do
+      it 'accepts "post" and returns params hash' do
+        data = described_class.new(config).authorization_url(method: 'post')
+        expect(data[:auth_url]).to eq(config[:authorization_endpoint])
+        expect(data[:params]).to be_a(Hash)
+      end
+
+      it 'accepts "get" and returns redirect URL' do
+        data = described_class.new(config).authorization_url(method: 'get')
+        expect(data[:auth_url]).to include('?')
+        expect(data.key?(:params)).to be(false)
+      end
+    end
+
+    context 'when method is invalid' do
+      it 'raises ConfigurationError' do
+        expect { described_class.new(config).authorization_url(method: :patch) }
+          .to raise_error(Safire::Errors::ConfigurationError, /Invalid authorization method/)
+      end
+    end
   end
 
   # ---------- Token Exchange ----------

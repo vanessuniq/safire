@@ -47,8 +47,8 @@ module Safire
     # @!attribute [r] capabilities
     #   @return [Array<String>] list of SMART capabilities supported by the server.
     # @!attribute [r] code_challenge_methods_supported
-    #   @return [Array<String>] list of PKCE code challenge methods supported. Must include "S256".
-    #     Must not include "plain".
+    #   @return [Array<String>] list of PKCE code challenge methods supported. Should include "S256".
+    #     Should not include "plain". See {#valid?} for compliance checks.
     class SmartMetadata < Safire::Entity
       REQUIRED_ATTRIBUTES = %i[
         grant_types_supported token_endpoint capabilities
@@ -83,14 +83,38 @@ module Safire
         super(metadata, ATTRIBUTES)
       end
 
+      # Checks whether the server's SMART metadata is valid according to SMART App Launch 2.2.0.
+      #
+      # This is a user-callable helper. Safire performs discovery without automatically
+      # asserting server compliance — it is the caller's responsibility to invoke this
+      # method when they wish to verify conformance.
+      #
+      # Checks performed:
+      # - All required fields are present
+      #   (token_endpoint, grant_types_supported, capabilities, code_challenge_methods_supported)
+      # - Conditional fields present when their capability is advertised
+      #   (issuer + jwks_uri for sso-openid-connect; authorization_endpoint for launch types)
+      # - `code_challenge_methods_supported` includes 'S256'
+      #   (SMART App Launch 2.2.0, §Conformance — SHALL be included)
+      # - `code_challenge_methods_supported` does NOT include 'plain'
+      #   (SMART App Launch 2.2.0, §Conformance — SHALL NOT be included)
+      #
+      # A warning is logged for each SMART 2.2.0 violation detected.
+      #
+      # @return [Boolean] true if all checks pass, false if any violation is found
       def valid?
         required_attrs = [*REQUIRED_ATTRIBUTES]
         required_attrs.push(:issuer, :jwks_uri) if issuer_and_jwks_uri_required?
         required_attrs.push(:authorization_endpoint) if authorization_endpoint_required?
 
         missing_attrs = required_attrs.reject { |attr| public_send(attr) }
+        missing_attrs.each do |attr|
+          Safire.logger.warn("SMART metadata non-compliance: required field '#{attr}' is missing")
+        end
 
-        missing_attrs.empty?
+        pkce_valid = validate_pkce_methods!
+
+        missing_attrs.empty? && pkce_valid
       end
 
       # Launch type support checks - requires both capability and authorization_endpoint
@@ -173,6 +197,34 @@ module Safire
 
       def authorization_endpoint_required?
         ehr_launch_capability? || standalone_launch_capability?
+      end
+
+      # Validates PKCE code challenge methods per SMART App Launch 2.2.0:
+      # - 'S256' SHALL be included
+      # - 'plain' SHALL NOT be included
+      #
+      # @return [Boolean] true if both conditions are satisfied
+      def validate_pkce_methods!
+        methods = code_challenge_methods_supported
+        valid = true
+
+        unless methods&.include?('S256')
+          Safire.logger.warn(
+            "SMART metadata non-compliance: 'S256' is missing from code_challenge_methods_supported " \
+            '(SMART App Launch 2.2.0 requires S256)'
+          )
+          valid = false
+        end
+
+        if methods&.include?('plain')
+          Safire.logger.warn(
+            "SMART metadata non-compliance: 'plain' is present in code_challenge_methods_supported " \
+            '(SMART App Launch 2.2.0 prohibits plain)'
+          )
+          valid = false
+        end
+
+        valid
       end
     end
   end

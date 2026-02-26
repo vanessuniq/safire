@@ -222,6 +222,35 @@ When endpoints are provided, Safire uses them directly instead of fetching from 
 
 ---
 
+## Token Response Validation
+
+After a successful token exchange, use `Safire.token_response_valid?` to verify the server's
+response meets SMART App Launch 2.2.0 requirements. This is a caller-invoked helper — token
+exchange methods return the raw response without checking compliance.
+
+Logs a warning per violation and returns `false`. Never raises.
+
+```ruby
+token_data = client.request_access_token(code: code, code_verifier: verifier)
+
+unless Safire.token_response_valid?(token_data)
+  # Safire has already logged each violation, e.g.:
+  # WARN: SMART token response non-compliance: required field 'scope' is missing
+  # WARN: SMART token response non-compliance: token_type is "bearer"; expected 'Bearer'
+  raise "Server token response does not meet SMART App Launch 2.2.0 requirements"
+end
+```
+
+**Checks performed (SMART App Launch 2.2.0 §Token Response):**
+
+| Field | Requirement |
+|-------|-------------|
+| `access_token` | SHALL be present |
+| `token_type` | SHALL be present and exactly `"Bearer"` (case-sensitive) |
+| `scope` | SHALL be present |
+
+---
+
 ## Logging Configuration
 
 Configure Safire's logger for debugging:

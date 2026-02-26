@@ -115,17 +115,29 @@ end
 
 ### Validation Rules
 
-`valid?` checks for the presence of:
+`valid?` performs the following checks and logs a warning for each violation found:
 
-**Always Required:**
+**Field presence — always required:**
 - `token_endpoint`
 - `grant_types_supported`
 - `capabilities`
 - `code_challenge_methods_supported`
 
-**Conditionally Required:**
-- `authorization_endpoint` - when capabilities include `launch-ehr` or `launch-standalone`
-- `issuer` and `jwks_uri` - when capabilities include `sso-openid-connect`
+**Field presence — conditionally required:**
+- `authorization_endpoint` — when capabilities include `launch-ehr` or `launch-standalone`
+- `issuer` and `jwks_uri` — when capabilities include `sso-openid-connect`
+
+**PKCE content checks (SMART App Launch 2.2.0):**
+- `code_challenge_methods_supported` **must include** `'S256'` (spec: SHALL be included)
+- `code_challenge_methods_supported` **must not include** `'plain'` (spec: SHALL NOT be included)
+
+{: .note }
+> **Non-blocking warnings**
+>
+> `valid?` never raises an exception. Each violation is logged via `Safire.logger.warn`
+> and the method returns `false`. Discovery itself is not blocked — this is intentional.
+> Safire's role is to discover the configuration; server compliance checking is the
+> caller's responsibility.
 
 ```ruby
 # Example: A backend service with no launch capabilities
@@ -254,21 +266,24 @@ configure_auth_type(client)
 
 ### Validating PKCE Support
 
+`valid?` now includes PKCE content checks. Warnings are logged automatically:
+
 ```ruby
-def validate_pkce_support(metadata)
-  methods = metadata.code_challenge_methods_supported || []
+metadata = client.smart_metadata
 
-  unless methods.include?('S256')
-    raise "Server does not support S256 PKCE (required for security)"
-  end
-
-  # Per spec, servers MUST support S256 and MUST NOT support "plain"
-  if methods.include?('plain')
-    Rails.logger.warn("Server advertises 'plain' PKCE - this is non-compliant")
-  end
+unless metadata.valid?
+  # Safire has already logged warnings for each violation, e.g.:
+  # WARN: SMART metadata non-compliance: 'S256' is missing from code_challenge_methods_supported
+  # WARN: SMART metadata non-compliance: 'plain' is present in code_challenge_methods_supported
+  raise "Server metadata does not meet SMART App Launch 2.2.0 requirements"
 end
+```
 
-validate_pkce_support(client.smart_metadata)
+If you need to enforce PKCE compliance programmatically without calling `valid?`:
+
+```ruby
+methods = metadata.code_challenge_methods_supported || []
+raise "Server does not support S256 PKCE" unless methods.include?('S256')
 ```
 
 ### Checking Authentication Methods

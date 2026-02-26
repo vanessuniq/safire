@@ -9,14 +9,82 @@ RSpec.describe Safire::Protocols::SmartMetadata do
   let(:smart_metadata) { described_class.new(full_metadata) }
 
   describe '#valid?' do
-    it 'returns true if all required fields are present' do
-      expect(smart_metadata.valid?).to be(true)
+    before { allow(Safire.logger).to receive(:warn) }
+
+    it 'returns true if all required fields are present and PKCE methods are compliant' do
+      result = smart_metadata.valid?
+
+      expect(result).to be(true)
+      expect(Safire.logger).not_to have_received(:warn)
     end
 
     it 'returns false if a required field is missing' do
-      smart_metadata = described_class.new({ authorization_endpoint: 'example.com' })
+      metadata = described_class.new({ authorization_endpoint: 'example.com' })
 
-      expect(smart_metadata.valid?).to be(false)
+      expect(metadata.valid?).to be(false)
+    end
+
+    it 'logs a warning for each missing required field' do
+      metadata = described_class.new({ authorization_endpoint: 'example.com' })
+      metadata.valid?
+
+      expect(Safire.logger).to have_received(:warn).with(/required field 'token_endpoint' is missing/)
+      expect(Safire.logger).to have_received(:warn).with(/required field 'grant_types_supported' is missing/)
+      expect(Safire.logger).to have_received(:warn).with(/required field 'capabilities' is missing/)
+      expect(Safire.logger).to have_received(:warn).with(/required field 'code_challenge_methods_supported' is missing/)
+    end
+
+    context 'when checking PKCE method compliance' do
+      it 'returns false and logs warnings when only plain is in code_challenge_methods_supported' do
+        data = full_metadata.merge('code_challenge_methods_supported' => ['plain'])
+        metadata = described_class.new(data)
+
+        result = metadata.valid?
+
+        expect(result).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/'S256' is missing from code_challenge_methods_supported/)
+        expect(Safire.logger).to have_received(:warn).with(/'plain' is present in code_challenge_methods_supported/)
+      end
+
+      it 'returns false and logs a warning when S256 is missing' do
+        data = full_metadata.merge('code_challenge_methods_supported' => ['RS256'])
+        metadata = described_class.new(data)
+
+        result = metadata.valid?
+
+        expect(result).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/'S256' is missing from code_challenge_methods_supported/)
+      end
+
+      it 'returns false and logs a warning when plain is present alongside S256' do
+        data = full_metadata.merge('code_challenge_methods_supported' => %w[S256 plain])
+        metadata = described_class.new(data)
+
+        result = metadata.valid?
+
+        expect(result).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/'plain' is present in code_challenge_methods_supported/)
+      end
+
+      it 'returns true and logs no warnings when S256 is present and plain is absent' do
+        data = full_metadata.merge('code_challenge_methods_supported' => ['S256'])
+        metadata = described_class.new(data)
+
+        result = metadata.valid?
+
+        expect(result).to be(true)
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+
+      it 'returns false and logs a warning when code_challenge_methods_supported is empty' do
+        data = full_metadata.merge('code_challenge_methods_supported' => [])
+        metadata = described_class.new(data)
+
+        result = metadata.valid?
+
+        expect(result).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/'S256' is missing from code_challenge_methods_supported/)
+      end
     end
   end
 

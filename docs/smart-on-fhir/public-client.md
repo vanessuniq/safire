@@ -135,6 +135,11 @@ auth_data
 >
 > Each call to `authorize_url()` generates a new `state` and `code_verifier`. These values are unique per authorization attempt.
 
+{: .note }
+> **POST-Based Authorization**
+>
+> If the server advertises the `authorize-post` capability, you can pass `method: :post` to `authorize_url` to submit the authorization request as a form POST instead of a GET redirect. See [POST-Based Authorization]({% link smart-on-fhir/post-based-authorization.md %}) for details.
+
 ### Authorization URL Parameters
 
 The generated URL includes:

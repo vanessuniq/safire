@@ -18,6 +18,7 @@ This section provides step-by-step guides for implementing SMART on FHIR authori
 | [Public Client]({% link smart-on-fhir/public-client.md %}) | Authorization flow for browser-based and mobile applications |
 | [Confidential Symmetric Client]({% link smart-on-fhir/confidential-symmetric.md %}) | Authorization flow for server-side applications with client secrets |
 | [Confidential Asymmetric Client]({% link smart-on-fhir/confidential-asymmetric.md %}) | Authorization flow using private_key_jwt (RSA/EC key pair) |
+| [POST-Based Authorization]({% link smart-on-fhir/post-based-authorization.md %}) | Sending the authorization request as a form POST (`authorize-post` capability) |
 
 ## Choosing a Client Type
 

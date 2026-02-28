@@ -16,6 +16,7 @@ Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** cli
 - SMART on FHIR Public Client (PKCE)
 - SMART on FHIR Confidential Symmetric Client (client_secret + Basic Auth)
 - SMART on FHIR Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
+- POST-Based Authorization (`authorize-post` capability, SMART 2.2.0)
 
 **Planned:**
 
@@ -72,7 +73,9 @@ puts "Capabilities: #{metadata.capabilities.join(', ')}"
 # Safire automatically retrieves endpoints from SMART metadata
 
 # Step 1 – /launch route (authorization request)
-auth_data = client.authorize_url
+# Use method: :post if the server advertises the 'authorize-post' capability
+auth_data = client.authorize_url            # GET redirect (default)
+# auth_data = client.authorize_url(method: :post)  # POST form submission
 
 session[:state] = auth_data[:state]
 session[:code_verifier] = auth_data[:code_verifier]

@@ -116,8 +116,8 @@ module Safire
       @smart_metadata ||= smart_client.well_known_config
     end
 
-    def authorize_url(launch: nil, custom_scopes: nil)
-      smart_client.authorization_url(launch:, custom_scopes:)
+    def authorize_url(launch: nil, custom_scopes: nil, method: :get)
+      smart_client.authorization_url(launch:, custom_scopes:, method:)
     end
 
     def request_access_token(code:, code_verifier:, client_secret: config.client_secret,

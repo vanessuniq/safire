@@ -34,6 +34,4 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'faraday', '~> 2.14'
   spec.add_dependency 'faraday-follow_redirects', '~> 0.4'
   spec.add_dependency 'jwt', '~> 2.8'
-  spec.add_dependency 'pry'
-  spec.add_dependency 'pry-byebug'
 end

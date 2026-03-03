@@ -7,6 +7,8 @@ gemspec
 group :development, :test do
   gem 'bundler-audit', '~> 0.9'
   gem 'debug'
+  gem 'pry'
+  gem 'pry-byebug'
   gem 'rspec', '~> 3.12'
   gem 'rubocop', '~> 1.57'
   gem 'rubocop-rspec', '~> 3.0', require: false

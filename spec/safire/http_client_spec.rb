@@ -48,6 +48,60 @@ RSpec.describe Safire::HTTPClient do
     end
   end
 
+  describe 'HTTP request logging' do
+    let(:log_output) { StringIO.new }
+    let(:test_logger) { Logger.new(log_output) }
+
+    context 'when log_http is true (default)' do
+      before do
+        allow(Safire).to receive_messages(
+          configuration: instance_double(Safire::Configuration, log_http: true),
+          logger: test_logger
+        )
+      end
+
+      let(:logging_client) { described_class.new(base_url:) }
+
+      it 'logs HTTP requests' do
+        stub_request(:get, base_url).to_return(status: 200, body: {}.to_json)
+        logging_client.get
+        expect(log_output.string).not_to be_empty
+      end
+
+      it 'filters the Authorization header value' do
+        stub_request(:post, "#{base_url}/token").to_return(status: 200, body: {}.to_json)
+        logging_client.post('/token', headers: { 'Authorization' => 'Basic c2VjcmV0' })
+        expect(log_output.string).to include('[FILTERED]')
+        expect(log_output.string).not_to include('c2VjcmV0')
+      end
+
+      it 'does not log request or response bodies' do
+        stub_request(:post, "#{base_url}/token")
+          .to_return(status: 200, body: { access_token: 'secret_token' }.to_json)
+        logging_client.post('/token', body: { client_secret: 'my_secret' })
+        expect(log_output.string).not_to include('my_secret')
+        expect(log_output.string).not_to include('secret_token')
+      end
+    end
+
+    context 'when log_http is false' do
+      before do
+        allow(Safire).to receive_messages(
+          configuration: instance_double(Safire::Configuration, log_http: false),
+          logger: test_logger
+        )
+      end
+
+      let(:quiet_client) { described_class.new(base_url:) }
+
+      it 'does not log HTTP requests' do
+        stub_request(:get, base_url).to_return(status: 200, body: {}.to_json)
+        quiet_client.get
+        expect(log_output.string).to be_empty
+      end
+    end
+  end
+
   describe 'integration scenarios' do
     it 'handles full CRUD cycle' do
       body = { id: 1, name: 'Item 1' }.to_json

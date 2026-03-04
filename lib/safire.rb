@@ -105,10 +105,11 @@ module Safire
   end
 
   class Configuration
-    attr_accessor :logger, :log_level, :user_agent
+    attr_accessor :logger, :log_level, :user_agent, :log_http
 
     def initialize
       @user_agent = "Safire v#{Safire::VERSION}"
+      @log_http   = true
     end
   end
 

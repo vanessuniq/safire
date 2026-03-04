@@ -40,8 +40,16 @@ module Safire
         builder.response :follow_redirects
         builder.response :json
         builder.response :raise_error
-        builder.response :logger
+        configure_logger(builder)
         builder.adapter @adapter
+      end
+    end
+
+    def configure_logger(builder)
+      return if Safire.configuration&.log_http == false
+
+      builder.response :logger, Safire.logger, { headers: { request: true, response: true }, bodies: false } do |logger|
+        logger.filter(/(Authorization: )(.+)/, '\1[FILTERED]')
       end
     end
 

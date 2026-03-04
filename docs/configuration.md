@@ -253,13 +253,28 @@ end
 
 ## Logging Configuration
 
-Configure Safire's logger for debugging:
+Configure Safire's logger and HTTP request logging via `Safire.configure`:
 
 ```ruby
 # config/initializers/safire.rb
 Safire.configure do |config|
-  config.logger = Rails.logger
+  config.logger    = Rails.logger
   config.log_level = Logger::DEBUG  # In development
+  config.log_http  = true           # Default — log HTTP requests with sensitive data filtered
+end
+```
+
+### `log_http` — HTTP Request Logging
+
+| Value | Behaviour |
+|-------|-----------|
+| `true` (default) | HTTP requests and responses are logged. The `Authorization` header is replaced with `[FILTERED]`. Request and response bodies are **never** logged to prevent credential or token leakage. |
+| `false` | No HTTP request or response logging. |
+
+```ruby
+# Disable HTTP logging in production if not needed
+Safire.configure do |config|
+  config.log_http = false
 end
 ```
 
@@ -267,9 +282,9 @@ end
 
 | Level | Description |
 |-------|-------------|
-| `Logger::DEBUG` | Detailed request/response logging |
-| `Logger::INFO` | Standard operation logging |
-| `Logger::WARN` | Warnings only |
+| `Logger::DEBUG` | Verbose Safire operation logging |
+| `Logger::INFO` | Standard operation logging (default) |
+| `Logger::WARN` | Compliance warnings and non-critical issues only |
 | `Logger::ERROR` | Errors only |
 
 ---

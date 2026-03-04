@@ -525,14 +525,26 @@ Log output includes:
 
 ### Inspect HTTP Requests
 
-Safire logs HTTP requests automatically:
+HTTP request logging is enabled by default (`log_http: true`). Sensitive data is always protected:
+
+- The `Authorization` header is replaced with `[FILTERED]`
+- Request and response bodies are **never** logged (they contain tokens and secrets)
 
 ```
 INFO -- : request: POST https://fhir.example.com/token
 INFO -- : request: User-Agent: "Safire v0.0.1"
          Accept: "application/json"
          Content-Type: "application/x-www-form-urlencoded"
+         Authorization: [FILTERED]
 INFO -- : response: Status 200
+```
+
+To disable HTTP logging entirely:
+
+```ruby
+Safire.configure do |config|
+  config.log_http = false
+end
 ```
 
 ### Test with Reference Server

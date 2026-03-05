@@ -30,11 +30,15 @@ module Safire
     end
 
     def logger
-      @logger ||= configuration&.logger || default_logger
+      log = configuration&.logger || default_logger
+      log.level = configuration.log_level if configuration&.log_level && log.respond_to?(:level=)
+      log
     end
 
     def default_logger
-      @default_logger ||= Logger.new(ENV['SAFIRE_LOGGER'] || $stdout)
+      @default_logger ||= Logger.new(ENV['SAFIRE_LOGGER'] || $stdout).tap do |l|
+        l.level = Logger::INFO
+      end
     end
 
     def http_client
@@ -112,6 +116,4 @@ module Safire
       @log_http   = true
     end
   end
-
-  Safire.logger.level = Safire.configuration&.log_level || Logger::INFO
 end

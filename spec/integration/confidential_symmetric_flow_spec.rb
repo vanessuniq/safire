@@ -338,7 +338,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
 
       expect do
         client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
-      end.to raise_error(Safire::Errors::TokenError, /Failed to obtain access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
     end
 
     it 'raises TokenError when refresh token is invalid' do
@@ -364,7 +364,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
 
       expect do
         client.refresh_token(refresh_token: 'expired_token')
-      end.to raise_error(Safire::Errors::TokenError, /Failed to refresh access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
     end
   end
 end

@@ -112,16 +112,11 @@ module Safire
         return @well_known_config if @well_known_config
 
         response = @http_client.get(well_known_endpoint)
-        metadata = parse_metadata(response.body)
-
-        @well_known_config = SmartMetadata.new(metadata)
-      rescue StandardError => e
-        msg = "Failed to discover SMART configuration: #{e.message.inspect}"
-        details = e.try(:details)
-        log_msg = "SMART discovery for endpoint `#{well_known_endpoint}` failed: #{msg}"
-        log_msg += " (details: #{details.inspect})" if details
-        Safire.logger.error(log_msg)
-        raise Errors::DiscoveryError.new(msg, details: details)
+        @well_known_config = SmartMetadata.new(parse_discovery_body(response.body))
+      rescue Faraday::Error => e
+        status = e.response&.dig(:status)
+        Safire.logger.error("SMART discovery failed for `#{well_known_endpoint}`: HTTP #{status}")
+        raise Errors::DiscoveryError.new(endpoint: well_known_endpoint, status: status)
       end
 
       # Builds the authorization request data for the authorization code flow.
@@ -183,10 +178,8 @@ module Safire
         )
 
         parse_token_response(response.body)
-      rescue StandardError => e
-        msg = "Failed to obtain access token: #{e.message.inspect}"
-        details = e.try(:details)
-        raise Errors::TokenError.new(msg, details: details)
+      rescue Faraday::Error => e
+        raise token_error_from(e)
       end
 
       # Exchanges a refresh token for a new access token.
@@ -213,10 +206,8 @@ module Safire
         )
 
         parse_token_response(response.body)
-      rescue StandardError => e
-        msg = "Failed to refresh access token: #{e.message.inspect}"
-        details = e.try(:details)
-        raise Errors::TokenError.new(msg, details: details)
+      rescue Faraday::Error => e
+        raise token_error_from(e)
       end
 
       private
@@ -225,15 +216,17 @@ module Safire
         missing = (ATTRIBUTES - OPTIONAL_ATTRIBUTES).select { |attr| send(attr).blank? }
         return if missing.empty?
 
-        raise Errors::ConfigurationError,
-              "SMART Client configuration missing attributes: #{missing.to_sentence}"
+        raise Errors::ConfigurationError.new(missing_attributes: missing)
       end
 
       def validate_authorization_method(method)
         return if %i[get post].include?(method)
 
-        raise Errors::ConfigurationError,
-              "Invalid authorization method: #{method.inspect}. Supported methods are :get and :post"
+        raise Errors::ConfigurationError.new(
+          invalid_attribute: :method,
+          invalid_value: method,
+          valid_values: %i[get post]
+        )
       end
 
       def build_authorization_response(method, params, code_verifier)
@@ -249,35 +242,32 @@ module Safire
       def validate_presence_of_scopes(custom_scopes = nil)
         return if (scopes || custom_scopes).present?
 
-        raise Errors::ConfigurationError,
-              'SMART Client auth flow requires scopes (Array)'
+        raise Errors::ConfigurationError.new(missing_attributes: [:scopes])
       end
 
       def validate_client_secret(secret)
         return if secret.present?
 
-        raise Errors::ConfigurationError, "client_secret is needed to request access token for #{auth_type}"
+        raise Errors::ConfigurationError.new(missing_attributes: [:client_secret])
       end
 
-      def parse_json_response(data, error_class, context)
-        unless data.is_a?(Hash)
-          raise error_class,
-                "Invalid #{context} format: expected JSON object but received #{data.inspect}"
-        end
+      def parse_discovery_body(body)
+        return body if body.is_a?(Hash)
 
-        data
+        raise Errors::DiscoveryError.new(
+          endpoint: well_known_endpoint,
+          error_description: 'response is not a JSON object'
+        )
       end
 
       def parse_token_response(token_response)
-        parse_json_response(token_response, Errors::TokenError, 'token response').tap do |parsed|
-          unless parsed['access_token'].present?
-            raise Errors::TokenError, "Missing access token in response: #{parsed.inspect}"
-          end
+        unless token_response.is_a?(Hash)
+          raise Errors::TokenError.new(error_description: 'response is not a JSON object')
         end
-      end
 
-      def parse_metadata(metadata)
-        parse_json_response(metadata, Errors::DiscoveryError, 'SMART configuration')
+        return token_response if token_response['access_token'].present?
+
+        raise Errors::TokenError.new(received_fields: token_response.keys)
       end
 
       def authorization_params(launch:, custom_scopes:, code_verifier:)
@@ -364,7 +354,21 @@ module Safire
         missing << :kid if kid.blank?
         return if missing.empty?
 
-        raise Errors::ConfigurationError, "Missing required asymmetric credentials: #{missing.to_sentence}"
+        raise Errors::ConfigurationError.new(missing_attributes: missing)
+      end
+
+      def token_error_from(faraday_error)
+        response = faraday_error.response
+        status   = response&.dig(:status)
+        body     = JSON.parse(response&.dig(:body))
+
+        Errors::TokenError.new(
+          status:,
+          error_code: body.is_a?(Hash) ? body['error'] : nil,
+          error_description: body.is_a?(Hash) ? body['error_description'] : nil
+        )
+      rescue JSON::ParserError
+        Errors::TokenError.new(status:)
       end
 
       def well_known_endpoint

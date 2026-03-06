@@ -246,7 +246,7 @@ RSpec.describe Safire::Protocols::Smart do
       stub_request(:get, well_known_url).to_return(status: 200, body: '[]',
                                                    headers: { 'Content-Type' => 'application/json' })
       expect { described_class.new(config).well_known_config }
-        .to raise_error(Safire::Errors::DiscoveryError, /expected JSON object/)
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a JSON object/)
     end
 
     it 'handles base_url with or without trailing slash' do
@@ -298,7 +298,7 @@ RSpec.describe Safire::Protocols::Smart do
 
     it 'raises when no scopes configured' do
       expect { described_class.new(config.except(:scopes)).authorization_url }
-        .to raise_error(Safire::Errors::ConfigurationError, /requires scopes/)
+        .to raise_error(Safire::Errors::ConfigurationError, /scopes/)
     end
 
     it 'uses custom scopes when provided' do
@@ -377,7 +377,7 @@ RSpec.describe Safire::Protocols::Smart do
     context 'when method is invalid' do
       it 'raises ConfigurationError' do
         expect { described_class.new(config).authorization_url(method: :patch) }
-          .to raise_error(Safire::Errors::ConfigurationError, /Invalid authorization method/)
+          .to raise_error(Safire::Errors::ConfigurationError, /method/)
       end
     end
   end
@@ -493,18 +493,18 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     context 'when confidential_asymmetric with missing credentials' do
-      it 'raises TokenError when private_key is missing' do
+      it 'raises ConfigurationError when private_key is missing' do
         expect do
           described_class.new(config.merge(kid: 'key-id'), auth_type: :confidential_asymmetric)
                          .request_access_token(code: authorization_code, code_verifier: code_verifier)
-        end.to raise_error(Safire::Errors::TokenError, /Missing required asymmetric credentials/)
+        end.to raise_error(Safire::Errors::ConfigurationError, /private_key/)
       end
 
-      it 'raises TokenError when kid is missing' do
+      it 'raises ConfigurationError when kid is missing' do
         expect do
           described_class.new(config.merge(private_key: rsa_private_key), auth_type: :confidential_asymmetric)
                          .request_access_token(code: authorization_code, code_verifier: code_verifier)
-        end.to raise_error(Safire::Errors::TokenError, /Missing required asymmetric credentials/)
+        end.to raise_error(Safire::Errors::ConfigurationError, /kid/)
       end
     end
 
@@ -529,7 +529,7 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     context 'when server OAuth error' do
-      it 'raises TokenError' do
+      it 'raises TokenError with status and error_code' do
         stub_token_post(
           body_matcher: {
             'grant_type' => 'authorization_code',
@@ -544,17 +544,17 @@ RSpec.describe Safire::Protocols::Smart do
         expect do
           described_class.new(config, auth_type: :public)
                          .request_access_token(code: 'bad', code_verifier: 'v')
-        end.to raise_error(Safire::Errors::TokenError, /Failed to obtain access token/)
+        end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
       end
     end
 
     context 'when network error' do
-      it 'raises TokenError' do
+      it 'raises NetworkError' do
         stub_request(:post, config[:token_endpoint]).to_raise(Faraday::ConnectionFailed)
         expect do
           described_class.new(config, auth_type: :public)
                          .request_access_token(code: 'x', code_verifier: 'y')
-        end.to raise_error(Safire::Errors::TokenError)
+        end.to raise_error(Safire::Errors::NetworkError)
       end
     end
   end
@@ -648,7 +648,7 @@ RSpec.describe Safire::Protocols::Smart do
       )
       expect do
         described_class.new(config, auth_type: :public).refresh_token(refresh_token: 'bad')
-      end.to raise_error(Safire::Errors::TokenError, /Failed to refresh access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
     end
 
     it 'raises TokenError when access_token missing' do
@@ -662,11 +662,11 @@ RSpec.describe Safire::Protocols::Smart do
       end.to raise_error(Safire::Errors::TokenError, /Missing access token/)
     end
 
-    it 'raises TokenError on network error' do
+    it 'raises NetworkError on network error' do
       stub_request(:post, config[:token_endpoint]).to_raise(Faraday::TimeoutError)
       expect do
         described_class.new(config, auth_type: :public).refresh_token(refresh_token: 'x')
-      end.to raise_error(Safire::Errors::TokenError)
+      end.to raise_error(Safire::Errors::NetworkError)
     end
   end
 end

@@ -387,7 +387,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
   end
 
   describe 'Error Handling' do
-    it 'raises TokenError when private_key is missing' do
+    it 'raises ConfigurationError when private_key is missing' do
       config = Safire::ClientConfig.new(
         base_url:,
         client_id:,
@@ -400,10 +400,10 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
 
       expect do
         client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
-      end.to raise_error(Safire::Errors::TokenError, /Missing required asymmetric credentials/)
+      end.to raise_error(Safire::Errors::ConfigurationError, /private_key|kid/)
     end
 
-    it 'raises TokenError when kid is missing' do
+    it 'raises ConfigurationError when kid is missing' do
       config = Safire::ClientConfig.new(
         base_url:,
         client_id:,
@@ -417,7 +417,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
 
       expect do
         client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
-      end.to raise_error(Safire::Errors::TokenError, /Missing required asymmetric credentials/)
+      end.to raise_error(Safire::Errors::ConfigurationError, /private_key|kid/)
     end
 
     it 'raises TokenError when server returns invalid_client error' do
@@ -444,7 +444,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
 
       expect do
         client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
-      end.to raise_error(Safire::Errors::TokenError, /Failed to obtain access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
     end
 
     it 'raises TokenError when refresh token is invalid' do
@@ -471,7 +471,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
 
       expect do
         client.refresh_token(refresh_token: 'expired_token')
-      end.to raise_error(Safire::Errors::TokenError, /Failed to refresh access token/)
+      end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
     end
   end
 end

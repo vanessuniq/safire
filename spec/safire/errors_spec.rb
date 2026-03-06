@@ -82,6 +82,10 @@ RSpec.describe Safire::Errors do
       it 'has nil status' do
         expect(error.status).to be_nil
       end
+
+      it 'has nil error_description' do
+        expect(error.error_description).to be_nil
+      end
     end
 
     context 'with endpoint and status' do
@@ -93,6 +97,23 @@ RSpec.describe Safire::Errors do
 
       it 'includes status in the message' do
         expect(error.message).to match(/404/)
+      end
+    end
+
+    context 'with endpoint and error_description' do
+      subject(:error) do
+        described_class.new(
+          endpoint: 'https://fhir.example.com/.well-known/smart-configuration',
+          error_description: 'response is not a JSON object'
+        )
+      end
+
+      it 'exposes error_description' do
+        expect(error.error_description).to eq('response is not a JSON object')
+      end
+
+      it 'includes error_description in the message' do
+        expect(error.message).to match(/response is not a JSON object/)
       end
     end
   end
@@ -150,20 +171,15 @@ RSpec.describe Safire::Errors do
       expect(described_class.superclass).to eq(Safire::Errors::Error)
     end
 
-    context 'with status and OAuth2 fields' do
-      subject(:error) do
-        described_class.new(status: 503, error_code: 'server_error', error_description: 'Service unavailable')
+    context 'with error_description' do
+      subject(:error) { described_class.new(error_description: 'Connection refused') }
+
+      it 'exposes error_description' do
+        expect(error.error_description).to eq('Connection refused')
       end
 
-      it 'exposes status, error_code, and error_description' do
-        expect(error.status).to eq(503)
-        expect(error.error_code).to eq('server_error')
-        expect(error.error_description).to eq('Service unavailable')
-      end
-
-      it 'builds a message from typed attributes' do
-        expect(error.message).to match(/503/)
-        expect(error.message).to match(/server_error/)
+      it 'includes the description in the message' do
+        expect(error.message).to match(/Connection refused/)
       end
     end
 
@@ -174,16 +190,100 @@ RSpec.describe Safire::Errors do
     end
   end
 
+  describe Safire::Errors::AuthError do
+    it 'is a Safire::Errors::Error' do
+      expect(described_class.superclass).to eq(Safire::Errors::Error)
+    end
+
+    context 'with status and OAuth2 fields' do
+      subject(:error) do
+        described_class.new(status: 400, error_code: 'invalid_request', error_description: 'Missing redirect_uri')
+      end
+
+      it 'exposes status, error_code, and error_description' do
+        expect(error.status).to eq(400)
+        expect(error.error_code).to eq('invalid_request')
+        expect(error.error_description).to eq('Missing redirect_uri')
+      end
+
+      it 'builds a message from typed attributes' do
+        expect(error.message).to match(/400/)
+        expect(error.message).to match(/invalid_request/)
+        expect(error.message).to match(/Missing redirect_uri/)
+      end
+    end
+
+    context 'with no arguments' do
+      it 'has a generic fallback message' do
+        expect(described_class.new.message).to match(/[Aa]uthorization/)
+      end
+    end
+  end
+
+  describe Safire::Errors::CertificateError do
+    it 'is a Safire::Errors::Error' do
+      expect(described_class.superclass).to eq(Safire::Errors::Error)
+    end
+
+    context 'with reason and subject' do
+      subject(:error) { described_class.new(reason: 'expired', subject: 'CN=my-client,O=Example') }
+
+      it 'exposes reason and subject' do
+        expect(error.reason).to eq('expired')
+        expect(error.subject).to eq('CN=my-client,O=Example')
+      end
+
+      it 'builds a message from typed attributes' do
+        expect(error.message).to match(/expired/)
+        expect(error.message).to match(/CN=my-client/)
+      end
+    end
+
+    context 'with no arguments' do
+      it 'has a generic fallback message' do
+        expect(described_class.new.message).to match(/[Cc]ertificate/)
+      end
+    end
+  end
+
+  describe Safire::Errors::ValidationError do
+    it 'is a Safire::Errors::Error' do
+      expect(described_class.superclass).to eq(Safire::Errors::Error)
+    end
+
+    context 'with attribute and reason' do
+      subject(:error) { described_class.new(attribute: :base_url, reason: 'must use HTTPS') }
+
+      it 'exposes attribute and reason' do
+        expect(error.attribute).to eq(:base_url)
+        expect(error.reason).to eq('must use HTTPS')
+      end
+
+      it 'builds a message from typed attributes' do
+        expect(error.message).to match(/base_url/)
+        expect(error.message).to match(/HTTPS/)
+      end
+    end
+
+    context 'with no arguments' do
+      it 'has a generic fallback message' do
+        expect(described_class.new.message).to match(/[Vv]alidation/)
+      end
+    end
+  end
+
   describe 'rescue hierarchy' do
     it 'can rescue all typed errors as Safire::Errors::Error' do
-      [
+      errors = [
         Safire::Errors::ConfigurationError.new,
         Safire::Errors::DiscoveryError.new(endpoint: 'https://example.com'),
         Safire::Errors::TokenError.new,
-        Safire::Errors::NetworkError.new
-      ].each do |error|
-        expect(error).to be_a(Safire::Errors::Error)
-      end
+        Safire::Errors::NetworkError.new,
+        Safire::Errors::AuthError.new,
+        Safire::Errors::CertificateError.new,
+        Safire::Errors::ValidationError.new
+      ]
+      expect(errors).to all(be_a(Safire::Errors::Error))
     end
   end
 end

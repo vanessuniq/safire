@@ -26,7 +26,7 @@ Common issues and solutions when integrating SMART on FHIR with Safire.
 
 **Symptoms:**
 ```ruby
-Safire::Errors::DiscoveryError: Failed to discover SMART configuration: "HTTP request failed: the server responded with status 404"
+Safire::Errors::DiscoveryError: Failed to discover SMART configuration from https://fhir.example.com/.well-known/smart-configuration (HTTP 404)
 ```
 
 **Causes:**
@@ -66,7 +66,7 @@ Safire::Errors::DiscoveryError: Failed to discover SMART configuration: "HTTP re
 
 **Symptoms:**
 ```ruby
-Safire::Errors::DiscoveryError: Invalid SMART configuration format: expected JSON object but received "..."
+Safire::Errors::DiscoveryError: Failed to discover SMART configuration from https://fhir.example.com/.well-known/smart-configuration: response is not a JSON object
 ```
 
 **Causes:**
@@ -97,7 +97,7 @@ Safire::Errors::DiscoveryError: Invalid SMART configuration format: expected JSO
 
 **Symptoms:**
 ```ruby
-Safire::Errors::ConfigurationError: SMART Client auth flow requires scopes (Array)
+Safire::Errors::ConfigurationError: Configuration missing: scopes
 ```
 
 **Causes:**
@@ -169,11 +169,11 @@ Safire::Errors::ConfigurationError: SMART Client auth flow requires scopes (Arra
 
 ## Token Exchange Errors
 
-### TokenError: Failed to obtain access token
+### TokenError: Token request failed
 
 **Symptoms:**
 ```ruby
-Safire::Errors::TokenError: Failed to obtain access token: "{\"error\":\"invalid_grant\"}"
+Safire::Errors::TokenError: Token request failed — HTTP 400 — invalid_grant — Authorization code has expired
 ```
 
 **Common Causes and Solutions:**
@@ -212,7 +212,7 @@ Safire::Errors::TokenError: Failed to obtain access token: "{\"error\":\"invalid
 
 **Symptoms:**
 ```ruby
-Safire::Errors::TokenError: Missing access token in response: {...}
+Safire::Errors::TokenError: Missing access token in response; received fields: token_type, expires_in
 ```
 
 **Causes:**
@@ -221,16 +221,12 @@ Safire::Errors::TokenError: Missing access token in response: {...}
 
 **Solutions:**
 
-1. Inspect the actual response using the `details` attribute:
+1. Inspect the full error message, which includes all available context:
    ```ruby
    begin
      tokens = client.request_access_token(code: code, code_verifier: verifier)
    rescue Safire::Errors::TokenError => e
      Rails.logger.error("Token error: #{e.message}")
-     if e.details
-       Rails.logger.error("HTTP status: #{e.details[:status]}")
-       Rails.logger.error("Response body: #{e.details[:body]}")
-     end
    end
    ```
 
@@ -238,11 +234,11 @@ Safire::Errors::TokenError: Missing access token in response: {...}
 
 ## Confidential Client Errors
 
-### ConfigurationError: client_secret is needed
+### ConfigurationError: Missing client_secret
 
 **Symptoms:**
 ```ruby
-Safire::Errors::ConfigurationError: client_secret is needed to request access token for confidential_symmetric
+Safire::Errors::ConfigurationError: Configuration missing: client_secret
 ```
 
 **Causes:**
@@ -308,11 +304,11 @@ Safire::Errors::ConfigurationError: client_secret is needed to request access to
    end
    ```
 
-### TokenError: Missing required asymmetric credentials
+### ConfigurationError: Missing required asymmetric credentials
 
 **Symptoms:**
 ```ruby
-Safire::Errors::TokenError: Failed to obtain access token: "Missing required asymmetric credentials: private_key"
+Safire::Errors::ConfigurationError: Configuration missing: private_key
 ```
 
 **Causes:**
@@ -374,11 +370,11 @@ Safire::Errors::TokenError: Failed to obtain access token: "Missing required asy
 
 ## Refresh Token Errors
 
-### TokenError: Failed to refresh access token
+### TokenError: Refresh token request failed
 
 **Symptoms:**
 ```ruby
-Safire::Errors::TokenError: Failed to refresh access token: "{\"error\":\"invalid_grant\"}"
+Safire::Errors::TokenError: Token request failed — HTTP 400 — invalid_grant — Refresh token expired
 ```
 
 **Causes:**
@@ -396,8 +392,7 @@ Safire::Errors::TokenError: Failed to refresh access token: "{\"error\":\"invali
    rescue Safire::Errors::TokenError => e
      Rails.logger.error("Refresh failed: #{e.message}")
 
-     # Check the server's OAuth error in e.details
-     if e.details&.dig(:body)&.include?('invalid_grant')
+     if e.error_code == 'invalid_grant'
        # Refresh token is no longer valid
        clear_session
        redirect_to launch_path, alert: 'Session expired. Please sign in again.'
@@ -582,16 +577,12 @@ rescue Safire::Errors::ConfigurationError => e
   render plain: 'Server configuration error', status: :internal_server_error
 rescue Safire::Errors::TokenError => e
   # Token exchange/refresh errors (invalid grant, expired code, server rejection)
+  # e.message contains status, error_code, and error_description
   Rails.logger.error("Token error: #{e.message}")
-  # Access HTTP status and raw response body via e.details
-  if e.details
-    Rails.logger.error("HTTP #{e.details[:status]}: #{e.details[:body]}")
-  end
   redirect_to launch_path, alert: 'Authorization failed. Please try again.'
 rescue Safire::Errors::NetworkError => e
   # Network/connection errors (timeout, connection refused)
   Rails.logger.error("Network error: #{e.message}")
-  Rails.logger.error("Details: #{e.details.inspect}") if e.details
   render plain: 'Server temporarily unavailable', status: :service_unavailable
 end
 ```
@@ -608,7 +599,6 @@ def ensure_valid_token
   rescue Safire::Errors::TokenError => e
     # Refresh token invalid - need to re-authenticate
     Rails.logger.error("Refresh failed: #{e.message}")
-    Rails.logger.error("Server response: #{e.details[:body]}") if e.details
     clear_session
     redirect_to launch_path
   end

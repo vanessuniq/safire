@@ -223,7 +223,6 @@ def callback
   redirect_to patient_path(session[:patient_id])
 rescue Safire::Errors::TokenError => e
   Rails.logger.error("Token exchange failed: #{e.message}")
-  Rails.logger.error("Server response: #{e.details[:body]}") if e.details
   render plain: 'Authorization failed', status: :unauthorized
 end
 ```
@@ -314,7 +313,6 @@ module SmartAuthentication
     Rails.logger.info("Access token refreshed successfully")
   rescue Safire::Errors::TokenError => e
     Rails.logger.error("Token refresh failed: #{e.message}")
-    Rails.logger.error("Server response: #{e.details[:body]}") if e.details
 
     # Clear invalid tokens
     clear_auth_session
@@ -517,14 +515,11 @@ def callback
 
   # ... store tokens ...
 rescue Safire::Errors::TokenError => e
-  # Access the server's error response via e.details
-  body = e.details&.dig(:body)
-
-  case body
-  when /invalid_grant/
+  case e.error_code
+  when 'invalid_grant'
     # Authorization code expired or was already used
     redirect_to launch_path, alert: 'Authorization code expired. Please try again.'
-  when /invalid_client/
+  when 'invalid_client'
     # Client ID not recognized
     Rails.logger.error("Invalid client configuration: #{e.message}")
     render plain: 'Configuration error', status: :internal_server_error
@@ -542,7 +537,6 @@ The automatic refresh concern handles errors gracefully:
 ```ruby
 rescue Safire::Errors::TokenError => e
   Rails.logger.error("Token refresh failed: #{e.message}")
-  Rails.logger.error("Server response: #{e.details[:body]}") if e.details
 
   # Clear invalid session state
   clear_auth_session

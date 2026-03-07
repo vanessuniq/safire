@@ -47,27 +47,7 @@ class SafireDemo < Sinatra::Base
     end
 
     def flash_error_message(context, error)
-      msg = "#{context}: #{error.message}"
-      msg += " — #{format_error_details(error.details)}" if error.respond_to?(:details) && error.details.present?
-      msg
-    end
-
-    def format_error_details(details)
-      return details.to_s unless details.is_a?(Hash)
-
-      parts = []
-      parts << "HTTP #{details[:status]}" if details[:status]
-      parts << extract_body_message(details[:body])
-      parts.compact.join(' — ')
-    end
-
-    def extract_body_message(body)
-      body = JSON.parse(body) if body.is_a?(String)
-      return body['error_description'] || body['error'] if body.is_a?(Hash)
-
-      body.presence&.to_s&.truncate(200)
-    rescue JSON::ParserError
-      body.to_s.truncate(200)
+      "#{context}: #{error.message}"
     end
 
     def asymmetric_credentials_configured?

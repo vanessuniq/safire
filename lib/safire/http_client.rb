@@ -53,24 +53,15 @@ module Safire
       end
     end
 
-    def request(method, path, body: nil, params: {}, headers: {}) # rubocop:disable Metrics/AbcSize
+    def request(method, path, body: nil, params: {}, headers: {})
       @connection.send(method) do |req|
         req.url path.sub(%r{^/}, '') # Remove leading slash if present since base_url ends with slash
         req.params.update(params) if params.present?
         req.headers.update(headers) if headers.present?
         req.body = body if body
       end
-    rescue Faraday::Error, Faraday::ConnectionFailed, Faraday::TimeoutError, Faraday::SSLError => e
-      raise Safire::Errors::NetworkError.new(
-        "HTTP request failed: #{e.message}",
-        details: { status: e.response&.dig(:status), body: safe_body(e.response&.dig(:body)) }
-      )
-    end
-
-    def safe_body(body)
-      return body unless body.is_a?(String) && body.length > 2000
-
-      "#{body[0..2000]}... (truncated, total #{body.length} characters)"
+    rescue Faraday::ConnectionFailed, Faraday::TimeoutError, Faraday::SSLError => e
+      raise Safire::Errors::NetworkError.new(error_description: e.message)
     end
 
     def normalize_base_url(url)

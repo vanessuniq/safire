@@ -239,7 +239,6 @@ def callback
   redirect_to patient_path(session[:patient_id])
 rescue Safire::Errors::TokenError => e
   Rails.logger.error("Token exchange failed: #{e.message}")
-  Rails.logger.error("Server response: #{e.details[:body]}") if e.details
   render plain: 'Authorization failed', status: :unauthorized
 end
 ```
@@ -350,7 +349,6 @@ module SmartAuthentication
     Rails.logger.info("Access token refreshed successfully")
   rescue Safire::Errors::TokenError => e
     Rails.logger.error("Token refresh failed: #{e.message}")
-    Rails.logger.error("Server response: #{e.details[:body]}") if e.details
 
     # Clear invalid tokens
     clear_auth_session
@@ -614,14 +612,12 @@ def callback
     code_verifier: session[:code_verifier]
   )
 rescue Safire::Errors::TokenError => e
-  body = e.details&.dig(:body)
-
-  case body
-  when /invalid_client/
+  case e.error_code
+  when 'invalid_client'
     # Server rejected the JWT assertion (wrong key, expired, bad signature)
-    Rails.logger.error("JWT assertion rejected: #{body}")
+    Rails.logger.error("JWT assertion rejected: #{e.message}")
     render plain: 'Client authentication failed', status: :unauthorized
-  when /invalid_grant/
+  when 'invalid_grant'
     # Authorization code expired or already used
     redirect_to launch_path, alert: 'Authorization expired. Please try again.'
   else
@@ -638,7 +634,7 @@ def refresh_access_token
   new_tokens = client.refresh_token(refresh_token: session[:refresh_token])
   # ...
 rescue Safire::Errors::TokenError => e
-  if e.details&.dig(:body)&.include?('invalid_grant')
+  if e.error_code == 'invalid_grant'
     # Refresh token expired - user must re-authorize
     Rails.logger.info("Refresh token expired for user")
     clear_auth_session
@@ -806,13 +802,11 @@ class SmartAuthController < ApplicationController
   end
 
   def handle_token_error(error)
-    body = error.details&.dig(:body)
-
-    case body
-    when /invalid_client/
+    case error.error_code
+    when 'invalid_client'
       Rails.logger.error("JWT assertion rejected by server")
       render plain: 'Client authentication failed', status: :unauthorized
-    when /invalid_grant/
+    when 'invalid_grant'
       redirect_to launch_path, alert: 'Authorization expired. Please try again.'
     else
       Rails.logger.error("Token error: #{error.message}")

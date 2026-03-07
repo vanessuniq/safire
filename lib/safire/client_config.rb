@@ -94,8 +94,12 @@ module Safire
     # @raise [Errors::ConfigurationError] if any URI is malformed or uses HTTP on a non-localhost host
     def validate_uris!
       invalid_uris, non_https_uris = collect_uri_violations
-      messages = build_uri_error_messages(invalid_uris, non_https_uris)
-      raise Errors::ConfigurationError, messages.join('. ') if messages.any?
+      return if invalid_uris.empty? && non_https_uris.empty?
+
+      raise Errors::ConfigurationError.new(
+        invalid_uri_attributes: invalid_uris,
+        non_https_uri_attributes: non_https_uris
+      )
     end
 
     def collect_uri_violations
@@ -124,18 +128,6 @@ module Safire
       :invalid
     end
 
-    def build_uri_error_messages(invalid_uris, non_https_uris)
-      messages = []
-      if invalid_uris.any?
-        messages << "Client configuration has invalid URIs for attributes: #{invalid_uris.to_sentence}"
-      end
-      if non_https_uris.any?
-        messages << "Client configuration requires HTTPS for: #{non_https_uris.to_sentence} " \
-                    '(SMART App Launch 2.2.0 requires TLS; HTTP is only allowed for localhost)'
-      end
-      messages
-    end
-
     # Returns true when the host is a local loopback address.
     # HTTP is permitted for localhost to support development environments.
     def localhost_host?(host)
@@ -151,8 +143,7 @@ module Safire
         return
       end
 
-      raise Errors::ConfigurationError,
-            "Client configuration missing required attributes: #{nil_vars.to_sentence}"
+      raise Errors::ConfigurationError.new(missing_attributes: nil_vars)
     end
   end
 end

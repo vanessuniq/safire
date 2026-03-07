@@ -66,7 +66,7 @@ module Safire
     end
 
     def warn_if_ssl_verification_disabled(ssl_options)
-      return unless ssl_options[:verify] == false
+      return unless ssl_options.is_a?(Hash) && ssl_options[:verify] == false
 
       Safire.logger.warn(
         '[Safire] ssl_options: { verify: false } disables TLS certificate verification — ' \

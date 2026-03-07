@@ -48,6 +48,35 @@ RSpec.describe Safire::HTTPClient do
     end
   end
 
+  describe 'SSL verification warning' do
+    before { allow(Safire.logger).to receive(:warn) }
+
+    context 'when ssl_options: { verify: false }' do
+      it 'logs a security warning' do
+        described_class.new(base_url:, ssl_options: { verify: false })
+        expect(Safire.logger).to have_received(:warn)
+          .with(/ssl.*verify.*false.*TLS.*verification.*disabled/i)
+      end
+    end
+
+    context 'when verify is not explicitly false' do
+      it 'does not warn with no ssl_options' do
+        described_class.new(base_url:)
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+
+      it 'does not warn with verify: true' do
+        described_class.new(base_url:, ssl_options: { verify: true })
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+
+      it 'does not warn with other ssl_options' do
+        described_class.new(base_url:, ssl_options: { ca_file: '/path/to/ca' })
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+  end
+
   describe 'HTTP request logging' do
     let(:log_output) { StringIO.new }
     let(:test_logger) { Logger.new(log_output) }

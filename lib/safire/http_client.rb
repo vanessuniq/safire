@@ -13,6 +13,7 @@ module Safire
       }
       @adapter = adapter || Faraday.default_adapter
       @request_format = request_format.to_sym
+      warn_if_ssl_verification_disabled(ssl_options)
       @connection = build_connection
     end
 
@@ -62,6 +63,15 @@ module Safire
       end
     rescue Faraday::ConnectionFailed, Faraday::TimeoutError, Faraday::SSLError => e
       raise Safire::Errors::NetworkError.new(error_description: e.message)
+    end
+
+    def warn_if_ssl_verification_disabled(ssl_options)
+      return unless ssl_options[:verify] == false
+
+      Safire.logger.warn(
+        '[Safire] ssl_options: { verify: false } disables TLS certificate verification — ' \
+        'do not use in production'
+      )
     end
 
     def normalize_base_url(url)

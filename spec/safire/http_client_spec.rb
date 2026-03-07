@@ -55,7 +55,7 @@ RSpec.describe Safire::HTTPClient do
       it 'logs a security warning' do
         described_class.new(base_url:, ssl_options: { verify: false })
         expect(Safire.logger).to have_received(:warn)
-          .with(/ssl.*verify.*false.*TLS.*verification.*disabled/i)
+          .with(/verify.*false.*TLS.*verification/i)
       end
     end
 

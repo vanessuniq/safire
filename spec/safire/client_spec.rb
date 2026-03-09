@@ -52,6 +52,13 @@ RSpec.describe Safire::Client do
 
   # ---------- Initialization ----------
 
+  describe '#initialize' do
+    it 'raises ConfigurationError for invalid auth_type keyword' do
+      expect { described_class.new(config, auth_type: :bogus) }
+        .to raise_error(Safire::Errors::ConfigurationError, /auth_type.*bogus/i)
+    end
+  end
+
   describe '#auth_type=' do
     it 'changes the auth type from public to confidential_symmetric' do
       client = described_class.new(config, auth_type: :public)
@@ -67,9 +74,10 @@ RSpec.describe Safire::Client do
       expect(client.auth_type).to eq(:confidential_symmetric)
     end
 
-    it 'raises ArgumentError for unsupported auth types' do
+    it 'raises ConfigurationError for unsupported auth types' do
       client = described_class.new(config)
-      expect { client.auth_type = :unsupported }.to raise_error(ArgumentError, /unsupported/)
+      expect { client.auth_type = :unsupported }
+        .to raise_error(Safire::Errors::ConfigurationError, /auth_type.*unsupported/i)
     end
 
     it 'resets the internal smart_client so new auth type is used' do

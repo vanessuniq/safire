@@ -5,6 +5,7 @@ require 'base64'
 
 require_relative 'safire/version'
 require_relative 'safire/errors'
+require_relative 'safire/middleware/https_only_redirects'
 require_relative 'safire/http_client'
 require_relative 'safire/entity'
 require_relative 'safire/pkce'

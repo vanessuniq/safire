@@ -131,6 +131,34 @@ RSpec.describe Safire::HTTPClient do
     end
   end
 
+  describe 'redirect safety' do
+    it 'follows a redirect to an HTTPS URL' do
+      stub_request(:get, base_url)
+        .to_return(status: 301, headers: { 'Location' => "#{base_url}/new" })
+      stub_request(:get, "#{base_url}/new")
+        .to_return(status: 200, body: {}.to_json)
+
+      expect { client.get }.not_to raise_error
+    end
+
+    it 'raises NetworkError when redirect points to HTTP on a non-localhost host' do
+      stub_request(:get, base_url)
+        .to_return(status: 301, headers: { 'Location' => 'http://api.example.com/new' })
+
+      expect { client.get }
+        .to raise_error(Safire::Errors::NetworkError, /non-HTTPS.*blocked/i)
+    end
+
+    it 'follows a redirect to HTTP localhost' do
+      stub_request(:get, base_url)
+        .to_return(status: 301, headers: { 'Location' => 'http://localhost:3000/callback' })
+      stub_request(:get, 'http://localhost:3000/callback')
+        .to_return(status: 200, body: {}.to_json)
+
+      expect { client.get }.not_to raise_error
+    end
+  end
+
   describe 'integration scenarios' do
     it 'handles full CRUD cycle' do
       body = { id: 1, name: 'Item 1' }.to_json

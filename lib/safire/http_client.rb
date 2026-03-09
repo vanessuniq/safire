@@ -39,6 +39,7 @@ module Safire
       Faraday.new(@options) do |builder|
         builder.request @request_format
         builder.response :follow_redirects
+        builder.use Safire::Middleware::HttpsOnlyRedirects
         builder.response :json
         builder.response :raise_error
         configure_logger(builder)

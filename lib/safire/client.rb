@@ -94,7 +94,7 @@ module Safire
     #
     # @param new_auth_type [Symbol] the new auth type (:public, :confidential_symmetric, :confidential_asymmetric)
     # @return [Symbol] the new auth type
-    # @raise [ArgumentError] if the auth type is not supported
+    # @raise [Safire::Errors::ConfigurationError] if the auth type is not supported
     #
     # @example Discover then switch auth type
     #   client = Safire::Client.new(config)  # defaults to :public
@@ -145,7 +145,11 @@ module Safire
     def validate_auth_type
       return if AUTH_TYPES.include?(auth_type)
 
-      raise ArgumentError, "`#{auth_type}` is not supported. The supported auth types are #{AUTH_TYPES.to_sentence}"
+      raise Errors::ConfigurationError.new(
+        invalid_attribute: :auth_type,
+        invalid_value: auth_type,
+        valid_values: AUTH_TYPES
+      )
     end
   end
 end

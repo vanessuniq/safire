@@ -57,6 +57,11 @@ RSpec.describe Safire::Client do
       expect { described_class.new(config, auth_type: :bogus) }
         .to raise_error(Safire::Errors::ConfigurationError, /auth_type.*bogus/i)
     end
+
+    it 'symbolizes a string auth_type keyword' do
+      client = described_class.new(config, auth_type: 'confidential_symmetric')
+      expect(client.auth_type).to eq(:confidential_symmetric)
+    end
   end
 
   describe '#auth_type=' do

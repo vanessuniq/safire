@@ -3,7 +3,7 @@ require 'spec_helper'
 RSpec.describe Safire::Protocols::Smart do
   # ---------- Test Data ----------
 
-  let(:config) do
+  let(:config_attrs) do
     {
       client_id: 'test_client_id',
       redirect_uri: 'https://app.example.com/callback',
@@ -14,14 +14,18 @@ RSpec.describe Safire::Protocols::Smart do
       token_endpoint: 'https://fhir.example.com/token'
     }
   end
-  let(:confidential_config) { config.merge(client_secret: 'test_client_secret') }
+
+  let(:config) { Safire::ClientConfig.new(config_attrs) }
+  let(:confidential_config) { Safire::ClientConfig.new(config_attrs.merge(client_secret: 'test_client_secret')) }
   let(:rsa_private_key) { OpenSSL::PKey::RSA.generate(2048) }
   let(:asymmetric_config) do
-    config.merge(
-      private_key: rsa_private_key,
-      kid: 'test-key-id',
-      jwt_algorithm: 'RS384',
-      jwks_uri: 'https://app.example.com/.well-known/jwks.json'
+    Safire::ClientConfig.new(
+      config_attrs.merge(
+        private_key: rsa_private_key,
+        kid: 'test-key-id',
+        jwt_algorithm: 'RS384',
+        jwks_uri: 'https://app.example.com/.well-known/jwks.json'
+      )
     )
   end
 
@@ -60,7 +64,7 @@ RSpec.describe Safire::Protocols::Smart do
   end
 
   def stub_token_post(body_matcher:, status:, body:, headers: {})
-    stub_request(:post, config[:token_endpoint]).with(
+    stub_request(:post, config_attrs[:token_endpoint]).with(
       body: body_matcher,
       headers: { 'Content-Type' => 'application/x-www-form-urlencoded' }.merge(headers)
     ).to_return(
@@ -70,7 +74,7 @@ RSpec.describe Safire::Protocols::Smart do
     )
   end
 
-  def stub_well_known(base_url: config[:base_url], status: 200, body: smart_metadata_body)
+  def stub_well_known(base_url: config_attrs[:base_url], status: 200, body: smart_metadata_body)
     well_known_url = "#{base_url.to_s.chomp('/')}#{described_class::WELL_KNOWN_PATH}"
     stub_request(:get, well_known_url).to_return(
       status: status, body: body.to_json, headers: { 'Content-Type' => 'application/json' }
@@ -104,9 +108,9 @@ RSpec.describe Safire::Protocols::Smart do
       {
         'grant_type' => 'authorization_code',
         'code' => authorization_code,
-        'redirect_uri' => config[:redirect_uri],
+        'redirect_uri' => config_attrs[:redirect_uri],
         'code_verifier' => code_verifier,
-        'client_id' => config[:client_id]
+        'client_id' => config_attrs[:client_id]
       }
     end
 
@@ -114,7 +118,7 @@ RSpec.describe Safire::Protocols::Smart do
       {
         'grant_type' => 'authorization_code',
         'code' => authorization_code,
-        'redirect_uri' => config[:redirect_uri],
+        'redirect_uri' => config_attrs[:redirect_uri],
         'code_verifier' => code_verifier
         # no client_id
       }
@@ -125,7 +129,7 @@ RSpec.describe Safire::Protocols::Smart do
       hash_including(
         'grant_type' => 'authorization_code',
         'code' => authorization_code,
-        'redirect_uri' => config[:redirect_uri],
+        'redirect_uri' => config_attrs[:redirect_uri],
         'code_verifier' => code_verifier,
         'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
         'client_assertion' => kind_of(String)
@@ -140,7 +144,7 @@ RSpec.describe Safire::Protocols::Smart do
       {
         'grant_type' => 'refresh_token',
         'refresh_token' => refresh_token_value,
-        'client_id' => config[:client_id]
+        'client_id' => config_attrs[:client_id]
       }
     end
 
@@ -166,25 +170,25 @@ RSpec.describe Safire::Protocols::Smart do
   # ---------- Initialization ----------
 
   describe '#initialize' do
-    it 'creates a public client with valid config' do
+    it 'creates a public client from a ClientConfig' do
       client = described_class.new(config, auth_type: :public)
       expect(client.auth_type).to eq(:public)
-      described_class::ATTRIBUTES.each { |attr| expect(client.send(attr)).to eq(config[attr]) }
+      described_class::ATTRIBUTES.each { |attr| expect(client.send(attr)).to eq(config.send(attr)) }
     end
 
     it 'creates a confidential symmetric client' do
       client = described_class.new(confidential_config, auth_type: :confidential_symmetric)
       expect(client.auth_type).to eq(:confidential_symmetric)
-      expect(client.client_secret).to eq(confidential_config[:client_secret])
+      expect(client.client_secret).to eq(confidential_config.client_secret)
     end
 
     it 'creates a confidential asymmetric client' do
       client = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
       expect(client.auth_type).to eq(:confidential_asymmetric)
-      expect(client.private_key).to eq(asymmetric_config[:private_key])
-      expect(client.kid).to eq(asymmetric_config[:kid])
-      expect(client.jwt_algorithm).to eq(asymmetric_config[:jwt_algorithm])
-      expect(client.jwks_uri).to eq(asymmetric_config[:jwks_uri])
+      expect(client.private_key).to eq(asymmetric_config.private_key)
+      expect(client.kid).to eq(asymmetric_config.kid)
+      expect(client.jwt_algorithm).to eq(asymmetric_config.jwt_algorithm)
+      expect(client.jwks_uri).to eq(asymmetric_config.jwks_uri)
     end
 
     it 'defaults auth_type to public' do
@@ -196,21 +200,22 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     it 'allows scopes and client_secret to be optional' do
-      client = described_class.new(config.except(:scopes, :client_secret))
+      client = described_class.new(Safire::ClientConfig.new(config_attrs.except(:scopes, :client_secret)))
       expect(client.scopes).to be_nil
       expect(client.client_secret).to be_nil
     end
 
     it 'raises ConfigurationError when a required attribute is missing' do
       %i[client_id redirect_uri base_url].each do |attr|
-        expect { described_class.new(config.except(attr)) }
+        expect { described_class.new(Safire::ClientConfig.new(config_attrs.except(attr))) }
           .to raise_error(Safire::Errors::ConfigurationError, /#{attr}/)
       end
     end
 
     it 'fetches endpoints from well-known when not provided' do
       stub_well_known
-      client = described_class.new(config.except(:authorization_endpoint, :token_endpoint))
+      cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint, :token_endpoint))
+      client = described_class.new(cfg)
       expect(client.authorization_endpoint).to eq(smart_metadata_body['authorization_endpoint'])
       expect(client.token_endpoint).to eq(smart_metadata_body['token_endpoint'])
     end
@@ -219,7 +224,7 @@ RSpec.describe Safire::Protocols::Smart do
   # ---------- Well-known Discovery ----------
 
   describe '#well_known_config' do
-    let(:well_known_url) { "#{config[:base_url]}#{described_class::WELL_KNOWN_PATH}" }
+    let(:well_known_url) { "#{config_attrs[:base_url]}#{described_class::WELL_KNOWN_PATH}" }
 
     it 'fetches and exposes metadata' do
       stub_well_known
@@ -252,7 +257,7 @@ RSpec.describe Safire::Protocols::Smart do
     it 'handles base_url with or without trailing slash' do
       stub_well_known(base_url: 'https://fhir.example.com/')
       expect do
-        described_class.new(config.merge(base_url: 'https://fhir.example.com/')).well_known_config
+        described_class.new(Safire::ClientConfig.new(config_attrs.merge(base_url: 'https://fhir.example.com/'))).well_known_config
       end.not_to raise_error
 
       stub_well_known(base_url: 'https://fhir.example.com')
@@ -279,7 +284,7 @@ RSpec.describe Safire::Protocols::Smart do
     shared_examples 'includes core oauth and pkce' do
       it 'includes response_type/client_id/redirect_uri/aud' do
         expect(query_params.values_at('response_type', 'client_id', 'redirect_uri', 'aud'))
-          .to eq(['code', config[:client_id], config[:redirect_uri], config[:base_url]])
+          .to eq(['code', config_attrs[:client_id], config_attrs[:redirect_uri], config_attrs[:base_url]])
       end
 
       it 'includes S256 challenge' do
@@ -293,11 +298,11 @@ RSpec.describe Safire::Protocols::Smart do
     it_behaves_like 'includes core oauth and pkce'
 
     it 'includes configured scopes' do
-      expect(query_params['scope']).to eq(config[:scopes].join(' '))
+      expect(query_params['scope']).to eq(config_attrs[:scopes].join(' '))
     end
 
     it 'raises when no scopes configured' do
-      expect { described_class.new(config.except(:scopes)).authorization_url }
+      expect { described_class.new(Safire::ClientConfig.new(config_attrs.except(:scopes))).authorization_url }
         .to raise_error(Safire::Errors::ConfigurationError, /scopes/)
     end
 
@@ -324,9 +329,9 @@ RSpec.describe Safire::Protocols::Smart do
       data = described_class.new(config).authorization_url(custom_scopes: cs)
       expect(data[:auth_url]).to include('patient%2F%2A.read')
 
-      cfg2 = config.merge(redirect_uri: 'https://app.example.com/callback?param=value')
+      cfg2 = Safire::ClientConfig.new(config_attrs.merge(redirect_uri: 'https://app.example.com/callback?param=value'))
       data2 = described_class.new(cfg2).authorization_url
-      expect(data2[:auth_url]).to include(CGI.escape(cfg2[:redirect_uri]))
+      expect(data2[:auth_url]).to include(CGI.escape(cfg2.redirect_uri))
     end
 
     context 'when method: :post' do
@@ -337,7 +342,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
 
       it 'auth_url is the bare authorization endpoint with no query string' do
-        expect(post_auth_data[:auth_url]).to eq(config[:authorization_endpoint])
+        expect(post_auth_data[:auth_url]).to eq(config_attrs[:authorization_endpoint])
         expect(post_auth_data[:auth_url]).not_to include('?')
       end
 
@@ -345,9 +350,9 @@ RSpec.describe Safire::Protocols::Smart do
         p = post_auth_data[:params]
         expect(p).to include(
           response_type: 'code',
-          client_id: config[:client_id],
-          redirect_uri: config[:redirect_uri],
-          aud: config[:base_url],
+          client_id: config_attrs[:client_id],
+          redirect_uri: config_attrs[:redirect_uri],
+          aud: config_attrs[:base_url],
           code_challenge_method: 'S256'
         )
         expect(p[:code_challenge]).to match(/\A[A-Za-z0-9_-]{43}\z/)
@@ -363,7 +368,7 @@ RSpec.describe Safire::Protocols::Smart do
     context 'when method is provided as a string' do
       it 'accepts "post" and returns params hash' do
         data = described_class.new(config).authorization_url(method: 'post')
-        expect(data[:auth_url]).to eq(config[:authorization_endpoint])
+        expect(data[:auth_url]).to eq(config_attrs[:authorization_endpoint])
         expect(data[:params]).to be_a(Hash)
       end
 
@@ -411,14 +416,14 @@ RSpec.describe Safire::Protocols::Smart do
       it 'includes client_id in request body' do
         token_response
 
-        expect(WebMock).to have_requested(:post, config[:token_endpoint])
-          .with(body: hash_including('client_id' => config[:client_id]))
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('client_id' => config_attrs[:client_id]))
       end
 
       it 'does not include Authorization header' do
         token_response
 
-        expect(WebMock).to(have_requested(:post, config[:token_endpoint])
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint])
           .with { |req| !req.headers.key?('Authorization') })
       end
     end
@@ -429,7 +434,7 @@ RSpec.describe Safire::Protocols::Smart do
                        .request_access_token(code: authorization_code, code_verifier: code_verifier)
       end
 
-      let(:auth_header) { basic_auth_header(confidential_config[:client_id], confidential_config[:client_secret]) }
+      let(:auth_header) { basic_auth_header(confidential_config.client_id, confidential_config.client_secret) }
 
       before do
         stub_token_post(
@@ -444,7 +449,7 @@ RSpec.describe Safire::Protocols::Smart do
 
       it 'uses Basic auth and omits client_id' do
         token_response
-        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint]).with do |req|
           have_basic_auth(auth_header).matches?(req) && body_excludes_keys(:client_id).matches?(req)
         end)
       end
@@ -464,7 +469,7 @@ RSpec.describe Safire::Protocols::Smart do
 
       it 'includes client_assertion_type and client_assertion, omits client_id' do
         token_response
-        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint]).with do |req|
           body = URI.decode_www_form(req.body).to_h
           body['client_assertion_type'] == 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
             body['client_assertion'].present? &&
@@ -474,35 +479,37 @@ RSpec.describe Safire::Protocols::Smart do
 
       it 'sends a valid JWT assertion' do
         token_response
-        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint]).with do |req|
           body = URI.decode_www_form(req.body).to_h
           jwt = body['client_assertion']
           decoded = JWT.decode(jwt, rsa_private_key.public_key, true, algorithm: 'RS384')
-          decoded[0]['iss'] == config[:client_id] &&
-            decoded[0]['sub'] == config[:client_id] &&
-            decoded[0]['aud'] == config[:token_endpoint] &&
-            decoded[1]['kid'] == asymmetric_config[:kid]
+          decoded[0]['iss'] == config_attrs[:client_id] &&
+            decoded[0]['sub'] == config_attrs[:client_id] &&
+            decoded[0]['aud'] == config_attrs[:token_endpoint] &&
+            decoded[1]['kid'] == asymmetric_config.kid
         end)
       end
 
       it 'does not include Authorization header' do
         token_response
-        expect(WebMock).to(have_requested(:post, config[:token_endpoint])
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint])
           .with { |req| !req.headers.key?('Authorization') })
       end
     end
 
     context 'when confidential_asymmetric with missing credentials' do
       it 'raises ConfigurationError when private_key is missing' do
+        cfg = Safire::ClientConfig.new(config_attrs.merge(kid: 'key-id'))
         expect do
-          described_class.new(config.merge(kid: 'key-id'), auth_type: :confidential_asymmetric)
+          described_class.new(cfg, auth_type: :confidential_asymmetric)
                          .request_access_token(code: authorization_code, code_verifier: code_verifier)
         end.to raise_error(Safire::Errors::ConfigurationError, /private_key/)
       end
 
       it 'raises ConfigurationError when kid is missing' do
+        cfg = Safire::ClientConfig.new(config_attrs.merge(private_key: rsa_private_key))
         expect do
-          described_class.new(config.merge(private_key: rsa_private_key), auth_type: :confidential_asymmetric)
+          described_class.new(cfg, auth_type: :confidential_asymmetric)
                          .request_access_token(code: authorization_code, code_verifier: code_verifier)
         end.to raise_error(Safire::Errors::ConfigurationError, /kid/)
       end
@@ -514,9 +521,9 @@ RSpec.describe Safire::Protocols::Smart do
           body_matcher: {
             'grant_type' => 'authorization_code',
             'code' => 'auth_code_abc123',
-            'redirect_uri' => config[:redirect_uri],
+            'redirect_uri' => config_attrs[:redirect_uri],
             'code_verifier' => 'test_code_verifier_xyz789',
-            'client_id' => config[:client_id]
+            'client_id' => config_attrs[:client_id]
           },
           status: 200,
           body: { 'token_type' => 'Bearer', 'expires_in' => 3600 }
@@ -534,9 +541,9 @@ RSpec.describe Safire::Protocols::Smart do
           body_matcher: {
             'grant_type' => 'authorization_code',
             'code' => 'bad',
-            'redirect_uri' => config[:redirect_uri],
+            'redirect_uri' => config_attrs[:redirect_uri],
             'code_verifier' => 'v',
-            'client_id' => config[:client_id]
+            'client_id' => config_attrs[:client_id]
           },
           status: 400,
           body: { 'error' => 'invalid_grant' }
@@ -550,7 +557,7 @@ RSpec.describe Safire::Protocols::Smart do
 
     context 'when network error' do
       it 'raises NetworkError' do
-        stub_request(:post, config[:token_endpoint]).to_raise(Faraday::ConnectionFailed)
+        stub_request(:post, config_attrs[:token_endpoint]).to_raise(Faraday::ConnectionFailed)
         expect do
           described_class.new(config, auth_type: :public)
                          .request_access_token(code: 'x', code_verifier: 'y')
@@ -599,7 +606,7 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     context 'when confidential_symmetric' do
-      let(:auth_header) { basic_auth_header(confidential_config[:client_id], confidential_config[:client_secret]) }
+      let(:auth_header) { basic_auth_header(confidential_config.client_id, confidential_config.client_secret) }
 
       before do
         stub_token_post(
@@ -615,7 +622,7 @@ RSpec.describe Safire::Protocols::Smart do
                              .refresh_token(refresh_token: refresh_token_value)
         expect(res).to eq(refreshed_token_response_body)
 
-        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint]).with do |req|
           have_basic_auth(auth_header).matches?(req) && body_excludes_keys(:client_id).matches?(req)
         end)
       end
@@ -631,7 +638,7 @@ RSpec.describe Safire::Protocols::Smart do
                              .refresh_token(refresh_token: refresh_token_value)
         expect(res).to eq(refreshed_token_response_body)
 
-        expect(WebMock).to(have_requested(:post, config[:token_endpoint]).with do |req|
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint]).with do |req|
           body = URI.decode_www_form(req.body).to_h
           body['client_assertion_type'] == 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
             body['client_assertion'].present? &&
@@ -642,7 +649,9 @@ RSpec.describe Safire::Protocols::Smart do
 
     it 'raises TokenError on invalid refresh token' do
       stub_token_post(
-        body_matcher: { 'grant_type' => 'refresh_token', 'refresh_token' => 'bad', 'client_id' => config[:client_id] },
+        body_matcher: {
+          'grant_type' => 'refresh_token', 'refresh_token' => 'bad', 'client_id' => config_attrs[:client_id]
+        },
         status: 400,
         body: { 'error' => 'invalid_grant' }
       )
@@ -653,7 +662,9 @@ RSpec.describe Safire::Protocols::Smart do
 
     it 'raises TokenError when access_token missing' do
       stub_token_post(
-        body_matcher: { 'grant_type' => 'refresh_token', 'refresh_token' => 'x', 'client_id' => config[:client_id] },
+        body_matcher: {
+          'grant_type' => 'refresh_token', 'refresh_token' => 'x', 'client_id' => config_attrs[:client_id]
+        },
         status: 200,
         body: { 'token_type' => 'Bearer' }
       )
@@ -663,7 +674,7 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     it 'raises NetworkError on network error' do
-      stub_request(:post, config[:token_endpoint]).to_raise(Faraday::TimeoutError)
+      stub_request(:post, config_attrs[:token_endpoint]).to_raise(Faraday::TimeoutError)
       expect do
         described_class.new(config, auth_type: :public).refresh_token(refresh_token: 'x')
       end.to raise_error(Safire::Errors::NetworkError)

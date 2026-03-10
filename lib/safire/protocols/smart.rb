@@ -1,73 +1,21 @@
 module Safire
   module Protocols
-    # SMART on FHIR OAuth2 client for authorization code, access token, and refresh token flows.
+    # SMART on FHIR OAuth2 implementation for authorization code, access token, and refresh token flows.
     #
-    # This class wraps the core SMART on FHIR authorization sequence:
-    # - Builds an authorization URL with PKCE and state for CSRF protection.
-    # - Exchanges an authorization code for an access token.
-    # - Exchanges a refresh token for a new access token.
+    # This is an internal class used exclusively by {Safire::Client}. Do not instantiate it directly —
+    # use {Safire::Client} instead.
     #
-    # Configuration is provided as a Hash and validated on initialization. All of the
-    # following keys are required unless noted:
+    # Accepts a {Safire::ClientConfig} and an +auth_type+ symbol. Reads all configuration
+    # attributes directly from the +ClientConfig+ object. Discovery of authorization and token
+    # endpoints from the FHIR server's +/.well-known/smart-configuration+ metadata is performed
+    # automatically when those endpoints are not present in the config.
     #
-    # * :base_url [String] FHIR server base URL
-    # * :client_id [String] OAuth2 client identifier
-    # * :client_secret [String, optional] client secret for confidential symmetric clients
-    # * :redirect_uri [String] redirect URI registered with the authorization server
-    # * :scopes [Array<String>, optional] default scopes requested during authorization
-    # * :issuer [String, optional] issuer identifier. Defaults to base_url if not provided
-    # * :authorization_endpoint [String, optional] SMART authorization endpoint URL
-    # * :token_endpoint [String, optional] SMART token endpoint URL
-    # * :private_key [OpenSSL::PKey, String, optional] private key for confidential asymmetric clients
-    # * :kid [String, optional] key ID matching the registered public key for asymmetric clients
-    # * :jwt_algorithm [String, optional] JWT signing algorithm (RS384 or ES384). Auto-detected if not provided
-    # * :jwks_uri [String, optional] URL to client's JWKS for jku header in JWT assertions
-    #
-    # authorization_endpoint and token_endpoint will be retrieved from the server's smart configuration if not provided.
-    #
-    # The `auth_type` controls how the client authenticates:
-    #
-    # * :public — public client; `client_id` is sent in token and refresh requests
-    # * :confidential_symmetric — confidential client using client_secret with HTTP Basic auth
-    # * :confidential_asymmetric — confidential client using private_key_jwt authentication (JWT assertion)
-    #
-    # Token responses returned by {#request_access_token} and {#refresh_token} are
-    # parsed JSON objects with **string keys**, and are validated to include
-    # `"access_token"`; otherwise a {Safire::Errors::TokenError} is raised.
+    # @note For internal use by {Safire::Client} only.
+    # @api private
     #
     # @raise [Safire::Errors::ConfigurationError]
     #   if required configuration attributes are missing or invalid
-    #
-    # @example Initialize a public SMART client
-    #   smart_client = Safire::Protocols::Smart.new({
-    #     client_id: 'my_client_id',
-    #     redirect_uri: 'https://myapp.example.com/callback',
-    #     scopes: ['launch/patient', 'openid', 'fhirUser', 'patient/*.read'],
-    #     issuer: 'https://fhir.example.com',
-    #     authorization_endpoint: 'https://fhir.example.com/authorize',
-    #     token_endpoint: 'https://fhir.example.com/token'
-    #   })
-    #
-    # @example Generate an authorization URL
-    #   auth_data = smart_client.authorization_url
-    #   auth_data[:auth_url]      # redirect the user to this URL
-    #   auth_data[:state]         # store and verify on callback
-    #   auth_data[:code_verifier] # store for the token request
-    #
-    # @example Exchange authorization code for tokens
-    #   token_data = smart_client.request_access_token(
-    #     code: 'abc123',
-    #     code_verifier: auth_data[:code_verifier]
-    #   )
-    #   token_data["access_token"]
-    #
-    # @example Refresh an access token
-    #   new_tokens = smart_client.refresh_token(
-    #     refresh_token: token_data["refresh_token"]
-    #   )
-    #   new_tokens["access_token"]
-
-    class Smart < Entity
+    class Smart
       ATTRIBUTES = %i[
         base_url client_id client_secret redirect_uri scopes issuer
         authorization_endpoint token_endpoint
@@ -81,8 +29,9 @@ module Safire
 
       attr_reader(*ATTRIBUTES, :auth_type)
 
+      # @api private
       def initialize(config, auth_type: :public)
-        super(config, ATTRIBUTES)
+        ATTRIBUTES.each { |attr| instance_variable_set("@#{attr}", config.public_send(attr)) }
 
         @auth_type = auth_type.to_sym
         @http_client = Safire.http_client
@@ -95,8 +44,8 @@ module Safire
 
       # Retrieves and parses SMART on FHIR configuration metadata from the FHIR server.
       #
-      # This method sends a GET request to the server’s
-      # `/.well-known/smart-configuration` endpoint, validates the response format,
+      # This method sends a GET request to the server's
+      # +/.well-known/smart-configuration+ endpoint, validates the response format,
       # and builds a {Safire::Protocols::SmartMetadata} object containing the
       # authorization and token endpoints, among other SMART metadata fields.
       #
@@ -106,8 +55,7 @@ module Safire
       # @return [Safire::Protocols::SmartMetadata]
       #   Parsed SMART configuration metadata object.
       # @raise [Safire::Errors::DiscoveryError]
-      #   If the discovery request fails or the response is not valid JSON.
-      #   The error's {Safire::Errors::Error#details details} may contain +:status+ and +:body+.
+      #   If the discovery request fails or the response is not a valid JSON object.
       def well_known_config
         return @well_known_config if @well_known_config
 
@@ -120,8 +68,6 @@ module Safire
       end
 
       # Builds the authorization request data for the authorization code flow.
-      #
-      # See {Safire::Protocols::Smart} for configuration details and supported auth types.
       #
       # @param launch [String, nil] optional launch parameter
       # @param custom_scopes [Array<String>, nil] optional custom scopes to override the configured ones
@@ -151,7 +97,6 @@ module Safire
 
       # Exchanges the authorization code for an access token.
       #
-      # See {Safire::Protocols::Smart} for authentication modes and client configuration.
       # @param code [String] authorization code from the authorization server
       # @param code_verifier [String] PKCE code verifier from the authorization step
       # @param client_secret [String, nil] optional; used for confidential symmetric clients when not already configured
@@ -166,7 +111,6 @@ module Safire
       #   * "authorization_details"   [Hash] additional authorization details, if provided (optional)
       #   * Context parameters such as "patient" or "encounter" MAY be present, depending on server behavior.
       # @raise [Safire::Errors::TokenError] if the request fails or response is invalid.
-      #   The error's {Safire::Errors::Error#details details} may contain +:status+ and +:body+.
       def request_access_token(code:, code_verifier:, client_secret: self.client_secret,
                                private_key: self.private_key, kid: self.kid)
         Safire.logger.info('Requesting access token using authorization code...')
@@ -185,16 +129,14 @@ module Safire
       # Exchanges a refresh token for a new access token.
       #
       # @param refresh_token [String] the refresh token issued by the authorization server (required)
-      # @param scopes [Array<String>, nil] optional reduced scope list
-      #   If omitted, the same scopes as the original token are requested.
+      # @param scopes [Array<String>, nil] optional reduced scope list;
+      #   if omitted, the same scopes as the original token are requested
       # @param client_secret [String, nil] optional; used for confidential symmetric clients when not already configured
       # @param private_key [OpenSSL::PKey, String, nil] optional; private key for asymmetric auth (overrides configured)
       # @param kid [String, nil] optional; key ID for asymmetric auth (overrides configured)
       # @return [Hash] token response parsed from the authorization server.
-      #   See {Safire::Protocols::Smart#request_access_token} for token response format.
-      #
+      #   See {#request_access_token} for token response format.
       # @raise [Safire::Errors::TokenError] if the refresh request fails or the response is invalid.
-      #   The error's {Safire::Errors::Error#details details} may contain +:status+ and +:body+.
       def refresh_token(refresh_token:, scopes: nil, client_secret: self.client_secret,
                         private_key: self.private_key, kid: self.kid)
         Safire.logger.info('Refreshing access token...')
@@ -314,9 +256,8 @@ module Safire
       end
 
       def oauth2_headers(secret)
-        headers = {
-          content_type: 'application/x-www-form-urlencoded'
-        }
+        headers = { content_type: 'application/x-www-form-urlencoded' }
+
         if auth_type == :confidential_symmetric
           headers[:Authorization] = authentication_header(secret.presence || client_secret)
         end

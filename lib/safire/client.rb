@@ -85,7 +85,7 @@ module Safire
 
     def initialize(config, auth_type: :public)
       @config = build_config(config)
-      @auth_type = auth_type
+      @auth_type = auth_type.to_sym
 
       validate_auth_type
     end
@@ -133,7 +133,7 @@ module Safire
     private
 
     def smart_client
-      @smart_client ||= Protocols::Smart.new(config.to_hash, auth_type:)
+      @smart_client ||= Protocols::Smart.new(config, auth_type:)
     end
 
     def build_config(config)

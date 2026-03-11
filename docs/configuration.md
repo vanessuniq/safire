@@ -359,6 +359,22 @@ SMART_CLIENT_SECRET=my_client_secret  # For confidential clients
 SMART_SCOPES="openid profile patient/*.read"
 ```
 
+### `SAFIRE_LOGGER` — Redirect Log Output to a File
+
+By default Safire logs to `$stdout`. Set `SAFIRE_LOGGER` to a file path to redirect the default logger's output to a file instead.
+
+```bash
+SAFIRE_LOGGER=/var/log/safire.log
+```
+
+This only affects the **default logger**. If you supply your own logger via `Safire.configure { |c| c.logger = MyLogger }`, `SAFIRE_LOGGER` is ignored entirely.
+
+| `SAFIRE_LOGGER` set? | `config.logger` set? | Log destination |
+|----------------------|----------------------|-----------------|
+| No | No | `$stdout` |
+| Yes (file path) | No | file at that path |
+| Either | Yes | your custom logger |
+
 ---
 
 ## Next Steps

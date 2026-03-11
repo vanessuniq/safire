@@ -19,6 +19,25 @@ RSpec.describe Safire::HTTPClient do
       expect(request).to have_been_made.once
     end
 
+    context 'when a custom user_agent is configured' do
+      before do
+        allow(Safire).to receive_messages(
+          configuration: instance_double(Safire::Configuration, user_agent: 'MyApp/1.0 Safire', log_http: true),
+          logger: Logger.new(StringIO.new)
+        )
+      end
+
+      it 'uses the configured user_agent in the User-Agent header' do
+        request = stub_request(:get, base_url)
+                  .with(headers: { 'User-Agent' => 'MyApp/1.0 Safire' })
+                  .to_return(status: 200, body: {}.to_json)
+
+        described_class.new(base_url:).get
+
+        expect(request).to have_been_made.once
+      end
+    end
+
     it 'uses url_encoded request format by default' do
       expect(client.instance_variable_get(:@request_format)).to eq(:url_encoded)
     end
@@ -84,7 +103,7 @@ RSpec.describe Safire::HTTPClient do
     context 'when log_http is true (default)' do
       before do
         allow(Safire).to receive_messages(
-          configuration: instance_double(Safire::Configuration, log_http: true),
+          configuration: instance_double(Safire::Configuration, log_http: true, user_agent: "Safire v#{Safire::VERSION}"),
           logger: test_logger
         )
       end
@@ -116,7 +135,7 @@ RSpec.describe Safire::HTTPClient do
     context 'when log_http is false' do
       before do
         allow(Safire).to receive_messages(
-          configuration: instance_double(Safire::Configuration, log_http: false),
+          configuration: instance_double(Safire::Configuration, log_http: false, user_agent: "Safire v#{Safire::VERSION}"),
           logger: test_logger
         )
       end

@@ -164,5 +164,61 @@ RSpec.describe Safire::ClientConfig do
       expect(hash[:base_url]).to eq(valid_attrs[:base_url])
       expect(hash[:client_id]).to eq(valid_attrs[:client_id])
     end
+
+    it 'masks client_secret with [FILTERED]' do
+      config = described_class.new(valid_attrs.merge(client_secret: 'super_secret'))
+      expect(config.to_hash[:client_secret]).to eq('[FILTERED]')
+    end
+
+    it 'masks private_key with [FILTERED]' do
+      config = described_class.new(valid_attrs.merge(private_key: 'pem_key_data'))
+      expect(config.to_hash[:private_key]).to eq('[FILTERED]')
+    end
+
+    it 'leaves nil client_secret as nil' do
+      config = described_class.new(valid_attrs)
+      expect(config.to_hash[:client_secret]).to be_nil
+    end
+
+    it 'does not mask non-sensitive attributes' do
+      config = described_class.new(valid_attrs)
+      expect(config.to_hash[:base_url]).to eq(valid_attrs[:base_url])
+    end
+  end
+
+  # ---------- inspect ----------
+
+  describe '#inspect' do
+    it 'does not expose client_secret in output' do
+      config = described_class.new(valid_attrs.merge(client_secret: 'super_secret'))
+      expect(config.inspect).not_to include('super_secret')
+    end
+
+    it 'shows [FILTERED] in place of client_secret' do
+      config = described_class.new(valid_attrs.merge(client_secret: 'super_secret'))
+      expect(config.inspect).to include('[FILTERED]')
+    end
+
+    it 'does not expose private_key in output' do
+      config = described_class.new(valid_attrs.merge(private_key: 'pem_key_data'))
+      expect(config.inspect).not_to include('pem_key_data')
+    end
+
+    it 'shows [FILTERED] in place of private_key' do
+      config = described_class.new(valid_attrs.merge(private_key: 'pem_key_data'))
+      expect(config.inspect).to include('[FILTERED]')
+    end
+
+    it 'includes non-sensitive attributes in output' do
+      config = described_class.new(valid_attrs)
+      expect(config.inspect).to include('base_url')
+      expect(config.inspect).to include('client_id')
+    end
+
+    it 'omits nil attributes' do
+      config = described_class.new(valid_attrs)
+      expect(config.inspect).not_to include('client_secret')
+      expect(config.inspect).not_to include('private_key')
+    end
   end
 end

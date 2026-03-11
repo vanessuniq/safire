@@ -91,6 +91,38 @@ Safire::ClientConfig.new(
 
 ---
 
+## Sensitive Attribute Protection
+
+`ClientConfig` protects `client_secret` and `private_key` from accidental exposure in two ways:
+
+### `#to_hash` masking
+
+Sensitive fields are replaced with `'[FILTERED]'` when present; `nil` values remain `nil`.
+
+```ruby
+config = Safire::ClientConfig.new(
+  base_url: 'https://fhir.example.com',
+  client_id: 'my_client',
+  redirect_uri: 'https://myapp.example.com/callback',
+  client_secret: 'my_secret'
+)
+
+config.to_hash[:client_secret]  # => "[FILTERED]"
+config.to_hash[:base_url]       # => "https://fhir.example.com"
+```
+
+### `#inspect` override
+
+Ruby's default `inspect` exposes all instance variables. `ClientConfig` overrides it to mask sensitive fields and omit `nil` attributes, making REPL sessions and error messages safe.
+
+```ruby
+config.inspect
+# => "#<Safire::ClientConfig base_url: \"https://fhir.example.com\", client_id: \"my_client\", ...>"
+# client_secret is shown as [FILTERED], never as the real value
+```
+
+---
+
 ## Creating a Client
 
 ### Using a Hash (Recommended)

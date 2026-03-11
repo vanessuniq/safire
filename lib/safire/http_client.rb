@@ -9,7 +9,10 @@ module Safire
       @options = {
         url: normalize_base_url(base_url),
         ssl: ssl_options,
-        headers: { 'User-Agent' => "Safire v#{Safire::VERSION}", 'Accept' => 'application/json' }
+        headers: {
+          'User-Agent' => Safire.configuration&.user_agent || "Safire v#{Safire::VERSION}",
+          'Accept' => 'application/json'
+        }
       }
       @adapter = adapter || Faraday.default_adapter
       @request_format = request_format.to_sym

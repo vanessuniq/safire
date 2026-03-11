@@ -76,11 +76,31 @@ module Safire
       end
     end
 
-    private
-
+    SENSITIVE_ATTRIBUTES = %i[client_secret private_key].freeze
     URI_ATTRS = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint jwks_uri].freeze
     OPTIONAL_URI_ATTRS = %i[authorization_endpoint token_endpoint jwks_uri].freeze
-    private_constant :URI_ATTRS, :OPTIONAL_URI_ATTRS
+    private_constant :SENSITIVE_ATTRIBUTES, :URI_ATTRS, :OPTIONAL_URI_ATTRS
+
+    # @api private
+    def inspect
+      attrs = ATTRIBUTES.map do |attr|
+        value = send(attr)
+        next if value.nil?
+
+        masked = SENSITIVE_ATTRIBUTES.include?(attr) ? '[FILTERED]' : value.inspect
+        "#{attr}: #{masked}"
+      end.compact.join(', ')
+      "#<#{self.class} #{attrs}>"
+    end
+
+    protected
+
+    # @return [Array<Symbol>] attributes masked as '[FILTERED]' in #to_hash
+    def sensitive_attributes
+      SENSITIVE_ATTRIBUTES
+    end
+
+    private
 
     # Validates all URI attributes for structure and HTTPS requirement.
     #

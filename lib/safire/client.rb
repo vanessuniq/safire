@@ -109,7 +109,7 @@ module Safire
     def auth_type=(new_auth_type)
       @auth_type = new_auth_type.to_sym
       validate_auth_type
-      @smart_client = nil # Reset cached client to use new auth type
+      @smart_client&.auth_type = @auth_type
     end
 
     def smart_metadata

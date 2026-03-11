@@ -27,7 +27,8 @@ module Safire
 
       WELL_KNOWN_PATH = '/.well-known/smart-configuration'.freeze
 
-      attr_reader(*ATTRIBUTES, :auth_type)
+      attr_reader(*ATTRIBUTES)
+      attr_accessor :auth_type
 
       # @api private
       def initialize(config, auth_type: :public)
@@ -36,10 +37,16 @@ module Safire
         @auth_type = auth_type.to_sym
         @http_client = Safire.http_client
         @issuer ||= base_url
-        @authorization_endpoint ||= well_known_config.authorization_endpoint
-        @token_endpoint ||= well_known_config.token_endpoint
 
         validate!
+      end
+
+      def authorization_endpoint
+        @authorization_endpoint ||= well_known_config.authorization_endpoint
+      end
+
+      def token_endpoint
+        @token_endpoint ||= well_known_config.token_endpoint
       end
 
       # Retrieves and parses SMART on FHIR configuration metadata from the FHIR server.

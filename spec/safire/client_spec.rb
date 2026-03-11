@@ -85,7 +85,7 @@ RSpec.describe Safire::Client do
         .to raise_error(Safire::Errors::ConfigurationError, /auth_type.*unsupported/i)
     end
 
-    it 'resets the internal smart_client so new auth type is used' do
+    it 'updates auth_type on the existing smart client without rebuilding it' do
       stub_token_request(headers: { 'Authorization' => /^Basic / })
 
       client = described_class.new(config, auth_type: :public)
@@ -96,6 +96,29 @@ RSpec.describe Safire::Client do
 
       expect(WebMock).to have_requested(:post, token_endpoint)
         .with(headers: { 'Authorization' => /^Basic / })
+    end
+
+    it 'does not re-discover endpoints when auth_type changes' do
+      discovery_config = Safire::ClientConfig.new(
+        base_config_attrs.except(:authorization_endpoint, :token_endpoint)
+                         .merge(client_secret: 'secret')
+      )
+      well_known_url = "#{base_url}/.well-known/smart-configuration"
+      stub_request(:get, well_known_url).to_return(
+        status: 200,
+        body: { 'authorization_endpoint' => "#{base_url}/authorize",
+                'token_endpoint' => token_endpoint,
+                'capabilities' => [] }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      stub_token_request(headers: { 'Authorization' => /^Basic / })
+
+      client = described_class.new(discovery_config)
+      client.smart_metadata
+      client.auth_type = :confidential_symmetric
+      client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
+
+      expect(WebMock).to have_requested(:get, well_known_url).once
     end
   end
 

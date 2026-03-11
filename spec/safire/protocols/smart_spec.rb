@@ -221,6 +221,17 @@ RSpec.describe Safire::Protocols::Smart do
     end
   end
 
+  # ---------- auth_type writer ----------
+
+  describe '#auth_type=' do
+    it 'allows auth_type to be updated after initialization' do
+      client = described_class.new(config, auth_type: :public)
+      client.auth_type = :confidential_symmetric
+
+      expect(client.auth_type).to eq(:confidential_symmetric)
+    end
+  end
+
   # ---------- Well-known Discovery ----------
 
   describe '#well_known_config' do

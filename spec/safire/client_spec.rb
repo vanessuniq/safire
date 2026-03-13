@@ -53,43 +53,56 @@ RSpec.describe Safire::Client do
   # ---------- Initialization ----------
 
   describe '#initialize' do
-    it 'raises ConfigurationError for invalid auth_type keyword' do
-      expect { described_class.new(config, auth_type: :bogus) }
-        .to raise_error(Safire::Errors::ConfigurationError, /auth_type.*bogus/i)
+    it 'defaults to protocol: :smart' do
+      expect(described_class.new(config).protocol).to eq(:smart)
     end
 
-    it 'symbolizes a string auth_type keyword' do
-      client = described_class.new(config, auth_type: 'confidential_symmetric')
-      expect(client.auth_type).to eq(:confidential_symmetric)
+    it 'defaults to client_type: :public' do
+      expect(described_class.new(config).client_type).to eq(:public)
+    end
+
+    it 'raises ConfigurationError for unknown protocol' do
+      expect { described_class.new(config, protocol: :bogus) }
+        .to raise_error(Safire::Errors::ConfigurationError, /protocol.*bogus/i)
+    end
+
+    it 'raises ConfigurationError for invalid client_type for SMART' do
+      expect { described_class.new(config, client_type: :bogus) }
+        .to raise_error(Safire::Errors::ConfigurationError, /client_type.*bogus/i)
+    end
+
+    it 'symbolizes a string client_type keyword' do
+      client = described_class.new(config, client_type: 'confidential_symmetric')
+      expect(client.client_type).to eq(:confidential_symmetric)
     end
   end
 
-  describe '#auth_type=' do
-    it 'changes the auth type from public to confidential_symmetric' do
-      client = described_class.new(config, auth_type: :public)
-      expect(client.auth_type).to eq(:public)
+  describe '#client_type=' do
+    it 'changes the client type from public to confidential_symmetric' do
+      client = described_class.new(config, client_type: :public)
+      expect(client.client_type).to eq(:public)
 
-      client.auth_type = :confidential_symmetric
-      expect(client.auth_type).to eq(:confidential_symmetric)
+      client.client_type = :confidential_symmetric
+      expect(client.client_type).to eq(:confidential_symmetric)
     end
 
-    it 'symbolizes string auth types' do
+    it 'symbolizes string client types' do
       client = described_class.new(config)
-      client.auth_type = 'confidential_symmetric'
-      expect(client.auth_type).to eq(:confidential_symmetric)
+      client.client_type = 'confidential_symmetric'
+      expect(client.client_type).to eq(:confidential_symmetric)
     end
 
-    it 'raises ConfigurationError for unsupported auth types' do
+    it 'raises ConfigurationError for unsupported client types' do
       client = described_class.new(config)
-      expect { client.auth_type = :unsupported }
-        .to raise_error(Safire::Errors::ConfigurationError, /auth_type.*unsupported/i)
+      expect { client.client_type = :unsupported }
+        .to raise_error(Safire::Errors::ConfigurationError, /client_type.*unsupported/i)
     end
 
-    it 'updates auth_type on the existing smart client without rebuilding it' do
+    it 'updates client_type on the existing protocol client without rebuilding it' do
       stub_token_request(headers: { 'Authorization' => /^Basic / })
 
-      client = described_class.new(config, auth_type: :public)
-      client.auth_type = :confidential_symmetric
+      client = described_class.new(config, client_type: :public)
+      client.client_type = :confidential_symmetric
 
       tokens = client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
       expect(tokens['access_token']).to eq('token123')
@@ -98,7 +111,7 @@ RSpec.describe Safire::Client do
         .with(headers: { 'Authorization' => /^Basic / })
     end
 
-    it 'does not re-discover endpoints when auth_type changes' do
+    it 'does not re-discover endpoints when client_type changes' do
       discovery_config = Safire::ClientConfig.new(
         base_config_attrs.except(:authorization_endpoint, :token_endpoint)
                          .merge(client_secret: 'secret')
@@ -114,22 +127,54 @@ RSpec.describe Safire::Client do
       stub_token_request(headers: { 'Authorization' => /^Basic / })
 
       client = described_class.new(discovery_config)
-      client.smart_metadata
-      client.auth_type = :confidential_symmetric
+      client.server_metadata
+      client.client_type = :confidential_symmetric
       client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
 
       expect(WebMock).to have_requested(:get, well_known_url).once
     end
   end
 
+  # ---------- Authorization URL ----------
+
+  describe '#authorization_url' do
+    it 'returns auth_url, state, and code_verifier' do
+      result = described_class.new(config).authorization_url
+      expect(result).to include(:auth_url, :state, :code_verifier)
+    end
+
+    it 'accepts launch and custom_scopes' do
+      result = described_class.new(config).authorization_url(launch: 'token', custom_scopes: %w[openid])
+      expect(result[:auth_url]).to include('launch=token')
+    end
+  end
+
+  # ---------- Server Metadata ----------
+
+  describe '#server_metadata' do
+    it 'returns SMART server metadata' do
+      well_known_url = "#{base_url}/.well-known/smart-configuration"
+      stub_request(:get, well_known_url).to_return(
+        status: 200,
+        body: { 'authorization_endpoint' => "#{base_url}/authorize",
+                'token_endpoint' => token_endpoint,
+                'capabilities' => [] }.to_json,
+        headers: { 'Content-Type' => 'application/json' }
+      )
+      discovery_config = Safire::ClientConfig.new(base_config_attrs.except(:authorization_endpoint, :token_endpoint))
+      result = described_class.new(discovery_config).server_metadata
+      expect(result).to be_a(Safire::Protocols::SmartMetadata)
+    end
+  end
+
   # ---------- Token Exchange ----------
 
   describe '#request_access_token' do
-    context 'with public auth' do
+    context 'with public client_type' do
       before { stub_token_request(body_matcher: hash_including('client_id' => 'test_client_id')) }
 
       it 'includes client_id in request body' do
-        client = described_class.new(config, auth_type: :public)
+        client = described_class.new(config, client_type: :public)
         tokens = client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
 
         expect(tokens['access_token']).to eq('token123')
@@ -138,11 +183,11 @@ RSpec.describe Safire::Client do
       end
     end
 
-    context 'with confidential_symmetric auth' do
+    context 'with confidential_symmetric client_type' do
       before { stub_token_request(headers: { 'Authorization' => /^Basic / }) }
 
       it 'uses Basic auth header' do
-        client = described_class.new(config, auth_type: :confidential_symmetric)
+        client = described_class.new(config, client_type: :confidential_symmetric)
         tokens = client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
 
         expect(tokens['access_token']).to eq('token123')
@@ -151,7 +196,7 @@ RSpec.describe Safire::Client do
       end
     end
 
-    context 'with confidential_asymmetric auth' do
+    context 'with confidential_asymmetric client_type' do
       before do
         stub_token_request(
           body_matcher: hash_including(
@@ -161,7 +206,7 @@ RSpec.describe Safire::Client do
       end
 
       it 'uses JWT assertion' do
-        client = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+        client = described_class.new(asymmetric_config, client_type: :confidential_asymmetric)
         tokens = client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
 
         expect(tokens['access_token']).to eq('token123')
@@ -170,7 +215,7 @@ RSpec.describe Safire::Client do
       end
 
       it 'sends valid JWT with correct claims' do
-        client = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+        client = described_class.new(asymmetric_config, client_type: :confidential_asymmetric)
         client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
 
         expect(WebMock).to(have_requested(:post, token_endpoint).with do |req|
@@ -190,7 +235,7 @@ RSpec.describe Safire::Client do
   describe '#refresh_token' do
     let(:refresh_response) { token_response.merge('refresh_token' => 'new_refresh') }
 
-    context 'with public auth' do
+    context 'with public client_type' do
       before do
         stub_request(:post, token_endpoint)
           .with(body: hash_including('grant_type' => 'refresh_token', 'client_id' => 'test_client_id'))
@@ -198,7 +243,7 @@ RSpec.describe Safire::Client do
       end
 
       it 'includes client_id in request body' do
-        client = described_class.new(config, auth_type: :public)
+        client = described_class.new(config, client_type: :public)
         tokens = client.refresh_token(refresh_token: 'old_refresh')
 
         expect(tokens['access_token']).to eq('token123')
@@ -207,7 +252,7 @@ RSpec.describe Safire::Client do
       end
     end
 
-    context 'with confidential_asymmetric auth' do
+    context 'with confidential_asymmetric client_type' do
       before do
         stub_request(:post, token_endpoint)
           .with(body: hash_including(
@@ -218,12 +263,41 @@ RSpec.describe Safire::Client do
       end
 
       it 'uses JWT assertion' do
-        client = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+        client = described_class.new(asymmetric_config, client_type: :confidential_asymmetric)
         tokens = client.refresh_token(refresh_token: 'old_refresh')
 
         expect(tokens['access_token']).to eq('token123')
         expect(tokens['refresh_token']).to eq('new_refresh')
       end
+    end
+  end
+
+  # ---------- Token Response Validation ----------
+
+  describe '#token_response_valid?' do
+    before { allow(Safire.logger).to receive(:warn) }
+
+    let(:valid_response) do
+      { 'access_token' => 'abc', 'token_type' => 'Bearer', 'scope' => 'openid' }
+    end
+
+    it 'returns true for a compliant response' do
+      expect(described_class.new(config).token_response_valid?(valid_response)).to be(true)
+    end
+
+    it 'returns false and warns for a non-compliant response' do
+      result = described_class.new(config).token_response_valid?({})
+      expect(result).to be(false)
+      expect(Safire.logger).to have_received(:warn).at_least(:once)
+    end
+  end
+
+  # ---------- Dynamic Client Registration ----------
+
+  describe '#register_client' do
+    it 'raises NotImplementedError' do
+      expect { described_class.new(config).register_client }
+        .to raise_error(NotImplementedError)
     end
   end
 end

@@ -124,7 +124,6 @@ RSpec.describe Safire::Protocols::Smart do
       }
     end
 
-    # Asymmetric auth code body includes client_assertion_type and client_assertion
     let(:asymmetric_auth_code_body_matcher) do
       hash_including(
         'grant_type' => 'authorization_code',
@@ -156,7 +155,6 @@ RSpec.describe Safire::Protocols::Smart do
       }
     end
 
-    # Asymmetric refresh body includes client_assertion_type and client_assertion
     let(:asymmetric_refresh_body_matcher) do
       hash_including(
         'grant_type' => 'refresh_token',
@@ -170,33 +168,37 @@ RSpec.describe Safire::Protocols::Smart do
   # ---------- Initialization ----------
 
   describe '#initialize' do
+    it 'includes Safire::Protocols::Behaviours' do
+      expect(described_class.ancestors).to include(Safire::Protocols::Behaviours)
+    end
+
     it 'creates a public client from a ClientConfig' do
-      client = described_class.new(config, auth_type: :public)
-      expect(client.auth_type).to eq(:public)
+      client = described_class.new(config, client_type: :public)
+      expect(client.client_type).to eq(:public)
       described_class::ATTRIBUTES.each { |attr| expect(client.send(attr)).to eq(config.send(attr)) }
     end
 
     it 'creates a confidential symmetric client' do
-      client = described_class.new(confidential_config, auth_type: :confidential_symmetric)
-      expect(client.auth_type).to eq(:confidential_symmetric)
+      client = described_class.new(confidential_config, client_type: :confidential_symmetric)
+      expect(client.client_type).to eq(:confidential_symmetric)
       expect(client.client_secret).to eq(confidential_config.client_secret)
     end
 
     it 'creates a confidential asymmetric client' do
-      client = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
-      expect(client.auth_type).to eq(:confidential_asymmetric)
+      client = described_class.new(asymmetric_config, client_type: :confidential_asymmetric)
+      expect(client.client_type).to eq(:confidential_asymmetric)
       expect(client.private_key).to eq(asymmetric_config.private_key)
       expect(client.kid).to eq(asymmetric_config.kid)
       expect(client.jwt_algorithm).to eq(asymmetric_config.jwt_algorithm)
       expect(client.jwks_uri).to eq(asymmetric_config.jwks_uri)
     end
 
-    it 'defaults auth_type to public' do
-      expect(described_class.new(config).auth_type).to eq(:public)
+    it 'defaults client_type to :public' do
+      expect(described_class.new(config).client_type).to eq(:public)
     end
 
-    it 'symbolizes string auth_type' do
-      expect(described_class.new(config, auth_type: 'public').auth_type).to eq(:public)
+    it 'symbolizes string client_type' do
+      expect(described_class.new(config, client_type: 'public').client_type).to eq(:public)
     end
 
     it 'allows scopes and client_secret to be optional' do
@@ -229,25 +231,25 @@ RSpec.describe Safire::Protocols::Smart do
     end
   end
 
-  # ---------- auth_type writer ----------
+  # ---------- client_type writer ----------
 
-  describe '#auth_type=' do
-    it 'allows auth_type to be updated after initialization' do
-      client = described_class.new(config, auth_type: :public)
-      client.auth_type = :confidential_symmetric
+  describe '#client_type=' do
+    it 'allows client_type to be updated after initialization' do
+      client = described_class.new(config, client_type: :public)
+      client.client_type = :confidential_symmetric
 
-      expect(client.auth_type).to eq(:confidential_symmetric)
+      expect(client.client_type).to eq(:confidential_symmetric)
     end
   end
 
-  # ---------- Well-known Discovery ----------
+  # ---------- Server Metadata (SMART Discovery) ----------
 
-  describe '#well_known_config' do
+  describe '#server_metadata' do
     let(:well_known_url) { "#{config_attrs[:base_url]}#{described_class::WELL_KNOWN_PATH}" }
 
     it 'fetches and exposes metadata' do
       stub_well_known
-      metadata = described_class.new(config).well_known_config
+      metadata = described_class.new(config).server_metadata
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
       expect(metadata.authorization_endpoint).to eq(smart_metadata_body['authorization_endpoint'])
       expect(metadata.token_endpoint).to eq(smart_metadata_body['token_endpoint'])
@@ -256,31 +258,32 @@ RSpec.describe Safire::Protocols::Smart do
 
     it 'raises on 404' do
       stub_request(:get, well_known_url).to_return(status: 404)
-      expect { described_class.new(config).well_known_config }
+      expect { described_class.new(config).server_metadata }
         .to raise_error(Safire::Errors::DiscoveryError, /Failed to discover SMART configuration/)
     end
 
     it 'raises on invalid JSON' do
       stub_request(:get, well_known_url).to_return(status: 200, body: 'not-json')
-      expect { described_class.new(config).well_known_config }
+      expect { described_class.new(config).server_metadata }
         .to raise_error(Safire::Errors::DiscoveryError)
     end
 
     it 'raises when response is not a hash' do
-      stub_request(:get, well_known_url).to_return(status: 200, body: '[]',
-                                                   headers: { 'Content-Type' => 'application/json' })
-      expect { described_class.new(config).well_known_config }
+      stub_request(:get, well_known_url).to_return(
+        status: 200, body: '[]', headers: { 'Content-Type' => 'application/json' }
+      )
+      expect { described_class.new(config).server_metadata }
         .to raise_error(Safire::Errors::DiscoveryError, /response is not a JSON object/)
     end
 
     it 'handles base_url with or without trailing slash' do
       stub_well_known(base_url: 'https://fhir.example.com/')
       expect do
-        described_class.new(Safire::ClientConfig.new(config_attrs.merge(base_url: 'https://fhir.example.com/'))).well_known_config
+        described_class.new(Safire::ClientConfig.new(config_attrs.merge(base_url: 'https://fhir.example.com/'))).server_metadata
       end.not_to raise_error
 
       stub_well_known(base_url: 'https://fhir.example.com')
-      expect { described_class.new(config).well_known_config }.not_to raise_error
+      expect { described_class.new(config).server_metadata }.not_to raise_error
     end
   end
 
@@ -422,7 +425,7 @@ RSpec.describe Safire::Protocols::Smart do
 
     context 'when public client' do
       subject(:token_response) do
-        described_class.new(config, auth_type: :public)
+        described_class.new(config, client_type: :public)
                        .request_access_token(code: authorization_code, code_verifier: code_verifier)
       end
 
@@ -449,7 +452,7 @@ RSpec.describe Safire::Protocols::Smart do
 
     context 'when confidential_symmetric' do
       subject(:token_response) do
-        described_class.new(confidential_config, auth_type: :confidential_symmetric)
+        described_class.new(confidential_config, client_type: :confidential_symmetric)
                        .request_access_token(code: authorization_code, code_verifier: code_verifier)
       end
 
@@ -476,7 +479,7 @@ RSpec.describe Safire::Protocols::Smart do
 
     context 'when confidential_asymmetric' do
       subject(:token_response) do
-        described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+        described_class.new(asymmetric_config, client_type: :confidential_asymmetric)
                        .request_access_token(code: authorization_code, code_verifier: code_verifier)
       end
 
@@ -520,7 +523,7 @@ RSpec.describe Safire::Protocols::Smart do
       it 'raises ConfigurationError when private_key is missing' do
         cfg = Safire::ClientConfig.new(config_attrs.merge(kid: 'key-id'))
         expect do
-          described_class.new(cfg, auth_type: :confidential_asymmetric)
+          described_class.new(cfg, client_type: :confidential_asymmetric)
                          .request_access_token(code: authorization_code, code_verifier: code_verifier)
         end.to raise_error(Safire::Errors::ConfigurationError, /private_key/)
       end
@@ -528,7 +531,7 @@ RSpec.describe Safire::Protocols::Smart do
       it 'raises ConfigurationError when kid is missing' do
         cfg = Safire::ClientConfig.new(config_attrs.merge(private_key: rsa_private_key))
         expect do
-          described_class.new(cfg, auth_type: :confidential_asymmetric)
+          described_class.new(cfg, client_type: :confidential_asymmetric)
                          .request_access_token(code: authorization_code, code_verifier: code_verifier)
         end.to raise_error(Safire::Errors::ConfigurationError, /kid/)
       end
@@ -548,7 +551,7 @@ RSpec.describe Safire::Protocols::Smart do
           body: { 'token_type' => 'Bearer', 'expires_in' => 3600 }
         )
         expect do
-          described_class.new(config, auth_type: :public)
+          described_class.new(config, client_type: :public)
                          .request_access_token(code: 'auth_code_abc123', code_verifier: 'test_code_verifier_xyz789')
         end.to raise_error(Safire::Errors::TokenError, /Missing access token/)
       end
@@ -568,7 +571,7 @@ RSpec.describe Safire::Protocols::Smart do
           body: { 'error' => 'invalid_grant' }
         )
         expect do
-          described_class.new(config, auth_type: :public)
+          described_class.new(config, client_type: :public)
                          .request_access_token(code: 'bad', code_verifier: 'v')
         end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
       end
@@ -578,7 +581,7 @@ RSpec.describe Safire::Protocols::Smart do
       it 'raises NetworkError' do
         stub_request(:post, config_attrs[:token_endpoint]).to_raise(Faraday::ConnectionFailed)
         expect do
-          described_class.new(config, auth_type: :public)
+          described_class.new(config, client_type: :public)
                          .request_access_token(code: 'x', code_verifier: 'y')
         end.to raise_error(Safire::Errors::NetworkError)
       end
@@ -600,7 +603,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
 
       it 'returns refreshed tokens' do
-        res = described_class.new(config, auth_type: :public)
+        res = described_class.new(config, client_type: :public)
                              .refresh_token(refresh_token: refresh_token_value)
         expect(res).to eq(refreshed_token_response_body)
       end
@@ -618,7 +621,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
 
       it 'includes scopes in request' do
-        res = described_class.new(config, auth_type: :public)
+        res = described_class.new(config, client_type: :public)
                              .refresh_token(refresh_token: refresh_token_value, scopes: custom_scopes)
         expect(res['access_token']).to eq('new_access_token_123ghi')
       end
@@ -637,7 +640,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
 
       it 'uses Basic auth and omits client_id' do
-        res = described_class.new(confidential_config, auth_type: :confidential_symmetric)
+        res = described_class.new(confidential_config, client_type: :confidential_symmetric)
                              .refresh_token(refresh_token: refresh_token_value)
         expect(res).to eq(refreshed_token_response_body)
 
@@ -653,7 +656,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
 
       it 'returns refreshed tokens with JWT assertion' do
-        res = described_class.new(asymmetric_config, auth_type: :confidential_asymmetric)
+        res = described_class.new(asymmetric_config, client_type: :confidential_asymmetric)
                              .refresh_token(refresh_token: refresh_token_value)
         expect(res).to eq(refreshed_token_response_body)
 
@@ -675,7 +678,7 @@ RSpec.describe Safire::Protocols::Smart do
         body: { 'error' => 'invalid_grant' }
       )
       expect do
-        described_class.new(config, auth_type: :public).refresh_token(refresh_token: 'bad')
+        described_class.new(config, client_type: :public).refresh_token(refresh_token: 'bad')
       end.to raise_error(Safire::Errors::TokenError, /Token request failed/)
     end
 
@@ -688,15 +691,86 @@ RSpec.describe Safire::Protocols::Smart do
         body: { 'token_type' => 'Bearer' }
       )
       expect do
-        described_class.new(config, auth_type: :public).refresh_token(refresh_token: 'x')
+        described_class.new(config, client_type: :public).refresh_token(refresh_token: 'x')
       end.to raise_error(Safire::Errors::TokenError, /Missing access token/)
     end
 
     it 'raises NetworkError on network error' do
       stub_request(:post, config_attrs[:token_endpoint]).to_raise(Faraday::TimeoutError)
       expect do
-        described_class.new(config, auth_type: :public).refresh_token(refresh_token: 'x')
+        described_class.new(config, client_type: :public).refresh_token(refresh_token: 'x')
       end.to raise_error(Safire::Errors::NetworkError)
+    end
+  end
+
+  # ---------- Token Response Validation ----------
+
+  describe '#token_response_valid?' do
+    let(:client) { described_class.new(config) }
+    let(:valid_response) do
+      { 'access_token' => 'abc123', 'token_type' => 'Bearer', 'scope' => 'openid profile' }
+    end
+
+    before { allow(Safire.logger).to receive(:warn) }
+
+    context 'when all required fields are present and token_type is "Bearer"' do
+      it 'returns true and does not warn' do
+        result = client.token_response_valid?(valid_response)
+        expect(result).to be(true)
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+
+    %w[access_token scope token_type].each do |field|
+      context "when #{field} is missing" do
+        it 'returns false and logs a warning' do
+          result = client.token_response_valid?(valid_response.except(field))
+          expect(result).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/'#{field}' is missing/)
+        end
+      end
+    end
+
+    [
+      ['lowercase "bearer"', 'bearer', /token_type.*bearer.*Bearer/],
+      ['"BEARER"', 'BEARER', /token_type/]
+    ].each do |description, value, warning_pattern|
+      context "when token_type is #{description}" do
+        it 'returns false and logs a warning' do
+          result = client.token_response_valid?(valid_response.merge('token_type' => value))
+          expect(result).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(warning_pattern)
+        end
+      end
+    end
+
+    context 'when multiple required fields are missing' do
+      it 'returns false and logs a warning for each missing field' do
+        result = client.token_response_valid?({})
+        expect(result).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/'access_token' is missing/)
+        expect(Safire.logger).to have_received(:warn).with(/'scope' is missing/)
+        expect(Safire.logger).to have_received(:warn).with(/'token_type' is missing/)
+      end
+    end
+
+    context 'when response is not a Hash' do
+      [nil, 'not a hash'].each do |invalid|
+        it "returns false for #{invalid.inspect} and logs a warning" do
+          result = client.token_response_valid?(invalid)
+          expect(result).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/not a JSON object/)
+        end
+      end
+    end
+  end
+
+  # ---------- Dynamic Client Registration ----------
+
+  describe '#register_client' do
+    it 'raises NotImplementedError' do
+      expect { described_class.new(config).register_client }
+        .to raise_error(NotImplementedError)
     end
   end
 end

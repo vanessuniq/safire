@@ -212,6 +212,14 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    it 'gives each instance its own distinct HTTPClient' do
+      client1 = described_class.new(config)
+      client2 = described_class.new(config)
+
+      expect(client1.instance_variable_get(:@http_client))
+        .not_to be(client2.instance_variable_get(:@http_client))
+    end
+
     it 'fetches endpoints from well-known when not provided' do
       stub_well_known
       cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint, :token_endpoint))

@@ -35,7 +35,7 @@ module Safire
         ATTRIBUTES.each { |attr| instance_variable_set("@#{attr}", config.public_send(attr)) }
 
         @auth_type = auth_type.to_sym
-        @http_client = Safire.http_client
+        @http_client = Safire::HTTPClient.new
         @issuer ||= base_url
 
         validate!

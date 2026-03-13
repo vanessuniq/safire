@@ -42,10 +42,6 @@ module Safire
       end
     end
 
-    def http_client
-      @http_client ||= Safire::HTTPClient.new
-    end
-
     # Validates a token response for SMART App Launch 2.2.0 compliance.
     #
     # This is a caller-invoked helper — Safire's token exchange methods do not call this

@@ -90,12 +90,12 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
       )
 
       # Initialize confidential symmetric client
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       # =====================================================
       # STEP 1: SMART Discovery
       # =====================================================
-      metadata = client.smart_metadata
+      metadata = client.server_metadata
 
       # Verify discovery response
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
@@ -107,7 +107,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
       # =====================================================
       # STEP 2: Authorization URL Generation
       # =====================================================
-      auth_data = client.authorize_url
+      auth_data = client.authorization_url
 
       # Verify authorization data structure
       expect(auth_data).to have_key(:auth_url)
@@ -209,7 +209,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       # Stub token endpoint
       stub_request(:post, "#{base_url}/token")
@@ -243,7 +243,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -280,7 +280,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
     end
 
     it 'public client includes client_id in body, no Authorization header' do
-      client = Safire::Client.new(public_config, auth_type: :public)
+      client = Safire::Client.new(public_config, client_type: :public)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -297,7 +297,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
     end
 
     it 'confidential symmetric client uses Basic auth, no client_id in body' do
-      client = Safire::Client.new(confidential_config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(confidential_config, client_type: :confidential_symmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -324,7 +324,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -350,7 +350,7 @@ RSpec.describe 'Confidential Symmetric Client End-to-End Flow', type: :integrati
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(

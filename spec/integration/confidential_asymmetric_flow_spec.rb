@@ -94,12 +94,12 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
       )
 
       # Initialize confidential asymmetric client
-      client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(config, client_type: :confidential_asymmetric)
 
       # =====================================================
       # STEP 1: SMART Discovery
       # =====================================================
-      metadata = client.smart_metadata
+      metadata = client.server_metadata
 
       # Verify discovery response
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
@@ -112,7 +112,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
       # =====================================================
       # STEP 2: Authorization URL Generation
       # =====================================================
-      auth_data = client.authorize_url
+      auth_data = client.authorization_url
 
       # Verify authorization data structure
       expect(auth_data).to have_key(:auth_url)
@@ -223,7 +223,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
         jwks_uri:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(config, client_type: :confidential_asymmetric)
 
       # Capture the JWT from the token request
       captured_jwt = nil
@@ -275,7 +275,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
         jwt_algorithm: 'ES384'
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(config, client_type: :confidential_asymmetric)
 
       captured_jwt = nil
 
@@ -332,7 +332,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
     end
 
     it 'public client includes client_id in body, no auth header' do
-      client = Safire::Client.new(public_config, auth_type: :public)
+      client = Safire::Client.new(public_config, client_type: :public)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -348,7 +348,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
     end
 
     it 'symmetric client uses Basic auth header, no client_id in body' do
-      client = Safire::Client.new(symmetric_config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(symmetric_config, client_type: :confidential_symmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -364,7 +364,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
     end
 
     it 'asymmetric client uses JWT assertion in body, no auth header' do
-      client = Safire::Client.new(asymmetric_config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(asymmetric_config, client_type: :confidential_asymmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -396,7 +396,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
         kid: # kid only, no private_key
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(config, client_type: :confidential_asymmetric)
 
       expect do
         client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
@@ -413,7 +413,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
         # No kid
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(config, client_type: :confidential_asymmetric)
 
       expect do
         client.request_access_token(code: 'test_code', code_verifier: 'test_verifier')
@@ -430,7 +430,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
         kid:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(config, client_type: :confidential_asymmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(
@@ -457,7 +457,7 @@ RSpec.describe 'Confidential Asymmetric Client End-to-End Flow', type: :integrat
         kid:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+      client = Safire::Client.new(config, client_type: :confidential_asymmetric)
 
       stub_request(:post, "#{base_url}/token")
         .to_return(

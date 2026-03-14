@@ -170,7 +170,7 @@ class SafireDemo < Sinatra::Base
 
     begin
       @safire_client = build_safire_client(@server)
-      @metadata = @safire_client.smart_metadata
+      @metadata = @safire_client.server_metadata
     rescue Safire::Errors::Error => e
       set_flash(:error, flash_error_message('Server connection failed', e))
       redirect "/servers/#{@server.id}"
@@ -189,15 +189,15 @@ class SafireDemo < Sinatra::Base
 
   # Start authorization flow
   post '/demo/:server_id/authorize' do
-    auth_type = params[:auth_type]&.to_sym || :public
+    client_type = params[:client_type]&.to_sym || :public
     launch_type = params[:launch_type] || 'provider_standalone'
 
     begin
-      @safire_client.auth_type = auth_type
+      @safire_client.client_type = client_type
       scopes = build_scopes_for_launch(launch_type, @server.scopes)
-      auth_data = @safire_client.authorize_url(custom_scopes: scopes)
+      auth_data = @safire_client.authorization_url(custom_scopes: scopes)
 
-      store_oauth_session(auth_data, auth_type, launch_type)
+      store_oauth_session(auth_data, client_type, launch_type)
       redirect auth_data[:auth_url]
     rescue Safire::Errors::Error => e
       set_flash(:error, flash_error_message('Authorization failed', e))
@@ -228,12 +228,12 @@ class SafireDemo < Sinatra::Base
 
   # EHR/Portal Launch endpoint
   # The EHR/Portal calls this URL with `launch` and `iss` parameters
-  # Optional: `auth_type` param to specify authentication type
+  # Optional: `client_type` param to specify authentication type
   # (public, confidential_symmetric, or confidential_asymmetric)
   get '/launch' do
     launch_token = params[:launch]
     iss = params[:iss]
-    auth_type = parse_auth_type(params[:auth_type])
+    client_type = parse_client_type(params[:client_type])
 
     unless launch_token && iss
       set_flash(:error, 'Missing required parameters: launch and iss are required for EHR launch')
@@ -249,11 +249,11 @@ class SafireDemo < Sinatra::Base
     end
 
     begin
-      client = build_safire_client(@server, auth_type: auth_type)
+      client = build_safire_client(@server, client_type: client_type)
       scopes = build_scopes_for_launch('ehr_launch', @server.scopes)
-      auth_data = client.authorize_url(launch: launch_token, custom_scopes: scopes)
+      auth_data = client.authorization_url(launch: launch_token, custom_scopes: scopes)
 
-      store_oauth_session(auth_data, auth_type, 'ehr_launch')
+      store_oauth_session(auth_data, client_type, 'ehr_launch')
       redirect auth_data[:auth_url]
     rescue Safire::Errors::Error => e
       set_flash(:error, flash_error_message('EHR launch failed', e))
@@ -281,7 +281,7 @@ class SafireDemo < Sinatra::Base
   end
 
   OAUTH_SESSION_KEYS = %i[
-    oauth_state oauth_code_verifier oauth_server_id oauth_auth_type oauth_launch_type
+    oauth_state oauth_code_verifier oauth_server_id oauth_client_type oauth_launch_type
   ].freeze
 
   TOKEN_RESPONSE_KEYS = %i[
@@ -309,24 +309,24 @@ class SafireDemo < Sinatra::Base
   end
 
   def load_oauth_session_vars
-    @auth_type = session[:oauth_auth_type]&.to_sym || :public
+    @client_type = session[:oauth_client_type]&.to_sym || :public
     @launch_type = session[:oauth_launch_type]
   end
 
   def exchange_code_for_token
-    client = build_safire_client(@server, auth_type: @auth_type)
+    client = build_safire_client(@server, client_type: @client_type)
     client.request_access_token(
       code: params[:code],
       code_verifier: session[:oauth_code_verifier]
     )
   end
 
-  def store_oauth_session(auth_data, auth_type, launch_type)
+  def store_oauth_session(auth_data, client_type, launch_type)
     oauth_data = {
       oauth_state: auth_data[:state],
       oauth_code_verifier: auth_data[:code_verifier],
       oauth_server_id: @server.id,
-      oauth_auth_type: auth_type.to_s,
+      oauth_client_type: client_type.to_s,
       oauth_launch_type: launch_type
     }
     oauth_data.each { |key, value| session[key] = value }
@@ -387,14 +387,14 @@ class SafireDemo < Sinatra::Base
     scopes_str.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
   end
 
-  def parse_auth_type(auth_type_param)
-    return :public if auth_type_param.to_s.strip.empty?
+  def parse_client_type(client_type_param)
+    return :public if client_type_param.to_s.strip.empty?
 
-    auth_type = auth_type_param.to_s.strip.to_sym
-    %i[public confidential_symmetric confidential_asymmetric].include?(auth_type) ? auth_type : :public
+    client_type = client_type_param.to_s.strip.to_sym
+    %i[public confidential_symmetric confidential_asymmetric].include?(client_type) ? client_type : :public
   end
 
-  def build_safire_client(server, auth_type: :public)
+  def build_safire_client(server, client_type: :public)
     config = {
       base_url: server.base_url,
       client_id: server.client_id,
@@ -402,7 +402,7 @@ class SafireDemo < Sinatra::Base
       scopes: server.scopes
     }
 
-    case auth_type
+    case client_type
     when :confidential_symmetric
       config[:client_secret] = server.client_secret
     when :confidential_asymmetric
@@ -411,7 +411,7 @@ class SafireDemo < Sinatra::Base
       config[:jwks_uri] = jwks_uri unless ENV['RACK_ENV'] == 'development'
     end
 
-    Safire::Client.new(config, auth_type: auth_type)
+    Safire::Client.new(config, client_type: client_type)
   end
 
   # Build a JWK from an OpenSSL key for the JWKS endpoint

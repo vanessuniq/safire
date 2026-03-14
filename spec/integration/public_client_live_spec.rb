@@ -45,10 +45,10 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # Fetch metadata from real server
-      metadata = client.smart_metadata
+      metadata = client.server_metadata
 
       # Verify metadata structure
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
@@ -80,8 +80,8 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
-      metadata = client.smart_metadata
+      client = Safire::Client.new(config, client_type: :public)
+      metadata = client.server_metadata
 
       # Optional fields may or may not be present
       # Just verify they're accessible without error
@@ -104,10 +104,10 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # Generate authorization URL
-      auth_data = client.authorize_url
+      auth_data = client.authorization_url
 
       # Verify structure
       expect(auth_data).to have_key(:auth_url)
@@ -146,11 +146,11 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # Generate authorization URL with launch parameter
       launch_token = 'WzAsImU3NDhkNDNmLTY4N2YtNGQ3Yi05MGM3LTBmYjAyYjJhNjdkOCIsInNpbS1laHIiLDEsIiIsIiIsIiIsIiIsMCwxXQ'
-      auth_data = client.authorize_url(launch: launch_token)
+      auth_data = client.authorization_url(launch: launch_token)
 
       # Parse URL
       auth_uri = URI.parse(auth_data[:auth_url])
@@ -170,11 +170,11 @@ RSpec.describe 'Public Client Flow (Live Server)', :live, type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # Generate multiple auth URLs to verify uniqueness
-      first_auth_data = client.authorize_url
-      second_auth_data = client.authorize_url
+      first_auth_data = client.authorization_url
+      second_auth_data = client.authorization_url
 
       # Verify verifiers are unique
       expect(first_auth_data[:code_verifier]).not_to eq(second_auth_data[:code_verifier])

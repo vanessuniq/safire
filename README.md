@@ -39,9 +39,9 @@ Then install:
 bundle install
 ```
 
-## Supported Auth Types
+## Supported Client Types
 
-| Auth Type                  | Description                                                | Client Authentication                                  | Supported  |
+| Client Type                | Description                                                | Client Authentication                                  | Supported  |
 | -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ | ---------- |
 | `:public`                  | Public client using PKCE (no secret)                       | `client_id` in token/refresh requests                  | ✅          |
 | `:confidential_symmetric`  | Confidential client using client_secret with Basic auth    | `Authorization: Basic base64(client_id:client_secret)` | ✅          |
@@ -64,7 +64,7 @@ client = Safire::Client.new(
 )
 
 # Discover SMART metadata
-metadata = client.smart_metadata
+metadata = client.server_metadata
 
 puts "Authorization endpoint: #{metadata.authorization_endpoint}"
 puts "Token endpoint: #{metadata.token_endpoint}"
@@ -74,8 +74,8 @@ puts "Capabilities: #{metadata.capabilities.join(', ')}"
 
 # Step 1 – /launch route (authorization request)
 # Use method: :post if the server advertises the 'authorize-post' capability
-auth_data = client.authorize_url            # GET redirect (default)
-# auth_data = client.authorize_url(method: :post)  # POST form submission
+auth_data = client.authorization_url            # GET redirect (default)
+# auth_data = client.authorization_url(method: :post)  # POST form submission
 
 session[:state] = auth_data[:state]
 session[:code_verifier] = auth_data[:code_verifier]
@@ -115,11 +115,11 @@ client = Safire::Client.new(
     kid: 'my-key-id-123',          # Key ID registered with the server
     jwks_uri: 'https://myapp.example.com/.well-known/jwks.json'  # Optional
   },
-  auth_type: :confidential_asymmetric
+  client_type: :confidential_asymmetric
 )
 
 # Usage is the same — Safire handles JWT assertion automatically
-auth_data = client.authorize_url
+auth_data = client.authorization_url
 token_data = client.request_access_token(code: '...', code_verifier: '...')
 ```
 

@@ -37,8 +37,8 @@ POST-based authorization can be useful when:
 Check whether the authorization server advertises the `authorize-post` capability before using POST mode:
 
 ```ruby
-client = Safire::Client.new(config, auth_type: :public)
-metadata = client.smart_metadata
+client = Safire::Client.new(config, client_type: :public)
+metadata = client.server_metadata
 
 if metadata.supports_post_based_authorization?
   puts "Server supports POST-based authorization"
@@ -49,10 +49,10 @@ end
 
 ## Generating a POST Authorization Request
 
-Pass `method: :post` (or `method: 'post'`) to `authorize_url`:
+Pass `method: :post` (or `method: 'post'`) to `authorization_url`:
 
 ```ruby
-auth_data = client.authorize_url(method: :post)
+auth_data = client.authorization_url(method: :post)
 
 auth_data[:auth_url]      # The bare authorization endpoint URL
 auth_data[:params]        # Hash of parameters to POST as the request body
@@ -70,10 +70,10 @@ The `:get` method returns `auth_url` as a fully-formed URL with query parameters
 # app/controllers/smart_auth_controller.rb
 def launch
   # Check server support (optional but recommended)
-  metadata = @client.smart_metadata
+  metadata = @client.server_metadata
   use_post = metadata.supports_post_based_authorization?
 
-  auth_data = @client.authorize_url(method: use_post ? :post : :get)
+  auth_data = @client.authorization_url(method: use_post ? :post : :get)
 
   session[:oauth_state] = auth_data[:state]
   session[:code_verifier] = auth_data[:code_verifier]
@@ -120,7 +120,7 @@ The callback handling (token exchange) is identical for both methods — the aut
 
 ```ruby
 get '/launch' do
-  auth_data = @client.authorize_url(method: :post)
+  auth_data = @client.authorization_url(method: :post)
 
   session[:state] = auth_data[:state]
   session[:code_verifier] = auth_data[:code_verifier]
@@ -148,16 +148,16 @@ end
 Both string and symbol values are accepted:
 
 ```ruby
-client.authorize_url(method: :post)   # symbol
-client.authorize_url(method: 'post')  # string — also accepted
-client.authorize_url(method: :get)    # default
-client.authorize_url(method: 'get')   # also accepted
+client.authorization_url(method: :post)   # symbol
+client.authorization_url(method: 'post')  # string — also accepted
+client.authorization_url(method: :get)    # default
+client.authorization_url(method: 'get')   # also accepted
 ```
 
 Passing any other value raises a `Safire::Errors::ConfigurationError`:
 
 ```ruby
-client.authorize_url(method: :put)
+client.authorization_url(method: :put)
 # => Safire::Errors::ConfigurationError:
 #      Invalid authorization method: :put. Supported methods are :get and :post
 ```

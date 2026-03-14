@@ -87,7 +87,7 @@ class SmartAuthController < ApplicationController
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
 
-    @client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+    @client = Safire::Client.new(config, client_type: :confidential_symmetric)
   end
 end
 ```
@@ -96,7 +96,7 @@ end
 
 ```ruby
 def check_server_capabilities
-  metadata = @client.smart_metadata
+  metadata = @client.server_metadata
 
   unless metadata.supports_symmetric_auth?
     raise "Server does not support confidential symmetric clients"
@@ -128,7 +128,7 @@ Authorization URL generation is identical to public clients.
 # app/controllers/smart_auth_controller.rb
 def launch
   # Generate authorization URL with PKCE
-  auth_data = @client.authorize_url
+  auth_data = @client.authorization_url
 
   # Store state and code_verifier in session
   session[:oauth_state] = auth_data[:state]
@@ -162,7 +162,7 @@ The URL is identical to public clients:
 {: .note }
 > **POST-Based Authorization**
 >
-> If the server advertises the `authorize-post` capability, you can pass `method: :post` to `authorize_url` to submit the authorization request as a form POST instead of a GET redirect. See [POST-Based Authorization]({% link smart-on-fhir/post-based-authorization.md %}) for details.
+> If the server advertises the `authorize-post` capability, you can pass `method: :post` to `authorization_url` to submit the authorization request as a form POST instead of a GET redirect. See [POST-Based Authorization]({% link smart-on-fhir/post-based-authorization.md %}) for details.
 
 ---
 
@@ -234,7 +234,7 @@ code_verifier=nioBARPNwPA8JvVQdZUPxTk6f...
 
 ### What Safire Does Automatically
 
-When `auth_type: :confidential_symmetric`:
+When `client_type: :confidential_symmetric`:
 
 1. Constructs Basic auth header from `client_id` and `client_secret`
 2. Adds `Authorization: Basic <encoded>` to token requests
@@ -313,7 +313,7 @@ module SmartAuthentication
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
-    Safire::Client.new(config, auth_type: :confidential_symmetric)
+    Safire::Client.new(config, client_type: :confidential_symmetric)
   end
 end
 ```
@@ -436,8 +436,8 @@ def validate_server_before_registration
     scopes: ['openid']
   )
 
-  client = Safire::Client.new(config, auth_type: :public)
-  metadata = client.smart_metadata
+  client = Safire::Client.new(config, client_type: :public)
+  metadata = client.server_metadata
 
   {
     supports_confidential_symmetric: metadata.supports_symmetric_auth?,
@@ -613,7 +613,7 @@ class SmartAuthController < ApplicationController
   before_action :initialize_client
 
   def launch
-    auth_data = @client.authorize_url
+    auth_data = @client.authorization_url
 
     session[:oauth_state] = auth_data[:state]
     session[:code_verifier] = auth_data[:code_verifier]
@@ -676,7 +676,7 @@ class SmartAuthController < ApplicationController
       scopes: ['openid', 'profile', 'patient/*.read', 'offline_access']
     )
 
-    @client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+    @client = Safire::Client.new(config, client_type: :confidential_symmetric)
   end
 
   def handle_token_error(error)

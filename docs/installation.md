@@ -84,7 +84,7 @@ client = Safire::Client.new(
 )
 
 # Discover SMART Configuration
-metadata = client.smart_metadata
+metadata = client.server_metadata
 
 puts "Authorization endpoint: #{metadata.authorization_endpoint}"
 # => Authorization endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/authorize

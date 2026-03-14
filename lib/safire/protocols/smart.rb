@@ -5,7 +5,7 @@ module Safire
     # This is an internal class used exclusively by {Safire::Client}. Do not instantiate it directly —
     # use {Safire::Client} instead.
     #
-    # Accepts a {Safire::ClientConfig} and an +auth_type+ symbol. Reads all configuration
+    # Accepts a {Safire::ClientConfig} and a +client_type+ symbol. Reads all configuration
     # attributes directly from the +ClientConfig+ object. Discovery of authorization and token
     # endpoints from the FHIR server's +/.well-known/smart-configuration+ metadata is performed
     # automatically when those endpoints are not present in the config.
@@ -16,6 +16,8 @@ module Safire
     # @raise [Safire::Errors::ConfigurationError]
     #   if required configuration attributes are missing or invalid
     class Smart
+      include Behaviours
+
       ATTRIBUTES = %i[
         base_url client_id client_secret redirect_uri scopes issuer
         authorization_endpoint token_endpoint
@@ -28,13 +30,13 @@ module Safire
       WELL_KNOWN_PATH = '/.well-known/smart-configuration'.freeze
 
       attr_reader(*ATTRIBUTES)
-      attr_accessor :auth_type
+      attr_accessor :client_type
 
       # @api private
-      def initialize(config, auth_type: :public)
+      def initialize(config, client_type: :public)
         ATTRIBUTES.each { |attr| instance_variable_set("@#{attr}", config.public_send(attr)) }
 
-        @auth_type = auth_type.to_sym
+        @client_type = client_type.to_sym
         @http_client = Safire::HTTPClient.new
         @issuer ||= base_url
 
@@ -42,11 +44,11 @@ module Safire
       end
 
       def authorization_endpoint
-        @authorization_endpoint ||= well_known_config.authorization_endpoint
+        @authorization_endpoint ||= server_metadata.authorization_endpoint
       end
 
       def token_endpoint
-        @token_endpoint ||= well_known_config.token_endpoint
+        @token_endpoint ||= server_metadata.token_endpoint
       end
 
       # Retrieves and parses SMART on FHIR configuration metadata from the FHIR server.
@@ -63,11 +65,11 @@ module Safire
       #   Parsed SMART configuration metadata object.
       # @raise [Safire::Errors::DiscoveryError]
       #   If the discovery request fails or the response is not a valid JSON object.
-      def well_known_config
-        return @well_known_config if @well_known_config
+      def server_metadata
+        return @server_metadata if @server_metadata
 
         response = @http_client.get(well_known_endpoint)
-        @well_known_config = SmartMetadata.new(parse_discovery_body(response.body))
+        @server_metadata = SmartMetadata.new(parse_discovery_body(response.body))
       rescue Faraday::Error => e
         status = e.response&.dig(:status)
         Safire.logger.error("SMART discovery failed for `#{well_known_endpoint}`: HTTP #{status}")
@@ -94,7 +96,7 @@ module Safire
         validate_presence_of_scopes(custom_scopes)
         validate_authorization_method(method)
 
-        Safire.logger.info("Generating authorization URL for SMART #{auth_type} (method: #{method})...")
+        Safire.logger.info("Generating authorization URL for SMART #{client_type} (method: #{method})...")
 
         code_verifier = PKCE.generate_code_verifier
         params = authorization_params(launch:, custom_scopes:, code_verifier:)
@@ -159,6 +161,38 @@ module Safire
         raise token_error_from(e)
       end
 
+      # Validates a token response for SMART App Launch 2.2.0 compliance.
+      #
+      # Checks all required token response fields per SMART App Launch 2.2.0 §Token Response:
+      # - +access_token+ must be present (SHALL)
+      # - +token_type+ must be present and exactly +"Bearer"+ (SHALL, case-sensitive)
+      # - +scope+ must be present (SHALL)
+      #
+      # Logs a warning via {Safire.logger} for each violation found and returns false.
+      # Never raises an exception.
+      #
+      # @param response [Hash] the token response returned by the server
+      # @return [Boolean] true if the response is compliant, false otherwise
+      def token_response_valid?(response)
+        unless response.is_a?(Hash)
+          Safire.logger.warn('SMART token response non-compliance: response is not a JSON object')
+          return false
+        end
+
+        valid = true
+
+        %w[access_token scope].each do |field|
+          next if response[field].present?
+
+          Safire.logger.warn(
+            "SMART token response non-compliance: required field '#{field}' is missing"
+          )
+          valid = false
+        end
+
+        token_type_valid?(response) && valid
+      end
+
       private
 
       def validate!
@@ -219,6 +253,23 @@ module Safire
         raise Errors::TokenError.new(received_fields: token_response.keys)
       end
 
+      def token_type_valid?(response)
+        if response['token_type'].blank?
+          Safire.logger.warn(
+            "SMART token response non-compliance: required field 'token_type' is missing"
+          )
+          return false
+        end
+
+        return true if response['token_type'] == 'Bearer'
+
+        Safire.logger.warn(
+          "SMART token response non-compliance: token_type is #{response['token_type'].inspect}; " \
+          "expected 'Bearer' (SMART App Launch 2.2.0 requires token_type \"Bearer\")"
+        )
+        false
+      end
+
       def authorization_params(launch:, custom_scopes:, code_verifier:)
         {
           response_type: 'code',
@@ -252,7 +303,7 @@ module Safire
       end
 
       def client_auth_params(private_key:, kid:)
-        case auth_type
+        case client_type
         when :public
           { client_id: client_id }
         when :confidential_asymmetric
@@ -265,7 +316,7 @@ module Safire
       def oauth2_headers(secret)
         headers = { content_type: 'application/x-www-form-urlencoded' }
 
-        if auth_type == :confidential_symmetric
+        if client_type == :confidential_symmetric
           headers[:Authorization] = authentication_header(secret.presence || client_secret)
         end
 

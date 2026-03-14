@@ -169,12 +169,12 @@ bundle exec rspec --tag live
 Example:
 ```ruby
 RSpec.describe Safire::Client do
-  describe '#smart_metadata' do
+  describe '#server_metadata' do
     context 'when server returns valid configuration' do
       it 'returns a SmartMetadata object' do
         stub_smart_configuration(valid_config)
 
-        metadata = client.smart_metadata
+        metadata = client.server_metadata
 
         expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
         expect(metadata.token_endpoint).to eq('https://example.com/token')
@@ -185,7 +185,7 @@ RSpec.describe Safire::Client do
       it 'raises DiscoveryError' do
         stub_smart_configuration_not_found
 
-        expect { client.smart_metadata }.to raise_error(Safire::Errors::DiscoveryError)
+        expect { client.server_metadata }.to raise_error(Safire::Errors::DiscoveryError)
       end
     end
   end

@@ -148,7 +148,7 @@ module Safire
     private
 
     def protocol_client
-      @protocol_client ||= PROTOCOL_CLASSES.fetch(@protocol).new(@config, client_type: @client_type)
+      @protocol_client ||= PROTOCOL_CLASSES.fetch(@protocol).new(config, client_type:)
     end
 
     def build_config(config)

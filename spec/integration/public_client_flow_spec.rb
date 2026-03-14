@@ -80,12 +80,12 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
       )
 
       # Initialize public client
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # =====================================================
       # STEP 1: SMART Discovery
       # =====================================================
-      metadata = client.smart_metadata
+      metadata = client.server_metadata
 
       # Verify discovery response
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
@@ -98,7 +98,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
       # =====================================================
       # STEP 2: Authorization URL Generation
       # =====================================================
-      auth_data = client.authorize_url
+      auth_data = client.authorization_url
 
       # Verify authorization data structure
       expect(auth_data).to have_key(:auth_url)
@@ -219,7 +219,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # Original refresh token from initial authorization
       original_refresh_token = 'test_refresh_token_xyz'
@@ -273,9 +273,9 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
-      expect { client.smart_metadata }.to raise_error(Safire::Errors::DiscoveryError)
+      expect { client.server_metadata }.to raise_error(Safire::Errors::DiscoveryError)
     end
 
     it 'raises TokenError when token exchange fails' do
@@ -286,7 +286,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # Stub token endpoint to return OAuth error
       stub_request(:post, "#{base_url}/token")
@@ -312,7 +312,7 @@ RSpec.describe 'Public Client End-to-End Flow', type: :integration do
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :public)
+      client = Safire::Client.new(config, client_type: :public)
 
       # Stub token endpoint to return OAuth error
       stub_request(:post, "#{base_url}/token")

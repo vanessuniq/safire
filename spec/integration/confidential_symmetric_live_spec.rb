@@ -52,10 +52,10 @@ RSpec.describe 'Confidential Symmetric Client Flow (Live Server)', :live, type: 
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       # Fetch metadata from real server
-      metadata = client.smart_metadata
+      metadata = client.server_metadata
 
       # Verify metadata structure
       expect(metadata).to be_a(Safire::Protocols::SmartMetadata)
@@ -85,10 +85,10 @@ RSpec.describe 'Confidential Symmetric Client Flow (Live Server)', :live, type: 
         scopes:
       )
 
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       # Generate authorization URL
-      auth_data = client.authorize_url
+      auth_data = client.authorization_url
 
       # Verify structure
       expect(auth_data).to have_key(:auth_url)
@@ -127,11 +127,11 @@ RSpec.describe 'Confidential Symmetric Client Flow (Live Server)', :live, type: 
       )
 
       # Client can be initialized without secret
-      client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+      client = Safire::Client.new(config, client_type: :confidential_symmetric)
 
       # But authorization URL generation still works
       # (secret is only needed for token exchange)
-      auth_data = client.authorize_url
+      auth_data = client.authorization_url
       expect(auth_data[:auth_url]).to be_present
     end
 
@@ -165,11 +165,11 @@ RSpec.describe 'Confidential Symmetric Client Flow (Live Server)', :live, type: 
         scopes:
       )
 
-      public_client = Safire::Client.new(public_config, auth_type: :public)
-      confidential_client = Safire::Client.new(confidential_config, auth_type: :confidential_symmetric)
+      public_client = Safire::Client.new(public_config, client_type: :public)
+      confidential_client = Safire::Client.new(confidential_config, client_type: :confidential_symmetric)
 
-      public_auth = public_client.authorize_url
-      confidential_auth = confidential_client.authorize_url
+      public_auth = public_client.authorization_url
+      confidential_auth = confidential_client.authorization_url
 
       public_uri = URI.parse(public_auth[:auth_url])
       confidential_uri = URI.parse(confidential_auth[:auth_url])

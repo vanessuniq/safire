@@ -157,12 +157,12 @@ This approach is useful when you need to reuse the same configuration for multip
 
 ---
 
-## Auth Types
+## Client Types
 
 ### Public Client (Default)
 
 ```ruby
-# auth_type defaults to :public when not specified
+# client_type defaults to :public when not specified
 client = Safire::Client.new(
   base_url: 'https://fhir.example.com/r4',
   client_id: 'my_client_id',
@@ -171,7 +171,7 @@ client = Safire::Client.new(
 )
 
 # Explicit:
-client = Safire::Client.new(config, auth_type: :public)
+client = Safire::Client.new(config, client_type: :public)
 ```
 
 ### Confidential Symmetric Client
@@ -185,7 +185,7 @@ client = Safire::Client.new(
     redirect_uri: 'https://myapp.com/callback',
     scopes: ['openid', 'profile', 'patient/*.read']
   },
-  auth_type: :confidential_symmetric
+  client_type: :confidential_symmetric
 )
 ```
 
@@ -202,32 +202,32 @@ client = Safire::Client.new(
     kid: ENV.fetch('SMART_KEY_ID'),
     jwks_uri: ENV.fetch('SMART_JWKS_URI')  # Optional
   },
-  auth_type: :confidential_asymmetric
+  client_type: :confidential_asymmetric
 )
 ```
 
-### Changing Auth Type
+### Changing Client Type
 
-You can change the auth type after initialization:
+You can change the client type after initialization:
 
 ```ruby
 # Start with default :public for discovery
 client = Safire::Client.new(config)
-metadata = client.smart_metadata
+metadata = client.server_metadata
 
 # Switch based on server capabilities
 if metadata.supports_asymmetric_auth?
-  client.auth_type = :confidential_asymmetric
+  client.client_type = :confidential_asymmetric
 elsif metadata.supports_symmetric_auth?
-  client.auth_type = :confidential_symmetric
+  client.client_type = :confidential_symmetric
 end
 ```
 
 ---
 
-## Supported Auth Types
+## Supported Client Types
 
-| Auth Type | Description | Authentication Method |
+| Client Type | Description | Authentication Method |
 |-----------|-------------|----------------------|
 | `:public` | Public client using PKCE | `client_id` in request body |
 | `:confidential_symmetric` | Confidential client with secret | HTTP Basic auth header |
@@ -256,7 +256,7 @@ When endpoints are provided, Safire uses them directly instead of fetching from 
 
 ## Token Response Validation
 
-After a successful token exchange, use `Safire.token_response_valid?` to verify the server's
+After a successful token exchange, use `client.token_response_valid?` to verify the server's
 response meets SMART App Launch 2.2.0 requirements. This is a caller-invoked helper — token
 exchange methods return the raw response without checking compliance.
 
@@ -265,7 +265,7 @@ Logs a warning per violation and returns `false`. Never raises.
 ```ruby
 token_data = client.request_access_token(code: code, code_verifier: verifier)
 
-unless Safire.token_response_valid?(token_data)
+unless client.token_response_valid?(token_data)
   # Safire has already logged each violation, e.g.:
   # WARN: SMART token response non-compliance: required field 'scope' is missing
   # WARN: SMART token response non-compliance: token_type is "bearer"; expected 'Bearer'
@@ -334,7 +334,7 @@ end
 
 # app/services/smart_client_service.rb
 class SmartClientService
-  def self.build_client(auth_type: :public)
+  def self.build_client(client_type: :public)
     Safire::Client.new(
       {
         base_url: ENV.fetch('FHIR_BASE_URL'),
@@ -343,7 +343,7 @@ class SmartClientService
         redirect_uri: Rails.application.routes.url_helpers.smart_callback_url,
         scopes: ENV.fetch('SMART_SCOPES', 'openid profile patient/*.read').split
       },
-      auth_type: auth_type
+      client_type: client_type
     )
   end
 end

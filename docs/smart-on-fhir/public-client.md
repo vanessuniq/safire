@@ -69,7 +69,7 @@ class SmartAuthController < ApplicationController
       scopes: ['openid', 'profile', 'patient/*.read']
     )
 
-    @client = Safire::Client.new(config, auth_type: :public)
+    @client = Safire::Client.new(config, client_type: :public)
   end
 end
 ```
@@ -84,7 +84,7 @@ end
 
 ```ruby
 def show_capabilities
-  metadata = @client.smart_metadata
+  metadata = @client.server_metadata
 
   render json: {
     authorization_endpoint: metadata.authorization_endpoint,
@@ -108,7 +108,7 @@ Generate the authorization URL and redirect the user to the SMART authorization 
 # app/controllers/smart_auth_controller.rb
 def launch
   # Generate authorization URL with PKCE
-  auth_data = @client.authorize_url
+  auth_data = @client.authorization_url
 
   # Store state and code_verifier in session (server-side storage)
   session[:oauth_state] = auth_data[:state]
@@ -133,12 +133,12 @@ auth_data
 {: .important }
 > **Fresh State Per Request**
 >
-> Each call to `authorize_url()` generates a new `state` and `code_verifier`. These values are unique per authorization attempt.
+> Each call to `authorization_url()` generates a new `state` and `code_verifier`. These values are unique per authorization attempt.
 
 {: .note }
 > **POST-Based Authorization**
 >
-> If the server advertises the `authorize-post` capability, you can pass `method: :post` to `authorize_url` to submit the authorization request as a form POST instead of a GET redirect. See [POST-Based Authorization]({% link smart-on-fhir/post-based-authorization.md %}) for details.
+> If the server advertises the `authorize-post` capability, you can pass `method: :post` to `authorization_url` to submit the authorization request as a form POST instead of a GET redirect. See [POST-Based Authorization]({% link smart-on-fhir/post-based-authorization.md %}) for details.
 
 ### Authorization URL Parameters
 
@@ -174,7 +174,7 @@ def ehr_launch
   # EHR provides launch token in query parameter
   launch_token = params[:launch]
 
-  auth_data = @client.authorize_url(launch: launch_token)
+  auth_data = @client.authorization_url(launch: launch_token)
 
   session[:oauth_state] = auth_data[:state]
   session[:code_verifier] = auth_data[:code_verifier]
@@ -335,7 +335,7 @@ module SmartAuthentication
       redirect_uri: callback_url,
       scopes: ['openid', 'profile', 'patient/*.read']
     )
-    Safire::Client.new(config, auth_type: :public)
+    Safire::Client.new(config, client_type: :public)
   end
 end
 ```
@@ -492,10 +492,10 @@ def initialize_client
     scopes: ['openid', 'profile', 'patient/*.read']
   )
 
-  @client = Safire::Client.new(config, auth_type: :public)
+  @client = Safire::Client.new(config, client_type: :public)
 
   # Trigger discovery to catch errors early
-  @client.smart_metadata
+  @client.server_metadata
 rescue Safire::Errors::DiscoveryError => e
   Rails.logger.error("SMART discovery failed: #{e.message}")
   render plain: 'FHIR server not available', status: :service_unavailable
@@ -615,7 +615,7 @@ class SmartAuthController < ApplicationController
   before_action :initialize_client
 
   def launch
-    auth_data = @client.authorize_url
+    auth_data = @client.authorization_url
 
     session[:oauth_state] = auth_data[:state]
     session[:code_verifier] = auth_data[:code_verifier]
@@ -680,7 +680,7 @@ class SmartAuthController < ApplicationController
       scopes: ['openid', 'profile', 'patient/*.read']
     )
 
-    @client = Safire::Client.new(config, auth_type: :public)
+    @client = Safire::Client.new(config, client_type: :public)
   end
 end
 ```

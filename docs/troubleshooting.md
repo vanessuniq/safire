@@ -102,7 +102,7 @@ Safire::Errors::ConfigurationError: Configuration missing: scopes
 
 **Causes:**
 - No scopes configured in `ClientConfig`
-- No `custom_scopes` passed to `authorize_url`
+- No `custom_scopes` passed to `authorization_url`
 
 **Solutions:**
 
@@ -118,7 +118,7 @@ Safire::Errors::ConfigurationError: Configuration missing: scopes
 
 2. Or pass custom scopes when generating the URL:
    ```ruby
-   auth_data = client.authorize_url(
+   auth_data = client.authorization_url(
      custom_scopes: ['openid', 'profile', 'patient/Patient.read']
    )
    ```
@@ -139,7 +139,7 @@ Safire::Errors::ConfigurationError: Configuration missing: scopes
 1. Ensure state is stored before redirect:
    ```ruby
    def launch
-     auth_data = client.authorize_url
+     auth_data = client.authorization_url
 
      # Store BOTH state and code_verifier
      session[:oauth_state] = auth_data[:state]
@@ -242,7 +242,7 @@ Safire::Errors::ConfigurationError: Configuration missing: client_secret
 ```
 
 **Causes:**
-- Using `:confidential_symmetric` auth type without providing client_secret
+- Using `:confidential_symmetric` client type without providing client_secret
 
 **Solutions:**
 
@@ -256,7 +256,7 @@ Safire::Errors::ConfigurationError: Configuration missing: client_secret
      scopes: ['openid', 'profile']
    )
 
-   client = Safire::Client.new(config, auth_type: :confidential_symmetric)
+   client = Safire::Client.new(config, client_type: :confidential_symmetric)
    ```
 
 2. Or pass it during token exchange:
@@ -296,7 +296,7 @@ Safire::Errors::ConfigurationError: Configuration missing: client_secret
 
 3. Verify server supports `client_secret_basic`:
    ```ruby
-   metadata = client.smart_metadata
+   metadata = client.server_metadata
    methods = metadata.token_endpoint_auth_methods_supported
 
    unless methods.include?('client_secret_basic')
@@ -312,7 +312,7 @@ Safire::Errors::ConfigurationError: Configuration missing: private_key
 ```
 
 **Causes:**
-- Using `:confidential_asymmetric` auth type without providing `private_key` or `kid`
+- Using `:confidential_asymmetric` client type without providing `private_key` or `kid`
 
 **Solutions:**
 
@@ -327,7 +327,7 @@ Safire::Errors::ConfigurationError: Configuration missing: private_key
      kid: 'my-key-id'
    )
 
-   client = Safire::Client.new(config, auth_type: :confidential_asymmetric)
+   client = Safire::Client.new(config, client_type: :confidential_asymmetric)
    ```
 
 ### 401 Unauthorized with JWT Assertion
@@ -358,7 +358,7 @@ Safire::Errors::ConfigurationError: Configuration missing: private_key
 
 3. Verify server supports `private_key_jwt`:
    ```ruby
-   metadata = client.smart_metadata
+   metadata = client.server_metadata
    methods = metadata.token_endpoint_auth_methods_supported
 
    unless methods.include?('private_key_jwt')
@@ -432,7 +432,7 @@ Safire::Errors::TokenError: Token request failed — HTTP 400 — invalid_grant 
 1. Ensure verifier is stored and retrieved correctly:
    ```ruby
    # Store during authorization
-   auth_data = client.authorize_url
+   auth_data = client.authorization_url
    session[:code_verifier] = auth_data[:code_verifier]
 
    # Retrieve during token exchange

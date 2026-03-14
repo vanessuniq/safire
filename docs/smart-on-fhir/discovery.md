@@ -47,22 +47,22 @@ config = Safire::ClientConfig.new(
   scopes: ['openid', 'profile']
 )
 
-# auth_type defaults to :public when not specified
+# client_type defaults to :public when not specified
 client = Safire::Client.new(config)
-metadata = client.smart_metadata
+metadata = client.server_metadata
 
 # Equivalent to:
-client = Safire::Client.new(config, auth_type: :public)
+client = Safire::Client.new(config, client_type: :public)
 ```
 
 {: .note }
-> **Default Auth Type**
+> **Default Client Type**
 >
-> Safire defaults to `:public` when `auth_type` is not specified. This is appropriate for discovery since fetching metadata does not require authentication.
+> Safire defaults to `:public` when `client_type` is not specified. This is appropriate for discovery since fetching metadata does not require authentication.
 
 ### SmartMetadata Object
 
-The `smart_metadata` method returns a `Safire::Protocols::SmartMetadata` object:
+The `server_metadata` method returns a `Safire::Protocols::SmartMetadata` object:
 
 ```ruby
 metadata.class
@@ -104,7 +104,7 @@ metadata.user_access_brand_identifier      # => "example-brand"
 The `valid?` method performs intelligent validation based on the server's declared capabilities:
 
 ```ruby
-metadata = client.smart_metadata
+metadata = client.server_metadata
 
 if metadata.valid?
   puts "Metadata is valid"
@@ -220,18 +220,18 @@ metadata.supports_openid_connect?
 
 ## Using Discovery for Client Selection
 
-### Changing Auth Type After Discovery
+### Changing Client Type After Discovery
 
-Use the `auth_type=` setter to change the client's auth type based on discovered capabilities:
+Use the `client_type=` setter to change the client type based on discovered capabilities:
 
 ```ruby
-# Start with default :public auth type for discovery
+# Start with default :public client type for discovery
 client = Safire::Client.new(config)
-metadata = client.smart_metadata
+metadata = client.server_metadata
 
 # Switch to confidential_symmetric based on server capabilities
 if metadata.supports_symmetric_auth?
-  client.auth_type = :confidential_symmetric
+  client.client_type = :confidential_symmetric
 end
 
 # Now token requests will use Basic auth
@@ -239,29 +239,29 @@ tokens = client.request_access_token(code: code, code_verifier: verifier)
 ```
 
 {: .important }
-> **Auth Type Setter**
+> **Client Type Setter**
 >
-> The `auth_type=` setter resets the internal protocol client, ensuring subsequent token operations use the new authentication method.
+> The `client_type=` setter updates the protocol client in place — already-fetched server metadata is preserved and no re-discovery occurs. Subsequent token operations use the new authentication method.
 
 ### Automatic Client Type Selection
 
 ```ruby
-def configure_auth_type(client)
-  metadata = client.smart_metadata
+def configure_client_type(client)
+  metadata = client.server_metadata
 
   if metadata.supports_asymmetric_auth?
-    client.auth_type = :confidential_asymmetric
+    client.client_type = :confidential_asymmetric
   elsif metadata.supports_symmetric_auth?
-    client.auth_type = :confidential_symmetric
+    client.client_type = :confidential_symmetric
   elsif metadata.supports_public_auth?
-    client.auth_type = :public
+    client.client_type = :public
   else
     raise "Server does not support any known client types"
   end
 end
 
 client = Safire::Client.new(config)  # defaults to :public
-configure_auth_type(client)
+configure_client_type(client)
 ```
 
 ### Validating PKCE Support
@@ -269,7 +269,7 @@ configure_auth_type(client)
 `valid?` now includes PKCE content checks. Warnings are logged automatically:
 
 ```ruby
-metadata = client.smart_metadata
+metadata = client.server_metadata
 
 unless metadata.valid?
   # Safire has already logged warnings for each violation, e.g.:
@@ -289,10 +289,10 @@ raise "Server does not support S256 PKCE" unless methods.include?('S256')
 ### Checking Authentication Methods
 
 ```ruby
-def validate_auth_methods(metadata, auth_type)
+def validate_auth_methods(metadata, client_type)
   auth_methods = metadata.token_endpoint_auth_methods_supported || []
 
-  case auth_type
+  case client_type
   when :confidential_symmetric
     unless auth_methods.include?('client_secret_basic')
       raise "Server does not support client_secret_basic"
@@ -372,7 +372,7 @@ base_url = "https://fhir.example.com/r4/"  # Trailing slash
 
 ```ruby
 begin
-  metadata = client.smart_metadata
+  metadata = client.server_metadata
 rescue Safire::Errors::DiscoveryError => e
   case e.message
   when /404/
@@ -401,11 +401,11 @@ def discover_with_fallback(base_url)
     scopes: ['openid', 'profile']
   )
 
-  # Use default :public auth type for discovery
+  # Use default :public client type for discovery
   client = Safire::Client.new(config)
 
   begin
-    metadata = client.smart_metadata
+    metadata = client.server_metadata
     {
       authorization_endpoint: metadata.authorization_endpoint,
       token_endpoint: metadata.token_endpoint,
@@ -434,7 +434,7 @@ Safire caches metadata within the client instance. For application-level caching
 
 ```ruby
 class SmartMetadataService
-  CACHE_KEY = "smart_metadata"
+  CACHE_KEY = "server_metadata"
   CACHE_DURATION = 1.hour
 
   def self.fetch(base_url)
@@ -446,9 +446,9 @@ class SmartMetadataService
         scopes: []
       )
 
-      # Default :public auth type for discovery
+      # Default :public client type for discovery
       client = Safire::Client.new(config)
-      metadata = client.smart_metadata
+      metadata = client.server_metadata
 
       {
         token_endpoint: metadata.token_endpoint,
@@ -491,9 +491,9 @@ class FhirServerRegistry
       scopes: ['openid', 'profile', 'patient/*.read']
     )
 
-    # Default :public auth type for discovery
+    # Default :public client type for discovery
     client = Safire::Client.new(config)
-    metadata = client.smart_metadata
+    metadata = client.server_metadata
 
     @servers[name] = {
       base_url: base_url,

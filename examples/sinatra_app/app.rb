@@ -387,10 +387,10 @@ class SafireDemo < Sinatra::Base
     scopes_str.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
   end
 
-  def parse_client_type(auth_type_param)
-    return :public if auth_type_param.to_s.strip.empty?
+  def parse_client_type(client_type_param)
+    return :public if client_type_param.to_s.strip.empty?
 
-    client_type = auth_type_param.to_s.strip.to_sym
+    client_type = client_type_param.to_s.strip.to_sym
     %i[public confidential_symmetric confidential_asymmetric].include?(client_type) ? client_type : :public
   end
 

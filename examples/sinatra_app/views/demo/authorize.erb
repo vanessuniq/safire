@@ -52,12 +52,12 @@
           when launching the app. The app will automatically initiate the authorization flow.
         </p>
         <p class="form-note">
-          <strong>Optional:</strong> Append <code>auth_type</code> parameter to specify authentication type:
+          <strong>Optional:</strong> Append <code>client_type</code> parameter to specify client type:
         </p>
         <ul class="form-note-list">
-          <li><code>auth_type=public</code> - Public client (default)</li>
-          <li><code>auth_type=confidential_symmetric</code> - Confidential client with Basic Auth</li>
-          <li><code>auth_type=confidential_asymmetric</code> - Confidential client with JWT assertion</li>
+          <li><code>client_type=public</code> - Public client (default)</li>
+          <li><code>client_type=confidential_symmetric</code> - Confidential client with Basic Auth</li>
+          <li><code>client_type=confidential_asymmetric</code> - Confidential client with JWT assertion</li>
         </ul>
       </div>
     <% end %>
@@ -69,7 +69,7 @@
       <div class="radio-group">
         <% if @metadata.supports_public_auth? %>
           <label class="radio-option">
-            <input type="radio" name="auth_type" value="public" checked>
+            <input type="radio" name="client_type" value="public" checked>
             <span class="radio-label">Public Client</span>
             <span class="radio-description">
               No client authentication. Client ID is sent in token requests.
@@ -80,7 +80,7 @@
 
         <% if @metadata.supports_symmetric_auth? %>
           <label class="radio-option <%= 'disabled' unless @server.confidential? %>">
-            <input type="radio" name="auth_type" value="confidential_symmetric"
+            <input type="radio" name="client_type" value="confidential_symmetric"
                    <%= 'checked' unless @metadata.supports_public_auth? %>
                    <%= 'disabled' unless @server.confidential? %>>
             <span class="radio-label">Confidential Symmetric</span>
@@ -95,7 +95,7 @@
 
         <% if @metadata.supports_asymmetric_auth? %>
           <label class="radio-option <%= 'disabled' unless asymmetric_credentials_configured? %>">
-            <input type="radio" name="auth_type" value="confidential_asymmetric"
+            <input type="radio" name="client_type" value="confidential_asymmetric"
                    <%= 'checked' unless @metadata.supports_public_auth? || @metadata.supports_symmetric_auth? %>
                    <%= 'disabled' unless asymmetric_credentials_configured? %>>
             <span class="radio-label">Confidential Asymmetric</span>

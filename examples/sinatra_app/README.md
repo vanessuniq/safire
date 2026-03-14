@@ -105,7 +105,7 @@ The app works with the SMART Health IT sandbox server for testing.
 2. Click "Start Authorization"
 3. Choose your settings:
    - **Launch Type**: Provider Standalone or Patient Standalone
-   - **Auth Type**: Public, Confidential Symmetric, or Confidential Asymmetric
+   - **Client Type**: Public, Confidential Symmetric, or Confidential Asymmetric
 4. Click "Start Authorization"
 5. In the SMART sandbox, select a patient and practitioner
 6. View the obtained tokens
@@ -121,10 +121,10 @@ To test EHR launch with the SMART sandbox:
 5. Click "Launch"
 6. The demo app will handle the authorization flow automatically
 
-**Optional:** Specify authentication type by appending `auth_type` parameter:
-- `http://localhost:4567/launch?auth_type=public` - Public client (default)
-- `http://localhost:4567/launch?auth_type=confidential_symmetric` - Confidential client with Basic Auth
-- `http://localhost:4567/launch?auth_type=confidential_asymmetric` - Confidential client with JWT assertion
+**Optional:** Specify client type by appending `client_type` parameter:
+- `http://localhost:4567/launch?client_type=public` - Public client (default)
+- `http://localhost:4567/launch?client_type=confidential_symmetric` - Confidential client with Basic Auth
+- `http://localhost:4567/launch?client_type=confidential_asymmetric` - Confidential client with JWT assertion
 
 ### Token Refresh
 

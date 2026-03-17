@@ -4,7 +4,7 @@
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** client protocols for healthcare applications.
+Safire is a lean Ruby library that implements **[SMART on FHIR](https://hl7.org/fhir/smart-app-launch/)** and **[UDAP](https://hl7.org/fhir/us/udap-security/)** client protocols for healthcare applications.
 
 ---
 
@@ -17,6 +17,11 @@ Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** cli
 - POST-Based Authorization (`authorize-post` capability, SMART 2.2.0)
 
 > See [ROADMAP.md](ROADMAP.md) for planned features.
+
+## Requirements
+
+- Ruby >= 4.0.1
+- Bundler
 
 ## Installation
 
@@ -163,3 +168,7 @@ Bug reports and pull requests are welcome on this [GitHub repo](https://github.c
 ## License
 
 The gem is available as open source under the terms of the Apache 2.0 License.
+
+---
+
+*Parts of this project were developed with AI assistance (Claude Code) and reviewed by maintainers.*

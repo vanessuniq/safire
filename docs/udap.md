@@ -36,7 +36,8 @@ UDAP (Unified Data Access Profiles) provides a framework for trusted dynamic cli
 
 - **Dynamic Client Registration** - Register clients using signed software statements
 - **JWT Authentication** - Authenticate using X.509 certificates and JWT assertions
-- **Tiered OAuth** - Support for delegated authorization (RFC 9126)
+- **Tiered OAuth** - Support for delegated authorization per UDAP Security IG
+- **PAR (RFC 9126)** - Pushed Authorization Requests support
 
 ### Trust Framework
 
@@ -83,7 +84,8 @@ UDAP is designed for scenarios requiring:
 ## Resources
 
 - [UDAP Security IG](https://hl7.org/fhir/us/udap-security/) - HL7 Implementation Guide
-- [Tiered OAuth RFC 9126](https://datatracker.ietf.org/doc/html/rfc9126) - Pushed Authorization Requests
+- [UDAP Tiered OAuth](https://hl7.org/fhir/us/udap-security/b2b.html) - Delegated authorization (UDAP Security IG)
+- [RFC 9126 — Pushed Authorization Requests (PAR)](https://datatracker.ietf.org/doc/html/rfc9126)
 
 ---
 

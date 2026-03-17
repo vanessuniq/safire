@@ -10,14 +10,16 @@ permalink: /
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 
-A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for clients.
+A lean Ruby gem implementing **[SMART on FHIR](https://hl7.org/fhir/smart-app-launch/)** and **[UDAP](https://hl7.org/fhir/us/udap-security/)** protocols for clients.
 
 ## Quick Navigation
 
 | Section | Description |
 |---------|-------------|
 | [Getting Started]({{ site.baseurl }}/installation/) | Install Safire and quick start guide |
+| [Configuration]({{ site.baseurl }}/configuration/) | All configuration options and parameters |
 | [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Discovery, Public clients, Confidential clients |
+| [UDAP]({{ site.baseurl }}/udap/) | UDAP protocol overview and planned support |
 | [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
 | [Safire API Docs]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |
 

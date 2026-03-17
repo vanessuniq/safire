@@ -1,0 +1,6 @@
+{% assign current_year = site.time | date: '%Y' %}
+{% if current_year == '2025' %}
+  <p class="footer-copyright">Copyright &copy; 2025 Safire Contributors. Licensed under Apache 2.0.</p>
+{% else %}
+  <p class="footer-copyright">Copyright &copy; 2025-{{ current_year }} Safire Contributors. Licensed under Apache 2.0.</p>
+{% endif %}

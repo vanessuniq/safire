@@ -41,7 +41,7 @@ search:
   preview_words_after: 5
   tokenizer_separator: /[\s\-/]+/
 nav_sort: case_insensitive
-footer_content: "Copyright &copy; 2025 Safire Contributors. Licensed under Apache 2.0."
+footer_content: ""
 
 # Markdown Processors
 kramdown:

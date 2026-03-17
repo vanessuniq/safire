@@ -23,16 +23,19 @@ A lean Ruby gem implementing **[SMART on FHIR](https://hl7.org/fhir/smart-app-la
 | [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
 | [Safire API Docs]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |
 
-## Current Features
+## Features
 
-| Feature | Status |
-|---------|--------|
-| SMART Discovery | Implemented |
-| Public Client (PKCE) | Implemented |
-| Confidential Symmetric Client | Implemented |
-| Confidential Asymmetric Client | Implemented |
-| SMART Backend Services | Planned |
-| UDAP Protocols | Planned |
+### SMART on FHIR App Launch
+
+- Discovery (`/.well-known/smart-configuration`)
+- Public Client (PKCE)
+- Confidential Symmetric Client (client_secret + Basic Auth)
+- Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
+- POST-Based Authorization
+
+### UDAP
+
+> Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details (coming soon).
 
 ## Demo Application
 

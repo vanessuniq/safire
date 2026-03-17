@@ -57,3 +57,5 @@ See [`examples/sinatra_app/README.md`](https://github.com/vanessuniq/safire/tree
 ---
 
 *Last updated: {{ site.time | date: '%B %d, %Y' }}*
+
+*Parts of this project were developed with AI assistance (Claude Code) and reviewed by maintainers.*

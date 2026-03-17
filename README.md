@@ -10,20 +10,13 @@ Safire is a lean Ruby library that implements **SMART on FHIR** and **UDAP** cli
 
 ## Features
 
-**Working:**
-
 - SMART App Launch Discovery (`/.well-known/smart-configuration`)
 - SMART on FHIR Public Client (PKCE)
 - SMART on FHIR Confidential Symmetric Client (client_secret + Basic Auth)
 - SMART on FHIR Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
 - POST-Based Authorization (`authorize-post` capability, SMART 2.2.0)
 
-**Planned:**
-
-- SMART Backend Services (client_credentials grant)
-- UDAP Discovery (`/.well-known/udap`)
-- UDAP Client Flows (JWT Auth, Dynamic Client Registration, Tiered OAuth)
-
+> See [ROADMAP.md](ROADMAP.md) for planned features.
 
 ## Installation
 
@@ -39,14 +32,14 @@ Then install:
 bundle install
 ```
 
-## Supported Client Types
+## Supported SMART Client Types
 
-| Client Type                | Description                                                | Client Authentication                                  | Supported  |
-| -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ | ---------- |
-| `:public`                  | Public client using PKCE (no secret)                       | `client_id` in token/refresh requests                  | ✅          |
-| `:confidential_symmetric`  | Confidential client using client_secret with Basic auth    | `Authorization: Basic base64(client_id:client_secret)` | ✅          |
-| `:confidential_asymmetric` | Confidential client using asymmetric key (private_key_jwt) | JWT assertion (RS384/ES384)                            | ✅          |
-| `:udap`                    | UDAP client using X.509 certificate and JWT-based auth     | Tiered OAuth (RFC 9126)                                | Planned |
+| Client Type                | Description                                                | Client Authentication                                  |
+| -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
+| `:public`                  | Public client using PKCE (no secret)                       | `client_id` in token/refresh requests                  |
+| `:confidential_symmetric`  | Confidential client using client_secret with Basic auth    | `Authorization: Basic base64(client_id:client_secret)` |
+| `:confidential_asymmetric` | Confidential client using asymmetric key (private_key_jwt) | JWT assertion (RS384/ES384)                            |
+
 
 
 ## Usage Example – SMART App Launch (Public Client)

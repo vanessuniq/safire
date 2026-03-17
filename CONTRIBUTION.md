@@ -74,19 +74,13 @@ Create a descriptive branch name:
 Write clear, concise commit messages:
 
 - Use the imperative mood ("Add feature" not "Added feature")
-- First line should be 50 characters or less
-- Provide additional detail in the body if needed
+- Keep the subject line as the entire commit message (no body)
+- Message should be 50 characters or less
 - Reference issues when applicable (`Fixes #123`)
 
 Example:
 ```
 Add UDAP discovery endpoint support
-
-- Implement /.well-known/udap endpoint fetching
-- Add UdapMetadata class for parsing responses
-- Include validation for required fields
-
-Fixes #42
 ```
 
 ### Small, Focused Commits

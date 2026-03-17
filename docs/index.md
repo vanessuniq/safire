@@ -10,27 +10,32 @@ permalink: /
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 
-A lean Ruby gem implementing **SMART on FHIR** and **UDAP** protocols for clients.
+A lean Ruby gem implementing **[SMART on FHIR](https://hl7.org/fhir/smart-app-launch/)** and **[UDAP](https://hl7.org/fhir/us/udap-security/)** protocols for clients.
 
 ## Quick Navigation
 
 | Section | Description |
 |---------|-------------|
 | [Getting Started]({{ site.baseurl }}/installation/) | Install Safire and quick start guide |
+| [Configuration]({{ site.baseurl }}/configuration/) | All configuration options and parameters |
 | [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Discovery, Public clients, Confidential clients |
+| [UDAP]({{ site.baseurl }}/udap/) | UDAP protocol overview and planned support |
 | [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
 | [Safire API Docs]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |
 
-## Current Features
+## Features
 
-| Feature | Status |
-|---------|--------|
-| SMART Discovery | Implemented |
-| Public Client (PKCE) | Implemented |
-| Confidential Symmetric Client | Implemented |
-| Confidential Asymmetric Client | Implemented |
-| SMART Backend Services | Planned |
-| UDAP Protocols | Planned |
+### SMART on FHIR App Launch
+
+- Discovery (`/.well-known/smart-configuration`)
+- Public Client (PKCE)
+- Confidential Symmetric Client (client_secret + Basic Auth)
+- Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
+- POST-Based Authorization
+
+### UDAP
+
+> Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details (coming soon).
 
 ## Demo Application
 
@@ -52,3 +57,5 @@ See [`examples/sinatra_app/README.md`](https://github.com/vanessuniq/safire/tree
 ---
 
 *Last updated: {{ site.time | date: '%B %d, %Y' }}*
+
+*Parts of this project were developed with AI assistance (Claude Code) and reviewed by maintainers.*

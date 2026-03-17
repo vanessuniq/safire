@@ -10,13 +10,17 @@ Safire is a lean Ruby library that implements **[SMART on FHIR](https://hl7.org/
 
 ## Features
 
-- SMART App Launch Discovery (`/.well-known/smart-configuration`)
-- SMART on FHIR Public Client (PKCE)
-- SMART on FHIR Confidential Symmetric Client (client_secret + Basic Auth)
-- SMART on FHIR Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
-- POST-Based Authorization (`authorize-post` capability, SMART 2.2.0)
+### SMART on FHIR App Launch
 
-> See [ROADMAP.md](ROADMAP.md) for planned features.
+- Discovery (`/.well-known/smart-configuration`)
+- Public Client (PKCE)
+- Confidential Symmetric Client (client_secret + Basic Auth)
+- Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
+- POST-Based Authorization
+
+### UDAP
+
+> Planned. See [ROADMAP.md](ROADMAP.md) for details (coming soon).
 
 ## Requirements
 

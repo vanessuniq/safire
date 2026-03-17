@@ -619,7 +619,7 @@ If you're still experiencing issues:
 
 1. **Check the logs** - Safire logs detailed information about requests
 2. **Test the endpoints manually** - Use curl to verify server responses
-3. **Review the spec** - [SMART App Launch v2.2.0](http://hl7.org/fhir/smart-app-launch/)
+3. **Review the spec** - [SMART App Launch v2.2.0](https://hl7.org/fhir/smart-app-launch/)
 4. **Open an issue** - Report bugs at the project repository
 
 When reporting issues, include:

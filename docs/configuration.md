@@ -179,6 +179,43 @@ This approach is useful when you need to reuse the same configuration for multip
 
 ---
 
+## Protocol Selection
+
+The `protocol:` keyword argument to `Safire::Client.new` selects the authorization protocol to use. It is independent of `client_type:` — the two parameters are orthogonal.
+
+```ruby
+client = Safire::Client.new(config, protocol: :smart, client_type: :confidential_symmetric)
+```
+
+| Value | Status | Description |
+|-------|--------|-------------|
+| `:smart` | Implemented | SMART App Launch 2.2.0 — the default. Use `client_type:` to select the authentication method. |
+| `:udap` | Planned | UDAP Security 1.0. Accepted by the validator but raises `NotImplementedError` until implemented. |
+
+### SMART (`protocol: :smart`)
+
+The default protocol. All three `client_type:` values are supported: `:public`, `:confidential_symmetric`, and `:confidential_asymmetric`. See [Client Types](#client-types) below for details.
+
+```ruby
+# Equivalent — protocol: :smart is the default
+client = Safire::Client.new(config)
+client = Safire::Client.new(config, protocol: :smart)
+client = Safire::Client.new(config, protocol: :smart, client_type: :public)
+```
+
+### UDAP (`protocol: :udap`) — Planned
+
+UDAP is a separate protocol from SMART — it is not a client type within SMART App Launch. When `protocol: :udap` is specified, `client_type:` is ignored entirely: UDAP clients always authenticate using a JWT signed by their private key.
+
+```ruby
+# Accepted by Safire, but raises NotImplementedError until UDAP support is complete
+client = Safire::Client.new(config, protocol: :udap)
+```
+
+See the [UDAP guide]({{ site.baseurl }}/udap/) for an overview of planned UDAP support.
+
+---
+
 ## Client Types
 
 ### Public Client (Default)

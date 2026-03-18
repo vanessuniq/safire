@@ -282,15 +282,7 @@ elsif metadata.supports_symmetric_auth?
 end
 ```
 
----
-
-## Supported Client Types
-
-| Client Type | Description | Authentication Method |
-|-----------|-------------|----------------------|
-| `:public` | Public client using PKCE | `client_id` in request body |
-| `:confidential_symmetric` | Confidential client with secret | HTTP Basic auth header |
-| `:confidential_asymmetric` | Confidential client with key pair | JWT assertion (RS384/ES384) |
+For a full explanation of each client type, when to choose it, and a decision guide, see [SMART on FHIR — Client Types]({{ site.baseurl }}/smart-on-fhir/).
 
 ---
 

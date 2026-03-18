@@ -590,7 +590,7 @@ standalone_servers = registry.all_capable_of('launch-standalone')
 
 ## Next Steps
 
-- [Public Client Workflow]({% link smart-on-fhir/public-client.md %})
-- [Confidential Symmetric Client Workflow]({% link smart-on-fhir/confidential-symmetric.md %})
-- [Confidential Asymmetric Client Workflow]({% link smart-on-fhir/confidential-asymmetric.md %})
+- [Public Client Workflow]({% link smart-on-fhir/public-client/index.md %})
+- [Confidential Symmetric Client Workflow]({% link smart-on-fhir/confidential-symmetric/index.md %})
+- [Confidential Asymmetric Client Workflow]({% link smart-on-fhir/confidential-asymmetric/index.md %})
 - [Troubleshooting Guide]({% link troubleshooting.md %})

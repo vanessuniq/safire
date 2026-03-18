@@ -16,6 +16,28 @@ nav_order: 3
 
 ---
 
+## Quick Reference
+
+All parameters at a glance. `protocol:` and `client_type:` are keyword arguments to `Safire::Client.new`; all others are keys in the configuration hash (or `ClientConfig` attributes).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `base_url` | String | Yes | — | FHIR server base URL |
+| `client_id` | String | Yes | — | OAuth2 client identifier |
+| `redirect_uri` | String | Yes | — | Registered callback URL |
+| `protocol:` | Symbol | No | `:smart` | Authorization protocol — `:smart` or `:udap` |
+| `client_type:` | Symbol | No | `:public` | SMART client type — `:public`, `:confidential_symmetric`, or `:confidential_asymmetric` |
+| `client_secret` | String | No | — | Required for `:confidential_symmetric` |
+| `private_key` | OpenSSL::PKey / String | No | — | RSA/EC private key; required for `:confidential_asymmetric` |
+| `kid` | String | No | — | Key ID matching the public key registered with the server |
+| `jwt_algorithm` | String | No | auto | JWT signing algorithm — `RS384` or `ES384`; auto-detected from key type |
+| `jwks_uri` | String | No | — | URL to client's public JWKS, included as `jku` in JWT header |
+| `scopes` | Array | No | — | Default scopes for authorization requests |
+| `authorization_endpoint` | String | No | — | Override the discovered authorization endpoint |
+| `token_endpoint` | String | No | — | Override the discovered token endpoint |
+
+---
+
 ## Client Configuration
 
 Safire accepts configuration either as a Hash or a `Safire::ClientConfig` object. When you pass a Hash, Safire automatically wraps it in a `ClientConfig`.

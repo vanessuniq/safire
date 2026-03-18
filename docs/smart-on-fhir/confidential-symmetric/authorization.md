@@ -43,7 +43,7 @@ def check_server_capabilities
 end
 ```
 
-See [SMART Discovery]({% link smart-on-fhir/discovery.md %}) for the full metadata reference.
+See [SMART Discovery]({% link smart-on-fhir/discovery/metadata.md %}) for the full field reference and validation rules.
 
 ---
 

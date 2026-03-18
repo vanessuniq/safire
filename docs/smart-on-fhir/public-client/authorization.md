@@ -36,7 +36,7 @@ def show_capabilities
 end
 ```
 
-Safire parses and validates the response and caches the metadata in the client instance. See [SMART Discovery]({% link smart-on-fhir/discovery.md %}) for full metadata reference.
+Safire parses and validates the response and caches the metadata in the client instance. See [Metadata Fields and Validation]({% link smart-on-fhir/discovery/metadata.md %}) for the full field reference and validation rules.
 
 ---
 

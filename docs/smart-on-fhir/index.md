@@ -14,7 +14,7 @@ This section provides step-by-step guides for implementing SMART on FHIR authori
 
 | Workflow | Description |
 |----------|-------------|
-| [SMART Discovery]({% link smart-on-fhir/discovery.md %}) | Fetching and using SMART configuration metadata |
+| [SMART Discovery]({% link smart-on-fhir/discovery/index.md %}) | Fetching and using SMART configuration metadata |
 | [Public Client]({% link smart-on-fhir/public-client/index.md %}) | Authorization flow for browser-based and mobile applications |
 | [Confidential Symmetric Client]({% link smart-on-fhir/confidential-symmetric/index.md %}) | Authorization flow for server-side applications with client secrets |
 | [Confidential Asymmetric Client]({% link smart-on-fhir/confidential-asymmetric/index.md %}) | Authorization flow using private_key_jwt (RSA/EC key pair) |

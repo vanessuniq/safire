@@ -247,4 +247,4 @@ end
 
 ---
 
-**See also:** [Security Guide]({{ site.baseurl }}/security/) · [Troubleshooting]({% link troubleshooting.md %}) · [SMART Discovery]({% link smart-on-fhir/discovery.md %})
+**See also:** [Security Guide]({{ site.baseurl }}/security/) · [Troubleshooting]({% link troubleshooting.md %}) · [SMART Discovery]({% link smart-on-fhir/discovery/index.md %})

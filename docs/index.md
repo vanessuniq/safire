@@ -20,6 +20,7 @@ A lean Ruby gem implementing **[SMART on FHIR](https://hl7.org/fhir/smart-app-la
 | [Configuration]({{ site.baseurl }}/configuration/) | All configuration options and parameters |
 | [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Discovery, Public clients, Confidential clients |
 | [UDAP]({{ site.baseurl }}/udap/) | UDAP protocol overview and planned support |
+| [Security Guide]({{ site.baseurl }}/security/) | HTTPS, credential protection, token storage, key rotation |
 | [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
 | [Safire API Docs]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |
 

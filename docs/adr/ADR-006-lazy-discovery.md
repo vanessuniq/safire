@@ -1,11 +1,11 @@
 ---
 layout: default
-title: "ADR-002: Lazy SMART discovery — no HTTP in constructors"
+title: "ADR-006: Lazy SMART discovery — no HTTP in constructors"
 parent: Architecture Decision Records
-nav_order: 2
+nav_order: 6
 ---
 
-# ADR-002: Lazy SMART discovery — no HTTP in constructors
+# ADR-006: Lazy SMART discovery — no HTTP in constructors
 
 **Status:** Accepted
 

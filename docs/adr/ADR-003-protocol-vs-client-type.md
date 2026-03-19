@@ -1,11 +1,11 @@
 ---
 layout: default
-title: "ADR-001: protocol: and client_type: as orthogonal dimensions"
+title: "ADR-003: protocol: and client_type: as orthogonal dimensions"
 parent: Architecture Decision Records
-nav_order: 1
+nav_order: 3
 ---
 
-# ADR-001: `protocol:` and `client_type:` as orthogonal dimensions
+# ADR-003: `protocol:` and `client_type:` as orthogonal dimensions
 
 **Status:** Accepted
 

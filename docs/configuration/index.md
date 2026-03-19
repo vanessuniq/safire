@@ -15,7 +15,7 @@ Safire is configured in two places:
 
 ## Architecture Overview
 
-`Safire::Client` is the public entry point. It owns a `ClientConfig` (validated at construction) and lazily builds a protocol implementation when first used. See [ADR-001]({% link adr/ADR-001-protocol-vs-client-type.md %}) for the `protocol:` / `client_type:` design rationale and [ADR-002]({% link adr/ADR-002-lazy-discovery.md %}) for the lazy discovery design.
+`Safire::Client` is the public entry point. It owns a `ClientConfig` (validated at construction) and lazily builds a protocol implementation when first used. See [ADR-002]({% link adr/ADR-002-facade-and-forwardable.md %}) for the facade design rationale, [ADR-003]({% link adr/ADR-003-protocol-vs-client-type.md %}) for the `protocol:` / `client_type:` design, and [ADR-006]({% link adr/ADR-006-lazy-discovery.md %}) for the lazy discovery design.
 
 ```mermaid
 flowchart TD

@@ -40,11 +40,33 @@ that can securely store credentials?
 
 ## Common Flow
 
-All SMART authorization flows follow this general pattern:
+All SMART authorization flows follow this general pattern. The key differences between client types are in how they authenticate during token exchange and refresh.
 
-1. **Discovery** - Fetch server metadata from `/.well-known/smart-configuration`
-2. **Authorization** - Generate authorization URL and redirect user
-3. **Callback** - Exchange authorization code for tokens
-4. **Refresh** - Refresh expired access tokens
+```mermaid
+sequenceDiagram
+    participant App
+    participant Safire
+    participant FHIR as FHIR Server
 
-The key differences between client types are in how they authenticate during token exchange and refresh.
+    App->>Safire: Client.new(config)
+    Note over Safire: No network call yet
+
+    App->>Safire: authorization_url()
+    Safire->>FHIR: GET /.well-known/smart-configuration
+    FHIR-->>Safire: SmartMetadata (endpoints, capabilities)
+    Safire-->>App: { auth_url, state, code_verifier }
+
+    App->>FHIR: Redirect user to auth_url
+    FHIR-->>App: Callback with ?code=...&state=...
+
+    App->>Safire: request_access_token(code:, code_verifier:)
+    Note over Safire: Auth method varies by client_type:<br/>public → client_id in body<br/>confidential_symmetric → Basic auth header<br/>confidential_asymmetric → JWT assertion in body
+    Safire->>FHIR: POST /token
+    FHIR-->>Safire: { access_token, refresh_token, expires_in, ... }
+    Safire-->>App: token response Hash
+
+    App->>Safire: refresh_token(refresh_token:)
+    Safire->>FHIR: POST /token (grant_type=refresh_token)
+    FHIR-->>Safire: { access_token, ... }
+    Safire-->>App: new token response Hash
+```

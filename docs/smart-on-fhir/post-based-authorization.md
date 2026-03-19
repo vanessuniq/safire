@@ -184,7 +184,7 @@ The parameters included in `:params` (POST) are identical to those embedded in t
 
 ## Next Steps
 
-- [Public Client Workflow]({% link smart-on-fhir/public-client.md %})
-- [Confidential Symmetric Client Workflow]({% link smart-on-fhir/confidential-symmetric.md %})
-- [Confidential Asymmetric Client Workflow]({% link smart-on-fhir/confidential-asymmetric.md %})
-- [SMART Discovery Details]({% link smart-on-fhir/discovery.md %})
+- [Public Client Workflow]({% link smart-on-fhir/public-client/index.md %})
+- [Confidential Symmetric Client Workflow]({% link smart-on-fhir/confidential-symmetric/index.md %})
+- [Confidential Asymmetric Client Workflow]({% link smart-on-fhir/confidential-asymmetric/index.md %})
+- [SMART Discovery Details]({% link smart-on-fhir/discovery/index.md %})

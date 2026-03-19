@@ -28,8 +28,12 @@ module Safire
   # * :confidential_symmetric       — HTTP Basic auth using client_secret
   # * :confidential_asymmetric      — private_key_jwt assertion (JWT signed with private key)
   #
-  # client_type is validated for :smart and ignored for :udap (UDAP always uses private_key_jwt
-  # via Dynamic Client Registration; client authentication is not user-configurable).
+  # client_type is validated for :smart and ignored for :udap. UDAP clients authenticate via
+  # signed JWT assertions (Authentication Token / AnT) with an X.509 certificate chain in the
+  # x5c JOSE header; the authentication method is not user-configurable for UDAP. DCR is
+  # typically performed once to obtain a client_id, which is then reused as iss/sub in every
+  # subsequent AnT. The unregistered client flow (§8.1) allows client_credentials grant without
+  # prior DCR when identity can be fully determined from certificate attributes alone.
   #
   # @note Future kwargs (not yet implemented):
   #

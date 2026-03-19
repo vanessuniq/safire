@@ -77,3 +77,4 @@ No `client_secret` is configured — public clients authenticate using PKCE only
 - [Authorization]({% link smart-on-fhir/public-client/authorization.md %}) — Discovery and generating the authorization URL
 - [Token Exchange & Refresh]({% link smart-on-fhir/public-client/token-exchange.md %}) — Exchanging the code, refreshing tokens, and error handling
 - [Security Guide]({{ site.baseurl }}/security/) — Token storage, CSRF protection, scope minimization
+- [Advanced Examples]({{ site.baseurl }}/advanced/) — Complete Rails controller, caching, multi-server, and retry patterns

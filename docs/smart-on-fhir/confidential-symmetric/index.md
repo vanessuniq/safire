@@ -66,3 +66,4 @@ Load `client_secret` from an environment variable, Rails credentials, or a secre
 - [Authorization]({% link smart-on-fhir/confidential-symmetric/authorization.md %}) — Discovery and generating the authorization URL
 - [Token Exchange & Refresh]({% link smart-on-fhir/confidential-symmetric/token-exchange.md %}) — Basic auth token requests, refresh, and error handling
 - [Security Guide]({{ site.baseurl }}/security/) — Secret management and rotation
+- [Advanced Examples]({{ site.baseurl }}/advanced/) — Complete Rails controller, caching, multi-server, and retry patterns

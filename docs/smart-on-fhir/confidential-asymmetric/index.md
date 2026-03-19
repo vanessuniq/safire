@@ -131,3 +131,4 @@ config = Safire::ClientConfig.new(
 - [Authorization]({% link smart-on-fhir/confidential-asymmetric/authorization.md %}) — Discovery and generating the authorization URL
 - [Token Exchange & Refresh]({% link smart-on-fhir/confidential-asymmetric/token-exchange.md %}) — JWT assertion token requests, refresh, and error handling
 - [Security Guide]({{ site.baseurl }}/security/) — Private key management and rotation
+- [Advanced Examples]({{ site.baseurl }}/advanced/) — Complete Rails controller, caching, multi-server, and retry patterns

@@ -111,6 +111,18 @@ RSpec.describe Safire::Client do
         .with(headers: { 'Authorization' => /^Basic / })
     end
 
+    context 'when protocol does not support client_type (e.g. :udap)' do
+      it 'logs a warning and returns without changing client_type' do
+        client = described_class.new(config, protocol: :udap)
+
+        allow(Safire.logger).to receive(:warn)
+        client.client_type = :confidential_symmetric
+
+        expect(Safire.logger).to have_received(:warn).with(/not configurable.*:udap/i)
+        expect(client.client_type).to eq(:public)
+      end
+    end
+
     it 'does not re-discover endpoints when client_type changes' do
       discovery_config = Safire::ClientConfig.new(
         base_config_attrs.except(:authorization_endpoint, :token_endpoint)

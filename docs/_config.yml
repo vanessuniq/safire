@@ -73,6 +73,10 @@ aux_links_new_tab: true
 
 back_to_top: true
 back_to_top_text: Back to Top ↑
+
+# Mermaid diagrams
+mermaid:
+  version: "10.9.0"
 # Exclude from processing.
 # The following items will not be processed, by default.
 # Any item listed under the `exclude:` key here will be automatically added to

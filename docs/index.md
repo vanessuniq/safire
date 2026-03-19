@@ -55,6 +55,7 @@ See [`examples/sinatra_app/README.md`](https://github.com/vanessuniq/safire/tree
 
 - [GitHub Repository](https://github.com/vanessuniq/safire)
 - [Issue Tracker](https://github.com/vanessuniq/safire/issues)
+- [Architecture Decision Records]({{ site.baseurl }}/adr/) — design decisions and rationale
 
 ---
 

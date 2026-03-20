@@ -39,7 +39,7 @@ class SmartMetadataService
         scopes:       []
       )
       client = Safire::Client.new(config)
-      client.server_metadata.to_h
+      client.server_metadata.to_hash
     end
   end
 
@@ -56,7 +56,7 @@ auth_endpoint = metadata[:authorization_endpoint]
 ```
 
 {: .note }
-> Cache the serialised hash (`to_h`), not the `SmartMetadata` object itself — the object holds an HTTPClient reference that does not serialise cleanly.
+> Cache the serialised hash (`to_hash`), not the `SmartMetadata` object itself — the object holds an HTTPClient reference that does not serialise cleanly.
 
 ---
 

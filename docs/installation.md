@@ -16,21 +16,11 @@ nav_order: 2
 
 ---
 
-## Requirements
+## Install
 
-- **Ruby:** 4.0.1 or later
-- **Bundler:** Latest version recommended
-- **OpenSSL:** For cryptographic operations
+**Requirements:** Ruby ≥ 4.0.1. OpenSSL is bundled with Ruby — no separate install needed.
 
----
-
-## Install from RubyGems
-
-```bash
-gem install safire
-```
-
-Or add to your Gemfile:
+Add to your Gemfile:
 
 ```ruby
 gem 'safire'
@@ -42,96 +32,65 @@ Then run:
 bundle install
 ```
 
----
-
-## Development Installation
-
-Clone the repository and set up the development environment:
+Or install directly:
 
 ```bash
-# Clone the repository
-git clone https://github.com/vanessuniq/safire.git
-cd safire
-
-# Set up dev
-rake setup # or `bin/setup`
-
-# Run tests to verify installation
-rake spec # or `bundle exec rspec`
-
-# Generate yard documentation
-rake docs # or `bin/docs`
-
-# Drop into the Safire console for interactive prompt
-bin/console
+gem install safire
 ```
 
 ---
 
-## Quick Start
+## Development Setup
 
-### SMART Discovery
+Clone the repo and set up the development environment:
+
+```bash
+git clone https://github.com/vanessuniq/safire.git
+cd safire
+bin/setup          # Install dependencies
+bundle exec rspec  # Run tests to verify
+bin/console        # Interactive prompt
+```
+
+To serve the docs site locally:
+
+```bash
+bin/docs                                           # Generate YARD API docs
+cd docs && bundle install && bundle exec jekyll serve
+```
+
+Then visit `http://localhost:4000/safire/`.
+
+---
+
+## Verify
+
+A quick smoke test to confirm the gem is installed and SMART discovery is working:
 
 ```ruby
 require 'safire'
 
-# Initialize Safire Client with Hash config (simplest approach)
 client = Safire::Client.new(
-  base_url: 'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
-  client_id: 'my_client_id',
-  redirect_uri: 'https://myapp.com/callback',
-  scopes: ['openid', 'profile', 'patient/*.read']
+  base_url:     'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
+  client_id:    'test',
+  redirect_uri: 'https://example.com/callback',
+  scopes:       ['openid', 'profile', 'patient/*.read']
 )
 
-# Discover SMART Configuration
 metadata = client.server_metadata
-
-puts "Authorization endpoint: #{metadata.authorization_endpoint}"
-# => Authorization endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/authorize
-
-puts "Token endpoint: #{metadata.token_endpoint}"
-# => Token endpoint: https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/auth/token
-
-puts "Capabilities: #{metadata.capabilities.join(', ')}"
-# => Capabilities: launch-ehr, launch-standalone, client-public, ...
+puts metadata.authorization_endpoint
+# => https://launch.smarthealthit.org/.../auth/authorize
 ```
 
----
-
-## Troubleshooting
-
-### Common Issues
-
-**Ruby Version Compatibility**
-
-If you encounter version compatibility issues:
-
-```bash
-# Check your Ruby version
-ruby --version
-
-# Install Ruby 4.0.1 or later using rbenv, rvm, or asdf
-# then set that version as default
-```
-
-For more detailed troubleshooting, see the [Troubleshooting Guide]({{ site.baseurl }}/troubleshooting/).
+If you see an authorization endpoint URL, the gem is working. For troubleshooting, see the [Troubleshooting Guide]({{ site.baseurl }}/troubleshooting/).
 
 ---
 
 ## Next Steps
 
-Once installation is complete:
-
-1. **[Configuration Guide]({{ site.baseurl }}/configuration/)** - Set up client configuration
-2. **[SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/)** - Learn about SMART authorization flows
-3. **[UDAP]({{ site.baseurl }}/udap/)** - Learn about UDAP (coming soon)
-4. **[API Reference]({{ site.baseurl }}/api/)** - Explore the complete API
-
----
-
-## Getting Help
-
-If you encounter issues:
-
-- **GitHub Issues:** [Report bugs and request features](https://github.com/vanessuniq/safire/issues)
-- **Documentation:** [Full documentation site]({{ site.baseurl }}/)
+| | |
+|-|-|
+| [Configuration]({{ site.baseurl }}/configuration/) | Client credentials, logging, and protocol selection |
+| [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Authorization flows for public and confidential clients |
+| [Security Guide]({{ site.baseurl }}/security/) | HTTPS requirements, credential protection, token storage |
+| [API Reference]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |

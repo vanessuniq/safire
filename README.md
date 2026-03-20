@@ -20,7 +20,7 @@ Safire is a lean Ruby library that implements **[SMART on FHIR](https://hl7.org/
 
 ### UDAP
 
-> Planned. See [ROADMAP.md](ROADMAP.md) for details.
+> Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ---
 

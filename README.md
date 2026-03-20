@@ -10,168 +10,148 @@ Safire is a lean Ruby library that implements **[SMART on FHIR](https://hl7.org/
 
 ## Features
 
-### SMART on FHIR App Launch
+### SMART on FHIR App Launch (v2.2.0)
 
 - Discovery (`/.well-known/smart-configuration`)
 - Public Client (PKCE)
-- Confidential Symmetric Client (client_secret + Basic Auth)
-- Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
+- Confidential Symmetric Client (`client_secret` + HTTP Basic Auth)
+- Confidential Asymmetric Client (`private_key_jwt` with RS384/ES384)
 - POST-Based Authorization
 
 ### UDAP
 
-> Planned. See [ROADMAP.md](ROADMAP.md) for details (coming soon).
+> Planned. See [ROADMAP.md](ROADMAP.md) for details.
 
-## Requirements
-
-- Ruby >= 4.0.1
-- Bundler
+---
 
 ## Installation
 
-Add this line to your Gemfile:
+Requires Ruby ≥ 4.0.1.
 
 ```ruby
 gem 'safire'
 ```
 
-Then install:
-
 ```bash
 bundle install
 ```
 
-## Supported SMART Client Types
+---
 
-| Client Type                | Description                                                | Client Authentication                                  |
-| -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
-| `:public`                  | Public client using PKCE (no secret)                       | `client_id` in token/refresh requests                  |
-| `:confidential_symmetric`  | Confidential client using client_secret with Basic auth    | `Authorization: Basic base64(client_id:client_secret)` |
-| `:confidential_asymmetric` | Confidential client using asymmetric key (private_key_jwt) | JWT assertion (RS384/ES384)                            |
-
-
-
-## Usage Example – SMART App Launch (Public Client)
+## Quick Start
 
 ```ruby
 require 'safire'
 
-# Initialize Safire client with Hash config (simplest approach)
-# You can also use Safire::ClientConfig.new(...) if you prefer
+# Step 1 — Create a client (Hash config or Safire::ClientConfig.new)
 client = Safire::Client.new(
-  base_url: 'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
-  client_id: 'my_client_id',
+  base_url:     'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
+  client_id:    'my_client_id',
   redirect_uri: 'https://myapp.example.com/callback',
-  scopes: ['openid', 'profile', 'patient/*.read']
+  scopes:       ['openid', 'profile', 'patient/*.read']
 )
 
-# Discover SMART metadata
+# Step 2 — Discover SMART metadata (lazy — only called when needed)
 metadata = client.server_metadata
+puts metadata.authorization_endpoint
+puts metadata.capabilities.join(', ')
 
-puts "Authorization endpoint: #{metadata.authorization_endpoint}"
-puts "Token endpoint: #{metadata.token_endpoint}"
-puts "Capabilities: #{metadata.capabilities.join(', ')}"
+# Step 3 — Build the authorization URL (Safire generates state + PKCE automatically)
+auth_data = client.authorization_url
+# auth_data => { auth_url:, state:, code_verifier: }
+# Store state and code_verifier server-side, redirect the user to auth_data[:auth_url]
 
-# Safire automatically retrieves endpoints from SMART metadata
-
-# Step 1 – /launch route (authorization request)
-# Use method: :post if the server advertises the 'authorize-post' capability
-auth_data = client.authorization_url            # GET redirect (default)
-# auth_data = client.authorization_url(method: :post)  # POST form submission
-
-session[:state] = auth_data[:state]
-session[:code_verifier] = auth_data[:code_verifier]
-redirect_to auth_data[:auth_url]
-
-# Step 2 – /callback route (token exchange)
-return head :unauthorized unless params[:state] == session[:state]
-
+# Step 4 — Exchange the authorization code for tokens (on callback)
 token_data = client.request_access_token(
-  code: params[:code],
+  code:          params[:code],
   code_verifier: session[:code_verifier]
 )
+# token_data => { "access_token" => "...", "token_type" => "Bearer", ... }
 
-# Store tokens securely (session, DB, etc.)
-puts token_data["access_token"]
-
-# Refreshing an access token
-new_tokens = client.refresh_token(refresh_token: stored_refresh_token)
-puts new_tokens["access_token"]
+# Step 5 — Refresh when the access token expires
+new_tokens = client.refresh_token(refresh_token: token_data['refresh_token'])
 ```
 
-### Confidential Asymmetric Client (private_key_jwt)
+### Supported SMART Client Types
+
+| `client_type:` | Authentication | When to use |
+|----------------|----------------|-------------|
+| `:public` (default) | PKCE only | Browser/mobile apps that cannot store a secret |
+| `:confidential_symmetric` | HTTP Basic Auth (`client_secret`) | Server-side apps with a securely stored secret |
+| `:confidential_asymmetric` | JWT assertion (`private_key_jwt`, RS384/ES384) | Server-side apps using a registered key pair |
+
+For a confidential asymmetric client, provide a private key and key ID:
 
 ```ruby
-require 'safire'
-
-# Load your RSA or EC private key
-private_key = OpenSSL::PKey::RSA.new(File.read('private_key.pem'))
-
 client = Safire::Client.new(
   {
-    base_url: 'https://fhir.example.com',
-    client_id: 'my_client_id',
+    base_url:    'https://fhir.example.com',
+    client_id:   'my_client_id',
     redirect_uri: 'https://myapp.example.com/callback',
-    scopes: ['openid', 'profile', 'patient/*.read'],
-    private_key: private_key,
-    kid: 'my-key-id-123',          # Key ID registered with the server
-    jwks_uri: 'https://myapp.example.com/.well-known/jwks.json'  # Optional
+    scopes:      ['openid', 'profile', 'patient/*.read'],
+    private_key: OpenSSL::PKey::RSA.new(File.read('private_key.pem')),
+    kid:         'my-key-id-123'
   },
   client_type: :confidential_asymmetric
 )
-
-# Usage is the same — Safire handles JWT assertion automatically
-auth_data = client.authorization_url
-token_data = client.request_access_token(code: '...', code_verifier: '...')
+# Authorization and token exchange are identical — Safire builds the JWT assertion automatically
 ```
 
-To see additional examples for all client types, visit the [Safire Docs](https://vanessuniq.github.io/safire/).
+---
+
+## Configuration
+
+```ruby
+Safire.configure do |config|
+  config.logger   = Rails.logger   # Default: $stdout
+  config.log_http = true           # Log HTTP requests (sensitive headers always filtered)
+end
+```
+
+See the [Configuration Guide](https://vanessuniq.github.io/safire/configuration/) for all options including `user_agent`, `log_level`, and SSL settings.
+
+---
 
 ## Demo Application
 
-A Sinatra-based demo application is included in [`examples/sinatra_app/`](examples/sinatra_app/) that demonstrates all SMART on FHIR features:
-
-- **Server Management**: Add, edit, and remove FHIR server configurations
-- **SMART Discovery**: View server capabilities from `/.well-known/smart-configuration`
-- **Authorization Flows**: Test provider standalone, patient standalone, and EHR launch flows
-- **Token Refresh**: Test token refresh functionality
-
-To run the demo:
+A Sinatra-based demo is included in [`examples/sinatra_app/`](examples/sinatra_app/):
 
 ```bash
 bin/demo
+# Visit http://localhost:4567
 ```
 
-Then visit http://localhost:4567 in your browser. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for more details.
+Demonstrates SMART discovery, all authorization flows, and token refresh. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
+
+---
 
 ## Development
 
-After checking out the repo, run:
-
 ```bash
 bin/setup            # Install dependencies
-bin/console          # Interactive prompt
 bundle exec rspec    # Run tests
+bin/console          # Interactive prompt
 ```
 
-### Documentation
-
-To serve the documentation site locally:
+To serve the docs locally:
 
 ```bash
-bin/docs                                        # Generate YARD API docs
+bin/docs
 cd docs && bundle install && bundle exec jekyll serve
+# Visit http://localhost:4000/safire/
 ```
 
-Then visit http://localhost:4000/safire/ in your browser.
+---
 
 ## Contributing
 
-Bug reports and pull requests are welcome on this [GitHub repo](https://github.com/vanessuniq/safire).
+Bug reports and pull requests are welcome. Please read [CONTRIBUTION.md](CONTRIBUTION.md) before opening a PR — it covers branch naming, commit message style, and the sign-off requirement.
+
+---
 
 ## License
 
-The gem is available as open source under the terms of the Apache 2.0 License.
+Available as open source under the [Apache 2.0 License](https://opensource.org/licenses/Apache-2.0).
 
 ---
 

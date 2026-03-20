@@ -4,7 +4,7 @@
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a lean Ruby library that implements **[SMART on FHIR](https://hl7.org/fhir/smart-app-launch/)** and **[UDAP](https://hl7.org/fhir/us/udap-security/)** client protocols for healthcare applications.
+Safire is a lean Ruby library that implements [SMART on FHIR](https://hl7.org/fhir/smart-app-launch/) and [UDAP](https://hl7.org/fhir/us/udap-security/) client protocols for healthcare applications.
 
 ---
 
@@ -20,7 +20,7 @@ Safire is a lean Ruby library that implements **[SMART on FHIR](https://hl7.org/
 
 ### UDAP
 
-> Planned. See [ROADMAP.md](ROADMAP.md) for details.
+> Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ---
 
@@ -145,7 +145,7 @@ cd docs && bundle install && bundle exec jekyll serve
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Please read [CONTRIBUTION.md](CONTRIBUTION.md) before opening a PR — it covers branch naming, commit message style, and the sign-off requirement.
+Bug reports and pull requests are welcome. Please read [CONTRIBUTION.md](https://github.com/vanessuniq/safire/blob/main/CONTRIBUTION.md) before opening a PR — it covers branch naming, commit message style, and the sign-off requirement.
 
 ---
 

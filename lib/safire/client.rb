@@ -28,8 +28,12 @@ module Safire
   # * :confidential_symmetric       — HTTP Basic auth using client_secret
   # * :confidential_asymmetric      — private_key_jwt assertion (JWT signed with private key)
   #
-  # client_type is validated for :smart and ignored for :udap (UDAP always uses private_key_jwt
-  # via Dynamic Client Registration; client authentication is not user-configurable).
+  # client_type is validated for :smart and ignored for :udap. UDAP clients authenticate via
+  # signed JWT assertions (Authentication Token / AnT) with an X.509 certificate chain in the
+  # x5c JOSE header; the authentication method is not user-configurable for UDAP. DCR is
+  # typically performed once to obtain a client_id, which is then reused as iss/sub in every
+  # subsequent AnT. The unregistered client flow (§8.1) allows client_credentials grant without
+  # prior DCR when identity can be fully determined from certificate attributes alone.
   #
   # @note Future kwargs (not yet implemented):
   #
@@ -101,10 +105,12 @@ module Safire
     }.freeze
 
     # Valid client_type values per protocol.
-    # nil means the protocol does not use client_type (e.g. UDAP always uses private_key_jwt via DCR).
+    # nil means the protocol does not use client_type (e.g. UDAP authenticates via signed
+    # JWT assertions with an X.509 certificate chain; the authentication method is not
+    # user-configurable for UDAP).
     PROTOCOL_CLIENT_TYPES = {
       smart: %i[public confidential_symmetric confidential_asymmetric],
-      udap: nil # UDAP always uses private_key_jwt via Dynamic Client Registration
+      udap: nil # UDAP authenticates via signed JWT assertions (AnT) with X.509 certificate chain
     }.freeze
 
     def_delegators :protocol_client,
@@ -140,6 +146,14 @@ module Safire
     #     client.client_type = :confidential_symmetric
     #   end
     def client_type=(new_client_type)
+      if PROTOCOL_CLIENT_TYPES[@protocol].nil?
+        Safire.logger.warn(
+          "client_type is not configurable for protocol: :#{@protocol}; " \
+          'UDAP clients authenticate via signed JWT assertions — ignoring'
+        )
+        return
+      end
+
       @client_type = new_client_type.to_sym
       validate_client_type!
       @protocol_client&.client_type = @client_type

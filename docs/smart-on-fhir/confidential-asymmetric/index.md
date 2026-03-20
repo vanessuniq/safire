@@ -86,6 +86,34 @@ The authorization server must know your public key. Host a JWKS endpoint:
 
 If you provide a `jwks_uri` in your Safire config, it is included as the `jku` header in JWT assertions so the server can locate your public key automatically.
 
+### JWT Assertion Structure
+
+Safire builds the following JWT assertion (sent as `client_assertion` in every token request):
+
+```mermaid
+flowchart LR
+    subgraph Header["JOSE Header"]
+        H1["alg: RS384 or ES384"]
+        H2["kid: key ID"]
+        H3["jku: JWKS URI (optional)"]
+    end
+
+    subgraph Claims["JWT Claims"]
+        C1["iss: client_id"]
+        C2["sub: client_id"]
+        C3["aud: token_endpoint"]
+        C4["jti: unique random ID"]
+        C5["iat: issued at"]
+        C6["exp: iat + 5 minutes"]
+    end
+
+    PK["Private Key\n(RSA or EC)"]
+
+    Header --> JWT
+    Claims --> JWT
+    PK -->|signs| JWT["Signed JWT Assertion\n(client_assertion)"]
+```
+
 ### Algorithm Selection
 
 Safire supports the two algorithms required by the SMART specification:

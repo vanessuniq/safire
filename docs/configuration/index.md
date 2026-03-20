@@ -13,6 +13,27 @@ Safire is configured in two places:
 - **Client configuration** — the FHIR server URL, credentials, and OAuth parameters passed to `Safire::Client.new`
 - **Global configuration** — the logger, log level, and HTTP logging behaviour set once via `Safire.configure`
 
+## Architecture Overview
+
+`Safire::Client` is the public entry point. It owns a `ClientConfig` (validated at construction) and lazily builds a protocol implementation when first used. See [ADR-002]({% link adr/ADR-002-facade-and-forwardable.md %}) for the facade design rationale, [ADR-003]({% link adr/ADR-003-protocol-vs-client-type.md %}) for the `protocol:` / `client_type:` design, and [ADR-006]({% link adr/ADR-006-lazy-discovery.md %}) for the lazy discovery design.
+
+```mermaid
+flowchart TD
+    A["Safire::Client.new(config, protocol: :smart, client_type: :public)"]
+    B["Safire::ClientConfig\n— validates URIs\n— masks sensitive attrs"]
+    C{protocol:}
+    D["Protocols::Smart\n— reads attrs from ClientConfig\n— owns HTTPClient"]
+    E["SmartMetadata\n(lazy — fetched on first use)"]
+    F["GET /.well-known/\nsmart-configuration"]
+
+    A -->|"resolves config"| B
+    A -->|"validates protocol + client_type"| C
+    C -->|":smart (default)"| D
+    C -->|":udap (planned)"| G["Protocols::Udap\n(future)"]
+    D -->|"lazily fetches"| E
+    E -->|"HTTP"| F
+```
+
 ## Quick Reference
 
 `protocol:` and `client_type:` are keyword arguments to `Safire::Client.new`. All other parameters are keys in the configuration hash (or `Safire::ClientConfig` attributes).

@@ -34,8 +34,8 @@ UDAP (Unified Data Access Profiles) provides a framework for trusted dynamic cli
 
 ### Client Flows
 
-- **Dynamic Client Registration** - Register clients using signed software statements
-- **JWT Authentication** - Authenticate using X.509 certificates and JWT assertions
+- **Dynamic Client Registration** - One-time registration using signed software statements to obtain a `client_id`
+- **JWT Client Authentication** - Authenticate on every request using signed JWT assertions (AnT) with an X.509 certificate chain (`x5c`); the registered `client_id` is reused as `iss`/`sub` in each assertion
 - **Tiered OAuth** - Support for delegated authorization per UDAP Security IG
 - **PAR (RFC 9126)** - Pushed Authorization Requests support
 
@@ -65,8 +65,8 @@ UDAP is designed for scenarios requiring:
 |---------|---------------|------|
 | User-Facing Apps | Primary use case | Supported |
 | Backend Services | Limited support | Primary use case |
-| Client Registration | Manual (pre-registered) | Dynamic (automated) |
-| Authentication | Client secrets or JWT | X.509 certificates |
+| Client Registration | Manual (pre-registered) | Dynamic via DCR (unregistered client flow available for `client_credentials`) |
+| Authentication | Client secrets or `private_key_jwt` | Signed JWT assertions (AnT) with X.509 certificate chain (`x5c`) |
 | Trust Model | Per-server registration | Trust community anchors |
 
 ---

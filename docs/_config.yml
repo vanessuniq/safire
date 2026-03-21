@@ -44,6 +44,11 @@ nav_sort: case_insensitive
 footer_content: ""
 
 # Markdown Processors
+sass:
+  quiet_deps: true
+  silence_deprecations:
+    - import
+
 kramdown:
   syntax_highlighter: rouge
   syntax_highlighter_opts:

@@ -140,7 +140,7 @@ GEM
       docile (~> 1.1)
       simplecov-html (~> 0.11)
       simplecov_json_formatter (~> 0.1)
-    simplecov-cobertura (2.1.0)
+    simplecov-cobertura (3.1.0)
       rexml
       simplecov (~> 0.19)
     simplecov-html (0.13.2)
@@ -173,8 +173,8 @@ DEPENDENCIES
   rubocop (~> 1.57)
   rubocop-rspec (~> 3.0)
   safire!
-  simplecov (~> 0.22)
-  simplecov-cobertura (~> 2.1)
+  simplecov
+  simplecov-cobertura
   timecop (~> 0.9)
   webmock (~> 3.18)
   yard (~> 0.9)

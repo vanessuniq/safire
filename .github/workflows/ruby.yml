@@ -25,8 +25,15 @@ jobs:
         ruby-version: ${{ matrix.ruby-version }}
         bundler-cache: true # This will run bundle install and cache gems automatically
 
-    - name: Run tests
+    - name: Run tests and collect coverage
+      env:
+        COVERAGE: 'true'
       run: bundle exec rspec
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Run RuboCop
       run: bundle exec rubocop

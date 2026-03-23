@@ -13,6 +13,15 @@
 # it.
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
+if ENV['COVERAGE']
+  require 'simplecov'
+  require 'simplecov-cobertura'
+  SimpleCov.start do
+    add_filter '/spec/'
+    formatter SimpleCov::Formatter::CoberturaFormatter
+  end
+end
+
 require 'pry'
 require 'webmock/rspec'
 

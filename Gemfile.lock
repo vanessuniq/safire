@@ -46,6 +46,7 @@ GEM
       irb (~> 1.10)
       reline (>= 0.3.8)
     diff-lcs (1.6.2)
+    docile (1.4.1)
     drb (2.2.3)
     erb (5.0.3)
     faraday (2.14.1)
@@ -135,6 +136,15 @@ GEM
       rubocop (~> 1.81)
     ruby-progressbar (1.13.0)
     securerandom (0.4.1)
+    simplecov (0.22.0)
+      docile (~> 1.1)
+      simplecov-html (~> 0.11)
+      simplecov_json_formatter (~> 0.1)
+    simplecov-cobertura (3.1.0)
+      rexml
+      simplecov (~> 0.19)
+    simplecov-html (0.13.2)
+    simplecov_json_formatter (0.1.4)
     stringio (3.1.9)
     thor (1.4.0)
     timecop (0.9.10)
@@ -163,6 +173,8 @@ DEPENDENCIES
   rubocop (~> 1.57)
   rubocop-rspec (~> 3.0)
   safire!
+  simplecov
+  simplecov-cobertura
   timecop (~> 0.9)
   webmock (~> 3.18)
   yard (~> 0.9)

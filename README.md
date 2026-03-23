@@ -2,6 +2,7 @@
 
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
+[![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
 Safire is a lean Ruby library that implements [SMART on FHIR](https://hl7.org/fhir/smart-app-launch/) and [UDAP](https://hl7.org/fhir/us/udap-security/) client protocols for healthcare applications.

@@ -20,5 +20,7 @@ group :development do
 end
 
 group :test do
+  gem 'simplecov', '~> 0.22', require: false
+  gem 'simplecov-cobertura', '~> 2.1', require: false
   gem 'webmock', '~> 3.18'
 end

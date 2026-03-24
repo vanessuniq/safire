@@ -2,6 +2,9 @@
 
 Describe what this pull request changes and why.
 
+Specify if it addresses an open issue:
+Closes #
+
 ## Type of Change
 
 - [ ] Bug fix

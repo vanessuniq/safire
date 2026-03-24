@@ -12,6 +12,7 @@ Closes #
 - [ ] Refactor
 - [ ] Documentation
 - [ ] CI / tooling
+- [ ] Breaking change (callers must update their code)
 
 ## Checklist
 

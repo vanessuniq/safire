@@ -7,8 +7,6 @@ PATH
       faraday (~> 2.14)
       faraday-follow_redirects (~> 0.4)
       jwt (~> 2.8)
-      pry
-      pry-byebug
 
 GEM
   remote: https://rubygems.org/

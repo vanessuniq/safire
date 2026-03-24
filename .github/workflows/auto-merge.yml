@@ -27,6 +27,10 @@ jobs:
       - name: Auto-approve PR
         uses: hmarr/auto-approve-action@v4
         with:
+          # PAT_TOKEN is required here instead of GITHUB_TOKEN because GitHub
+          # does not allow a workflow to approve its own pull request — a
+          # separate personal access token acting as a distinct reviewer is
+          # needed to satisfy the branch protection approval requirement.
           github-token: ${{ secrets.PAT_TOKEN }}
 
       - name: Auto-merge PR

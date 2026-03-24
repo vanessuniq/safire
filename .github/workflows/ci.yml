@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0.1'
+          bundler-cache: true
+
+      - name: Run tests and collect coverage
+        env:
+          COVERAGE: 'true'
+        run: bundle exec rspec
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
+      - name: Security audit
+        run: bundle exec bundler-audit check --update

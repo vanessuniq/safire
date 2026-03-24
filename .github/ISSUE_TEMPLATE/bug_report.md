@@ -29,6 +29,7 @@ What actually happened. Include any error messages or stack traces.
 - **Safire version:**
 - **Ruby version:**
 - **OS:**
+- **FHIR server / EHR (if applicable):**
 
 ## Additional Context
 

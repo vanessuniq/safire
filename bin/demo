@@ -13,11 +13,8 @@ fi
 
 cd "$DEMO_DIR"
 
-# Check if dependencies are installed
-if [ ! -f "Gemfile.lock" ]; then
-  echo "Installing demo app dependencies..."
-  bundle install
-fi
+echo "Installing demo app dependencies..."
+bundle install
 
 PORT="${PORT:-4567}"
 

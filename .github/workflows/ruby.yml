@@ -1,6 +1,4 @@
 name: Ruby
-permissions:
-  contents: read
 
 on:
   push:
@@ -9,34 +7,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        ruby-version: ['4.0.1']
-
-    steps:
-    - uses: actions/checkout@v6
-
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby-version }}
-        bundler-cache: true # This will run bundle install and cache gems automatically
-
-    - name: Run tests and collect coverage
-      env:
-        COVERAGE: 'true'
-      run: bundle exec rspec
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: Run RuboCop
-      run: bundle exec rubocop
-
-    - name: Security audit
-      run: bundle exec bundler-audit check --update
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit

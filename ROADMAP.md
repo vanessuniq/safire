@@ -46,7 +46,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 | Component | Version |
 |-----------|---------|
-| Ruby | ≥ 4.0.1 |
+| Ruby | ≥ 4.0.2 |
 | ActiveSupport | ~> 8.0 |
 | Rails (optional) | 7.x, 8.x |
 | SMART App Launch | 2.2.0 (STU2) |

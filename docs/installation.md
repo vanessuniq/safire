@@ -18,7 +18,7 @@ nav_order: 2
 
 ## Install
 
-**Requirements:** Ruby ≥ 4.0.1. OpenSSL is bundled with Ruby — no separate install needed.
+**Requirements:** Ruby ≥ 4.0.2. OpenSSL is bundled with Ruby — no separate install needed.
 
 Add to your Gemfile:
 

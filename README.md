@@ -27,7 +27,7 @@ Safire is a lean Ruby library that implements [SMART on FHIR](https://hl7.org/fh
 
 ## Installation
 
-Requires Ruby ≥ 4.0.1.
+Requires Ruby ≥ 4.0.2.
 
 ```ruby
 gem 'safire'

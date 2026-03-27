@@ -2,12 +2,10 @@ name: CI
 
 on:
   workflow_call:
-    secrets:
-      CODECOV_TOKEN:
-        required: false
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   test:
@@ -29,7 +27,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
 
       - name: Run RuboCop
         run: bundle exec rubocop

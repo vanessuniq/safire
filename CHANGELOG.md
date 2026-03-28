@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `redirect_uri` is now optional in `Safire::ClientConfig` to support backend services
+  clients that operate without a redirect URI; the field is still validated when provided
+
 ## [0.1.0] - 2026-03-25
 
 ### Added

@@ -78,7 +78,7 @@ module Safire
 
     SENSITIVE_ATTRIBUTES = %i[client_secret private_key].freeze
     URI_ATTRS = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint jwks_uri].freeze
-    OPTIONAL_URI_ATTRS = %i[authorization_endpoint token_endpoint jwks_uri].freeze
+    OPTIONAL_URI_ATTRS = %i[redirect_uri authorization_endpoint token_endpoint jwks_uri].freeze
     private_constant :SENSITIVE_ATTRIBUTES, :URI_ATTRS, :OPTIONAL_URI_ATTRS
 
     # @api private
@@ -155,7 +155,7 @@ module Safire
     end
 
     def validate!
-      required_attrs = %i[base_url client_id redirect_uri]
+      required_attrs = %i[base_url client_id]
       nil_vars = required_attrs.select { |attr| send(attr).nil? }
 
       if nil_vars.empty?

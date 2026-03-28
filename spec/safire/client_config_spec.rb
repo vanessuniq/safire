@@ -16,7 +16,11 @@ RSpec.describe Safire::ClientConfig do
       expect { described_class.new(valid_attrs) }.not_to raise_error
     end
 
-    %i[base_url client_id redirect_uri].each do |attr|
+    it 'initializes successfully without redirect_uri' do
+      expect { described_class.new(valid_attrs.except(:redirect_uri)) }.not_to raise_error
+    end
+
+    %i[base_url client_id].each do |attr|
       it "raises ConfigurationError when #{attr} is missing" do
         expect { described_class.new(valid_attrs.except(attr)) }
           .to raise_error(Safire::Errors::ConfigurationError, /#{attr}/)

@@ -24,17 +24,19 @@ RSpec.describe 'SMART Backend Services Flow (Live Server)', :live, type: :integr
   let(:client_id)   { ENV.fetch('SAFIRE_LIVE_BACKEND_CLIENT_ID', nil) }
   let(:kid)         { ENV.fetch('SAFIRE_LIVE_BACKEND_KID', nil) }
   let(:algorithm)   { ENV.fetch('SAFIRE_LIVE_BACKEND_ALGORITHM', 'RS384') }
-  let(:scopes)      { (ENV.fetch('SAFIRE_LIVE_BACKEND_SCOPES', 'system/*.rs')).split }
+  let(:scopes)      { ENV.fetch('SAFIRE_LIVE_BACKEND_SCOPES', 'system/*.rs').split }
   let(:private_key) do
     pem = ENV.fetch('SAFIRE_LIVE_BACKEND_PRIVATE_KEY_PEM', nil)
     OpenSSL::PKey.read(pem) if pem
   end
 
   before(:all) do
-    skip 'Set SAFIRE_LIVE_BACKEND_BASE_URL to run backend services live tests' unless ENV['SAFIRE_LIVE_BACKEND_BASE_URL']
+    unless ENV['SAFIRE_LIVE_BACKEND_BASE_URL']
+      skip 'Set SAFIRE_LIVE_BACKEND_BASE_URL to run backend services live tests'
+    end
 
     WebMock.allow_net_connect!
-    uri = URI("#{ENV['SAFIRE_LIVE_BACKEND_BASE_URL']}/.well-known/smart-configuration")
+    uri = URI("#{ENV.fetch('SAFIRE_LIVE_BACKEND_BASE_URL', nil)}/.well-known/smart-configuration")
     Net::HTTP.get_response(uri)
   rescue StandardError => e
     skip "Backend services server not reachable: #{e.message}"

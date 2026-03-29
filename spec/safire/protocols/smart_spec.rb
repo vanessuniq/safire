@@ -208,10 +208,15 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     it 'raises ConfigurationError when a required attribute is missing' do
-      %i[client_id redirect_uri base_url].each do |attr|
+      %i[client_id base_url].each do |attr|
         expect { described_class.new(Safire::ClientConfig.new(config_attrs.except(attr))) }
           .to raise_error(Safire::Errors::ConfigurationError, /#{attr}/)
       end
+    end
+
+    it 'initializes successfully without redirect_uri and authorization_endpoint' do
+      cfg = Safire::ClientConfig.new(config_attrs.except(:redirect_uri, :authorization_endpoint))
+      expect { described_class.new(cfg) }.not_to raise_error
     end
 
     it 'gives each instance its own distinct HTTPClient' do
@@ -405,6 +410,23 @@ RSpec.describe Safire::Protocols::Smart do
       it 'raises ConfigurationError' do
         expect { described_class.new(config).authorization_url(method: :patch) }
           .to raise_error(Safire::Errors::ConfigurationError, /method/)
+      end
+    end
+
+    context 'when redirect_uri is not configured' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:redirect_uri))
+        expect { described_class.new(cfg).authorization_url }
+          .to raise_error(Safire::Errors::ConfigurationError, /redirect_uri/)
+      end
+    end
+
+    context 'when authorization_endpoint cannot be resolved' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint))
+        stub_well_known(body: smart_metadata_body.except('authorization_endpoint'))
+        expect { described_class.new(cfg).authorization_url }
+          .to raise_error(Safire::Errors::ConfigurationError, /authorization_endpoint/)
       end
     end
   end
@@ -700,6 +722,149 @@ RSpec.describe Safire::Protocols::Smart do
       expect do
         described_class.new(config, client_type: :public).refresh_token(refresh_token: 'x')
       end.to raise_error(Safire::Errors::NetworkError)
+    end
+  end
+
+  # ---------- Backend Token ----------
+
+  describe '#request_backend_token' do
+    let(:backend_token_response) do
+      { 'access_token' => 'backend_token_abc', 'token_type' => 'Bearer',
+        'expires_in' => 300, 'scope' => 'system/Patient.rs system/Observation.rs' }
+    end
+
+    let(:backend_assertion_matcher) do
+      hash_including(
+        'grant_type' => 'client_credentials',
+        'scope' => 'system/Patient.rs system/Observation.rs',
+        'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+        'client_assertion' => kind_of(String)
+      )
+    end
+
+    let(:backend_config_attrs) do
+      {
+        client_id: 'backend_client_id',
+        base_url: 'https://fhir.example.com',
+        token_endpoint: 'https://fhir.example.com/token',
+        private_key: rsa_private_key,
+        kid: 'backend-key-id',
+        scopes: %w[system/Patient.rs system/Observation.rs]
+      }
+    end
+
+    let(:backend_config) { Safire::ClientConfig.new(backend_config_attrs) }
+
+    context 'with RSA private key and configured scopes' do
+      before do
+        stub_token_post(body_matcher: backend_assertion_matcher, status: 200, body: backend_token_response)
+      end
+
+      it 'returns the access token response' do
+        result = described_class.new(backend_config).request_backend_token
+        expect(result['access_token']).to eq('backend_token_abc')
+        expect(result['token_type']).to eq('Bearer')
+      end
+
+      it 'sends client_credentials grant with scope and JWT assertion' do
+        described_class.new(backend_config).request_backend_token
+
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint]).with do |req|
+          body = URI.decode_www_form(req.body).to_h
+          body['grant_type'] == 'client_credentials' &&
+            body['scope'] == 'system/Patient.rs system/Observation.rs' &&
+            body['client_assertion_type'] == 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
+            body['client_assertion'].present?
+        end)
+      end
+
+      it 'does not include an Authorization header' do
+        described_class.new(backend_config).request_backend_token
+
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint])
+          .with { |req| !req.headers.key?('Authorization') })
+      end
+
+      it 'sends a valid JWT assertion with correct claims' do
+        described_class.new(backend_config).request_backend_token
+
+        expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint]).with do |req|
+          body    = URI.decode_www_form(req.body).to_h
+          decoded = JWT.decode(body['client_assertion'], rsa_private_key.public_key, true, algorithm: 'RS384')
+          payload, header = decoded
+
+          payload['iss'] == 'backend_client_id' &&
+            payload['sub'] == 'backend_client_id' &&
+            payload['aud'] == config_attrs[:token_endpoint] &&
+            payload['jti'].present? &&
+            payload['exp'].is_a?(Integer) &&
+            header['kid'] == 'backend-key-id'
+        end)
+      end
+    end
+
+    context 'with scope override' do
+      before do
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'system/Patient.rs'),
+          status: 200,
+          body: backend_token_response
+        )
+      end
+
+      it 'uses the provided scopes instead of configured ones' do
+        described_class.new(backend_config).request_backend_token(scopes: %w[system/Patient.rs])
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => 'system/Patient.rs'))
+      end
+    end
+
+    context 'when no scopes are configured and none provided' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
+        expect { described_class.new(cfg).request_backend_token }
+          .to raise_error(Safire::Errors::ConfigurationError, /scopes/)
+      end
+    end
+
+    context 'when private_key is missing' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:private_key))
+        expect { described_class.new(cfg).request_backend_token }
+          .to raise_error(Safire::Errors::ConfigurationError, /private_key/)
+      end
+    end
+
+    context 'when kid is missing' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:kid))
+        expect { described_class.new(cfg).request_backend_token }
+          .to raise_error(Safire::Errors::ConfigurationError, /kid/)
+      end
+    end
+
+    context 'when server returns an error' do
+      before do
+        stub_request(:post, config_attrs[:token_endpoint]).to_return(
+          status: 401,
+          body: { 'error' => 'invalid_client', 'error_description' => 'JWT signature invalid' }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'raises TokenError' do
+        expect { described_class.new(backend_config).request_backend_token }
+          .to raise_error(Safire::Errors::TokenError, /Token request failed/)
+      end
+    end
+
+    context 'when a network error occurs' do
+      it 'raises NetworkError' do
+        stub_request(:post, config_attrs[:token_endpoint]).to_raise(Faraday::ConnectionFailed)
+        expect { described_class.new(backend_config).request_backend_token }
+          .to raise_error(Safire::Errors::NetworkError)
+      end
     end
   end
 

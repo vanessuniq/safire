@@ -5,7 +5,7 @@ RSpec.describe Safire::Protocols::Behaviours do
 
   %i[
     server_metadata authorization_url request_access_token
-    refresh_token token_response_valid? register_client
+    refresh_token token_response_valid? register_client request_backend_token
   ].each do |method|
     it "##{method} raises NotImplementedError by default" do
       expect { instance.public_send(method) }.to raise_error(NotImplementedError)

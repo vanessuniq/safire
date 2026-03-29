@@ -821,10 +821,17 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     context 'when no scopes are configured and none provided' do
-      it 'raises ConfigurationError' do
+      it 'defaults to system/*.rs scope' do
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'system/*.rs'),
+          status: 200,
+          body: backend_token_response.merge('scope' => 'system/*.rs')
+        )
         cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
-        expect { described_class.new(cfg).request_backend_token }
-          .to raise_error(Safire::Errors::ConfigurationError, /scopes/)
+        described_class.new(cfg).request_backend_token
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => 'system/*.rs'))
       end
     end
 

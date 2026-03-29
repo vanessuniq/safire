@@ -164,17 +164,23 @@ RSpec.describe 'SMART Backend Services End-to-End Flow', type: :integration do
         .with(body: hash_including('scope' => 'system/Patient.rs'))
       expect(tokens['scope']).to eq('system/Patient.rs')
     end
+
+    it 'defaults to system/*.rs when no scopes are configured' do
+      stub_token_post(
+        body_matcher: hash_including('scope' => 'system/*.rs'),
+        response_body: backend_token_response.merge('scope' => 'system/*.rs')
+      )
+      cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
+      Safire::Client.new(cfg).request_backend_token
+
+      expect(WebMock).to have_requested(:post, token_endpoint)
+        .with(body: hash_including('scope' => 'system/*.rs'))
+    end
   end
 
   # ---------- Error Handling ----------
 
   describe 'Error Handling' do
-    it 'raises ConfigurationError when scopes are missing' do
-      cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
-      expect { Safire::Client.new(cfg).request_backend_token }
-        .to raise_error(Safire::Errors::ConfigurationError, /scopes/)
-    end
-
     it 'raises ConfigurationError when private_key is missing' do
       cfg = Safire::ClientConfig.new(backend_config_attrs.except(:private_key))
       expect { Safire::Client.new(cfg).request_backend_token }

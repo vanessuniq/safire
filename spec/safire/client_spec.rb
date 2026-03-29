@@ -367,10 +367,12 @@ RSpec.describe Safire::Client do
         .with(body: hash_including('scope' => 'system/Patient.rs'))
     end
 
-    it 'raises ConfigurationError when scopes are missing' do
+    it 'defaults to system/*.rs scope when no scopes are configured' do
       cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
-      expect { described_class.new(cfg).request_backend_token }
-        .to raise_error(Safire::Errors::ConfigurationError, /scopes/)
+      described_class.new(cfg).request_backend_token
+
+      expect(WebMock).to have_requested(:post, token_endpoint)
+        .with(body: hash_including('scope' => 'system/*.rs'))
     end
   end
 

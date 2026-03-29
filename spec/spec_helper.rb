@@ -22,8 +22,11 @@ if ENV['COVERAGE']
   end
 end
 
+require 'dotenv'
 require 'pry'
 require 'webmock/rspec'
+
+Dotenv.load('.env.test')
 
 WebMock.disable_net_connect!
 

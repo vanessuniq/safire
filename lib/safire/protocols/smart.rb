@@ -1,6 +1,7 @@
 module Safire
   module Protocols
-    # SMART on FHIR OAuth2 implementation for authorization code, access token, and refresh token flows.
+    # SMART on FHIR OAuth2 implementation for app launch (authorization code, token exchange, refresh)
+    # and backend services (client credentials) flows.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not instantiate it directly —
     # use {Safire::Client} instead.
@@ -25,7 +26,9 @@ module Safire
       ].freeze
 
       # Attributes that are not required during validation
-      OPTIONAL_ATTRIBUTES = %i[scopes client_secret private_key kid jwt_algorithm jwks_uri].freeze
+      OPTIONAL_ATTRIBUTES = %i[
+        redirect_uri authorization_endpoint scopes client_secret private_key kid jwt_algorithm jwks_uri
+      ].freeze
 
       WELL_KNOWN_PATH = '/.well-known/smart-configuration'.freeze
 
@@ -90,11 +93,14 @@ module Safire
       #   * :state [String] state parameter for CSRF protection; store and verify on callback
       #   * :code_verifier [String] PKCE code verifier for the token exchange
       #   * :params [Hash] (POST only) authorization parameters to submit as the request body
-      # @raise [Errors::ConfigurationError] if no scopes are configured or if method is invalid
+      # @raise [Errors::ConfigurationError] if method is invalid, scopes are missing,
+      #   or +redirect_uri+ / +authorization_endpoint+ are not configured or resolvable via discovery
       def authorization_url(launch: nil, custom_scopes: nil, method: :get)
         method = method.to_sym
-        validate_presence_of_scopes(custom_scopes)
+        custom_scopes ||= scopes
         validate_authorization_method(method)
+        validate_presence_of_scopes(custom_scopes)
+        validate_app_launch_attrs!
 
         Safire.logger.info("Generating authorization URL for SMART #{client_type} (method: #{method})...")
 
@@ -154,6 +160,40 @@ module Safire
           token_endpoint,
           body: refresh_token_params(refresh_token:, scopes:, private_key:, kid:),
           headers: oauth2_headers(client_secret)
+        )
+
+        parse_token_response(response.body)
+      rescue Faraday::Error => e
+        raise token_error_from(e)
+      end
+
+      # Requests an access token using the client credentials grant (SMART Backend Services).
+      #
+      # Implements the SMART Backend Services Authorization flow per
+      # https://hl7.org/fhir/smart-app-launch/backend-services.html
+      #
+      # No user interaction, redirect, or PKCE is involved. The client authenticates
+      # exclusively via a signed JWT assertion (RS384 or ES384).
+      #
+      # @param scopes [Array<String>, nil] scope override; uses configured scopes if nil,
+      #   falling back to +["system/*.rs"]+ when neither is provided
+      # @param private_key [OpenSSL::PKey] private key for JWT assertion; uses configured key if not provided.
+      #   Required — must be present either in configuration or passed here.
+      # @param kid [String] key ID for JWT assertion header; uses configured kid if not provided.
+      #   Required — must be present either in configuration or passed here.
+      # @return [Hash] token response from the authorization server
+      # @raise [Safire::Errors::ConfigurationError] if private_key or kid are missing
+      # @raise [Safire::Errors::TokenError] if the server returns an error or invalid response
+      # @raise [Safire::Errors::NetworkError] on network failure
+      def request_backend_token(scopes: nil, private_key: self.private_key, kid: self.kid)
+        scopes ||= self.scopes.presence || ['system/*.rs']
+
+        Safire.logger.info('Requesting backend services access token (client_credentials grant)...')
+
+        response = @http_client.post(
+          token_endpoint,
+          body: backend_services_token_params(scopes:, private_key:, kid:),
+          headers: { content_type: 'application/x-www-form-urlencoded' }
         )
 
         parse_token_response(response.body)
@@ -222,8 +262,17 @@ module Safire
         end
       end
 
-      def validate_presence_of_scopes(custom_scopes = nil)
-        return if (scopes || custom_scopes).present?
+      def validate_app_launch_attrs!
+        missing = []
+        missing << :redirect_uri if redirect_uri.blank?
+        missing << :authorization_endpoint if authorization_endpoint.blank?
+        return if missing.empty?
+
+        raise Errors::ConfigurationError.new(missing_attributes: missing)
+      end
+
+      def validate_presence_of_scopes(scopes_value)
+        return if scopes_value.present?
 
         raise Errors::ConfigurationError.new(missing_attributes: [:scopes])
       end
@@ -276,7 +325,7 @@ module Safire
           client_id:,
           redirect_uri:,
           launch:,
-          scope: [custom_scopes || scopes].flatten.join(' '),
+          scope: [custom_scopes].flatten.join(' '),
           state: SecureRandom.hex(16),
           aud: issuer.to_s,
           code_challenge_method: 'S256',
@@ -300,6 +349,13 @@ module Safire
         }
         params[:scope] = [scopes].flatten.join(' ') if scopes.present?
         params.merge(client_auth_params(private_key:, kid:))
+      end
+
+      def backend_services_token_params(scopes:, private_key:, kid:)
+        {
+          grant_type: 'client_credentials',
+          scope: [scopes].flatten.join(' ')
+        }.merge(jwt_assertion_params(private_key:, kid:))
       end
 
       def client_auth_params(private_key:, kid:)

@@ -304,6 +304,76 @@ RSpec.describe Safire::Client do
     end
   end
 
+  # ---------- Backend Token ----------
+
+  describe '#request_backend_token' do
+    let(:backend_config_attrs) do
+      {
+        client_id: 'backend_client_id',
+        base_url: base_url,
+        token_endpoint: token_endpoint,
+        private_key: rsa_private_key,
+        kid: 'backend-key-id',
+        scopes: %w[system/Patient.rs system/Observation.rs]
+      }
+    end
+
+    let(:backend_config) { Safire::ClientConfig.new(backend_config_attrs) }
+
+    let(:backend_token_response) do
+      { 'access_token' => 'backend_token_abc', 'token_type' => 'Bearer',
+        'expires_in' => 300, 'scope' => 'system/Patient.rs system/Observation.rs' }
+    end
+
+    before do
+      stub_request(:post, token_endpoint)
+        .with(body: hash_including('grant_type' => 'client_credentials'))
+        .to_return(
+          status: 200,
+          body: backend_token_response.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+    end
+
+    it 'delegates to the protocol and returns the token response' do
+      result = described_class.new(backend_config).request_backend_token
+      expect(result['access_token']).to eq('backend_token_abc')
+      expect(result['token_type']).to eq('Bearer')
+    end
+
+    it 'sends client_credentials grant with scope and JWT assertion' do
+      described_class.new(backend_config).request_backend_token
+
+      expect(WebMock).to have_requested(:post, token_endpoint)
+        .with(body: hash_including(
+          'grant_type' => 'client_credentials',
+          'scope' => 'system/Patient.rs system/Observation.rs',
+          'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+        ))
+    end
+
+    it 'accepts a scopes override' do
+      stub_request(:post, token_endpoint)
+        .with(body: hash_including('scope' => 'system/Patient.rs'))
+        .to_return(
+          status: 200,
+          body: backend_token_response.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      described_class.new(backend_config).request_backend_token(scopes: %w[system/Patient.rs])
+
+      expect(WebMock).to have_requested(:post, token_endpoint)
+        .with(body: hash_including('scope' => 'system/Patient.rs'))
+    end
+
+    it 'raises ConfigurationError when scopes are missing' do
+      cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
+      expect { described_class.new(cfg).request_backend_token }
+        .to raise_error(Safire::Errors::ConfigurationError, /scopes/)
+    end
+  end
+
   # ---------- Dynamic Client Registration ----------
 
   describe '#register_client' do

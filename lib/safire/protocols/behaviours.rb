@@ -39,6 +39,12 @@ module Safire
         raise NotImplementedError, "#{self.class}#token_response_valid? is not implemented"
       end
 
+      # Requests an access token using the client credentials grant (SMART Backend Services).
+      # @abstract
+      def request_backend_token(...)
+        raise NotImplementedError, "#{self.class}#request_backend_token is not implemented"
+      end
+
       # Dynamically registers this client with the authorization server (RFC 7591).
       #
       # SMART App Launch 2.2.0 encourages implementers to consider the OAuth 2.0

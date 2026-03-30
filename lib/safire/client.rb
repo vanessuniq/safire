@@ -3,17 +3,20 @@ module Safire
   #
   # This class is the main entry point for integrating SMART on FHIR authorization via Safire.
   # It supports discovery of server metadata and provides a unified interface for building
-  # authorization URLs, exchanging authorization codes, and refreshing tokens.
+  # authorization URLs, exchanging authorization codes, refreshing tokens, and requesting
+  # backend services access tokens (client_credentials grant).
   #
-  # Configuration is provided via {Safire::ClientConfig} or a Hash. At minimum:
+  # Configuration is provided via {Safire::ClientConfig} or a Hash. Key attributes:
   #
   # * :base_url [String] FHIR base URL used for SMART discovery
   # * :client_id [String] OAuth2 client identifier
-  # * :redirect_uri [String] redirect URI registered with the authorization server
-  # * :scopes [Array<String>] default scopes requested during authorization
+  # * :redirect_uri [String] redirect URI registered with the authorization server;
+  #     required for app launch, not required for backend services
+  # * :scopes [Array<String>] default scopes; falls back to +["system/*.rs"]+ for
+  #     backend services when not provided
   # * :client_secret [String, optional] required for confidential_symmetric clients
-  # * :private_key [OpenSSL::PKey, String, optional] private key for confidential_asymmetric clients
-  # * :kid [String, optional] key ID matching the registered public key for asymmetric clients
+  # * :private_key [OpenSSL::PKey, String, optional] private key for asymmetric clients and backend services
+  # * :kid [String, optional] key ID matching the registered public key for asymmetric clients and backend services
   # * :jwt_algorithm [String, optional] JWT signing algorithm (RS384 or ES384). Auto-detected if not provided
   # * :jwks_uri [String, optional] URL to client's JWKS for jku header in JWT assertions
   #
@@ -37,17 +40,11 @@ module Safire
   #
   # @note Future kwargs (not yet implemented):
   #
-  #   flow: [Symbol] the authorization flow for this client.
-  #     SMART values:
-  #       nil / absent  — :app_launch (default): SMART App Launch, authorization_code grant
-  #       :backend_services — SMART Backend Services, client_credentials grant;
-  #         private_key_jwt is implied; client_type validation is skipped
-  #     UDAP values (protocol: :udap):
-  #       :b2b          — client_credentials grant, server-to-server
-  #       :b2c          — authorization_code grant, user-facing
-  #       :tiered_oauth — authorization_code + IdP identity delegation
+  #   flow: [Symbol] the authorization flow for UDAP clients (protocol: :udap):
+  #     :b2b          — client_credentials grant, server-to-server
+  #     :b2c          — authorization_code grant, user-facing
+  #     :tiered_oauth — authorization_code + IdP identity delegation
   #
-  #   Contract methods will be extended per flow in a future PR.
   #   When protocol: :udap is fully implemented, client_type: will default to nil
   #   (not applicable) and the flow: kwarg will drive B2B vs B2C selection.
   #
@@ -94,6 +91,17 @@ module Safire
   # @example Step 3 – Refreshing an access token
   #   client = Safire::Client.new(config)
   #   new_tokens = client.refresh_token(refresh_token: stored_refresh_token)
+  #
+  # @example Backend Services – system-to-system access token (client_credentials grant)
+  #   config = Safire::ClientConfig.new(
+  #     base_url:   'https://fhir.example.com',
+  #     client_id:  'my_client_id',
+  #     private_key: OpenSSL::PKey::RSA.new(File.read('private_key.pem')),
+  #     kid:        'my-key-id',
+  #     scopes:     ['system/Patient.rs']
+  #   )
+  #   client = Safire::Client.new(config, client_type: :confidential_asymmetric)
+  #   token_data = client.request_backend_token
   class Client
     extend Forwardable
 
@@ -116,6 +124,7 @@ module Safire
     def_delegators :protocol_client,
                    :server_metadata, :authorization_url,
                    :request_access_token, :refresh_token,
+                   :request_backend_token,
                    :token_response_valid?, :register_client
 
     attr_reader :config, :protocol, :client_type

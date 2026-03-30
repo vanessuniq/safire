@@ -25,6 +25,11 @@ end
 require 'pry'
 require 'webmock/rspec'
 
+if File.exist?('.env.test')
+  require 'dotenv'
+  Dotenv.load('.env.test')
+end
+
 WebMock.disable_net_connect!
 
 RSpec.configure do |config|

@@ -12,6 +12,9 @@
 
 # Used by dotenv library to load environment variables.
 .env
+.env.test
+.env.development
+.env.production
 examples/sinatra_app/.env
 examples/sinatra_app/data/
 

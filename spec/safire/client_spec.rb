@@ -302,6 +302,12 @@ RSpec.describe Safire::Client do
       expect(result).to be(false)
       expect(Safire.logger).to have_received(:warn).at_least(:once)
     end
+
+    it 'forwards flow: :backend_services and validates expires_in' do
+      result = described_class.new(config).token_response_valid?(valid_response, flow: :backend_services)
+      expect(result).to be(false)
+      expect(Safire.logger).to have_received(:warn).with(/'expires_in' is missing/)
+    end
   end
 
   # ---------- Backend Token ----------

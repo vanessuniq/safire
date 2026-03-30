@@ -893,25 +893,28 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when token_type is "bearer" (lowercase)' do
+      it 'returns true — both "Bearer" and "bearer" are accepted' do
+        result = client.token_response_valid?(valid_response.merge('token_type' => 'bearer'))
+        expect(result).to be(true)
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+
+    context 'when token_type is an unrecognized value' do
+      it 'returns false and logs a warning' do
+        result = client.token_response_valid?(valid_response.merge('token_type' => 'BEARER'))
+        expect(result).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/token_type/)
+      end
+    end
+
     %w[access_token scope token_type].each do |field|
       context "when #{field} is missing" do
         it 'returns false and logs a warning' do
           result = client.token_response_valid?(valid_response.except(field))
           expect(result).to be(false)
           expect(Safire.logger).to have_received(:warn).with(/'#{field}' is missing/)
-        end
-      end
-    end
-
-    [
-      ['lowercase "bearer"', 'bearer', /token_type.*bearer.*Bearer/],
-      ['"BEARER"', 'BEARER', /token_type/]
-    ].each do |description, value, warning_pattern|
-      context "when token_type is #{description}" do
-        it 'returns false and logs a warning' do
-          result = client.token_response_valid?(valid_response.merge('token_type' => value))
-          expect(result).to be(false)
-          expect(Safire.logger).to have_received(:warn).with(warning_pattern)
         end
       end
     end
@@ -932,6 +935,36 @@ RSpec.describe Safire::Protocols::Smart do
           result = client.token_response_valid?(invalid)
           expect(result).to be(false)
           expect(Safire.logger).to have_received(:warn).with(/not a JSON object/)
+        end
+      end
+    end
+
+    context 'with flow: :backend_services' do
+      let(:backend_response) { valid_response.merge('expires_in' => 300) }
+
+      context 'when expires_in is present' do
+        it 'returns true' do
+          result = client.token_response_valid?(backend_response, flow: :backend_services)
+          expect(result).to be(true)
+          expect(Safire.logger).not_to have_received(:warn)
+        end
+      end
+
+      context 'when expires_in is missing' do
+        it 'returns false and logs a warning' do
+          result = client.token_response_valid?(valid_response, flow: :backend_services)
+          expect(result).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/'expires_in' is missing/)
+        end
+      end
+    end
+
+    context 'with flow: :app_launch (default)' do
+      context 'when expires_in is absent' do
+        it 'returns true — expires_in is not required for app launch' do
+          result = client.token_response_valid?(valid_response)
+          expect(result).to be(true)
+          expect(Safire.logger).not_to have_received(:warn)
         end
       end
     end

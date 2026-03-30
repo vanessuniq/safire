@@ -207,19 +207,21 @@ module Safire
         raise token_error_from(e)
       end
 
-      # Validates a token response for SMART App Launch 2.2.0 compliance.
+      # Validates a token response for SMART compliance.
       #
-      # Checks all required token response fields per SMART App Launch 2.2.0 §Token Response:
-      # - +access_token+ must be present (SHALL)
-      # - +token_type+ must be present and exactly +"Bearer"+ (SHALL, case-sensitive)
-      # - +scope+ must be present (SHALL)
+      # Checks all required token response fields based on the authorization flow:
+      # - +access_token+ must be present (all flows, SHALL)
+      # - +token_type+ must be present and +"Bearer"+ or +"bearer"+ (all flows, SHALL)
+      # - +scope+ must be present (all flows, SHALL)
+      # - +expires_in+ must be present when +flow: :backend_services+ (required per Backend Services spec)
       #
       # Logs a warning via {Safire.logger} for each violation found and returns false.
       # Never raises an exception.
       #
       # @param response [Hash] the token response returned by the server
+      # @param flow [Symbol] the authorization flow; +:app_launch+ (default) or +:backend_services+
       # @return [Boolean] true if the response is compliant, false otherwise
-      def token_response_valid?(response)
+      def token_response_valid?(response, flow: :app_launch)
         unless response.is_a?(Hash)
           Safire.logger.warn('SMART token response non-compliance: response is not a JSON object')
           return false
@@ -227,7 +229,10 @@ module Safire
 
         valid = true
 
-        %w[access_token scope].each do |field|
+        required_fields = %w[access_token scope]
+        required_fields << 'expires_in' if flow == :backend_services
+
+        required_fields.each do |field|
           next if response[field].present?
 
           Safire.logger.warn(
@@ -316,11 +321,11 @@ module Safire
           return false
         end
 
-        return true if response['token_type'] == 'Bearer'
+        return true if %w[Bearer bearer].include?(response['token_type'])
 
         Safire.logger.warn(
           "SMART token response non-compliance: token_type is #{response['token_type'].inspect}; " \
-          "expected 'Bearer' (SMART App Launch 2.2.0 requires token_type \"Bearer\")"
+          "expected 'Bearer' or 'bearer'"
         )
         false
       end

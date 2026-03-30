@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `token_response_valid?` now accepts a `flow:` keyword argument (`:app_launch` default):
   when `flow: :backend_services`, also validates `expires_in` presence (required per
   SMART Backend Services spec)
-- `token_response_valid?` now accepts both `"Bearer"` and `"bearer"` as valid `token_type`
-  values to accommodate both App Launch and Backend Services server responses
+- `token_response_valid?` accepts both `"Bearer"` (SMART App Launch spec) and `"bearer"`
+  (SMART Backend Services spec) as valid `token_type` values; the non-compliance warning
+  now references the expected value for the active flow
 
 ### Changed
 

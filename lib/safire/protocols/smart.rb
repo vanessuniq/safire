@@ -241,7 +241,7 @@ module Safire
           valid = false
         end
 
-        token_type_valid?(response) && valid
+        token_type_valid?(response, flow:) && valid
       end
 
       private
@@ -313,7 +313,7 @@ module Safire
         raise Errors::TokenError.new(received_fields: token_response.keys)
       end
 
-      def token_type_valid?(response)
+      def token_type_valid?(response, flow: :app_launch)
         if response['token_type'].blank?
           Safire.logger.warn(
             "SMART token response non-compliance: required field 'token_type' is missing"
@@ -323,9 +323,14 @@ module Safire
 
         return true if %w[Bearer bearer].include?(response['token_type'])
 
+        expected = if flow == :backend_services
+                     "'bearer' (SMART Backend Services spec)"
+                   else
+                     "'Bearer' (SMART App Launch spec)"
+                   end
         Safire.logger.warn(
           "SMART token response non-compliance: token_type is #{response['token_type'].inspect}; " \
-          "expected 'Bearer' or 'bearer'"
+          "expected #{expected}"
         )
         false
       end
@@ -363,6 +368,9 @@ module Safire
       end
 
       def backend_services_token_params(scopes:, private_key:, kid:)
+        # Per SMART Backend Services spec, client identity is conveyed via the JWT
+        # iss/sub claims (RFC 7523 §3); client_id is intentionally omitted from the
+        # POST body, consistent with the SMART IG reference token request example.
         {
           grant_type: 'client_credentials',
           scope: [scopes].flatten.join(' ')

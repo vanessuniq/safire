@@ -902,10 +902,10 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     context 'when token_type is an unrecognized value' do
-      it 'returns false and logs a warning' do
+      it 'returns false and logs a warning referencing the App Launch spec' do
         result = client.token_response_valid?(valid_response.merge('token_type' => 'BEARER'))
         expect(result).to be(false)
-        expect(Safire.logger).to have_received(:warn).with(/token_type/)
+        expect(Safire.logger).to have_received(:warn).with(/token_type.*SMART App Launch spec/)
       end
     end
 
@@ -955,6 +955,15 @@ RSpec.describe Safire::Protocols::Smart do
           result = client.token_response_valid?(valid_response, flow: :backend_services)
           expect(result).to be(false)
           expect(Safire.logger).to have_received(:warn).with(/'expires_in' is missing/)
+        end
+      end
+
+      context 'when token_type is an unrecognized value' do
+        it 'returns false and logs a warning referencing the Backend Services spec' do
+          response = backend_response.merge('token_type' => 'BEARER')
+          result = client.token_response_valid?(response, flow: :backend_services)
+          expect(result).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/token_type.*SMART Backend Services spec/)
         end
       end
     end

@@ -119,13 +119,14 @@ module Safire
       # @param kid [String, nil] optional; key ID for asymmetric auth (overrides configured)
       # @return [Hash] token response parsed from the authorization server, including:
       #   * "access_token" [String] new access token issued by the authorization server (required)
-      #   * "token_type"  [String] token type, fixed value "bearer" (required)
-      #   * "expires_in"  [Integer] lifetime of the access token in seconds (required)
+      #   * "token_type"  [String] token type, exactly +"Bearer"+ (required, case-sensitive per SMART spec)
+      #   * "expires_in"  [Integer] lifetime of the access token in seconds (RECOMMENDED)
       #   * "scope"       [String] authorized scopes for this token (required)
       #   * "refresh_token"           [String] refresh token, if issued (optional)
       #   * "authorization_details"   [Hash] additional authorization details, if provided (optional)
       #   * Context parameters such as "patient" or "encounter" MAY be present, depending on server behavior.
       # @raise [Safire::Errors::TokenError] if the request fails or response is invalid.
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error.
       def request_access_token(code:, code_verifier:, client_secret: self.client_secret,
                                private_key: self.private_key, kid: self.kid)
         Safire.logger.info('Requesting access token using authorization code...')
@@ -152,6 +153,7 @@ module Safire
       # @return [Hash] token response parsed from the authorization server.
       #   See {#request_access_token} for token response format.
       # @raise [Safire::Errors::TokenError] if the refresh request fails or the response is invalid.
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error.
       def refresh_token(refresh_token:, scopes: nil, client_secret: self.client_secret,
                         private_key: self.private_key, kid: self.kid)
         Safire.logger.info('Refreshing access token...')
@@ -181,10 +183,14 @@ module Safire
       #   Required — must be present either in configuration or passed here.
       # @param kid [String] key ID for JWT assertion header; uses configured kid if not provided.
       #   Required — must be present either in configuration or passed here.
-      # @return [Hash] token response from the authorization server
+      # @return [Hash] token response from the authorization server, including:
+      #   * "access_token" [String] access token (required)
+      #   * "token_type"  [String] token type, value +"Bearer"+ (required)
+      #   * "expires_in"  [Integer] lifetime of the access token in seconds (required per Backend Services spec)
+      #   * "scope"       [String] authorized scopes (required)
       # @raise [Safire::Errors::ConfigurationError] if private_key or kid are missing
       # @raise [Safire::Errors::TokenError] if the server returns an error or invalid response
-      # @raise [Safire::Errors::NetworkError] on network failure
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
       def request_backend_token(scopes: nil, private_key: self.private_key, kid: self.kid)
         scopes ||= self.scopes.presence || ['system/*.rs']
 

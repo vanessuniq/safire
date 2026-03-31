@@ -1,6 +1,6 @@
 # Safire Roadmap
 
-## Current Release — v0.0.1
+## Current Release — v0.1.0
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
 
@@ -20,13 +20,16 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **JWT Assertion Builder** — signed JWT assertions with configurable `kid` and expiry
 - **PKCE** — automatic code verifier and challenge generation
 
+### SMART on FHIR Backend Services
+
+- **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; scope defaults to `system/*.rs` when not configured
+
 ---
 
 ## Planned Features
 
 ### SMART on FHIR
 
-- **Backend Services** — `client_credentials` grant for system-to-system flows (no user interaction)
 - **Dynamic Client Registration** — programmatic client registration per [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591)
 
 ### UDAP Security

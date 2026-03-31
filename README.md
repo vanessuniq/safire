@@ -19,6 +19,12 @@ Safire is a lean Ruby library that implements [SMART on FHIR](https://hl7.org/fh
 - Confidential Asymmetric Client (`private_key_jwt` with RS384/ES384)
 - POST-Based Authorization
 
+### SMART on FHIR Backend Services
+
+- System-to-system access token request (`client_credentials` grant)
+- JWT assertion authentication (RS384/ES384) — no user interaction, redirect, or PKCE
+- Scope defaults to `system/*.rs` when not configured
+
 ### UDAP
 
 > Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
@@ -98,6 +104,33 @@ client = Safire::Client.new(
 # Authorization and token exchange are identical — Safire builds the JWT assertion automatically
 ```
 
+### Backend Services (system-to-system)
+
+No user interaction, redirect URI, or PKCE required — the client authenticates entirely via a signed JWT assertion:
+
+```ruby
+client = Safire::Client.new(
+  base_url:    'https://fhir.example.com',
+  client_id:   'my_backend_client',
+  private_key: OpenSSL::PKey::RSA.new(File.read('private_key.pem')),
+  kid:         'my-key-id-123',
+  scopes:      ['system/Patient.rs', 'system/Observation.rs']
+)
+
+token_data = client.request_backend_token
+# token_data => { "access_token" => "...", "token_type" => "Bearer", "expires_in" => 300, ... }
+
+# Override scope or credentials per call
+token_data = client.request_backend_token(
+  scopes:      ['system/Patient.rs'],
+  private_key: OpenSSL::PKey::RSA.new(File.read('new_key.pem')),
+  kid:         'new-key-id'
+)
+
+# Validate the token response (flow: :backend_services also checks expires_in)
+client.token_response_valid?(token_data, flow: :backend_services)
+```
+
 ---
 
 ## Configuration
@@ -122,7 +155,7 @@ bin/demo
 # Visit http://localhost:4567
 ```
 
-Demonstrates SMART discovery, all authorization flows, and token refresh. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
+Demonstrates SMART discovery, all authorization flows, token refresh, and backend services token requests. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
 
 ---
 

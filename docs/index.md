@@ -18,7 +18,7 @@ A lean Ruby gem implementing **[SMART on FHIR](https://hl7.org/fhir/smart-app-la
 |---------|-------------|
 | [Getting Started]({{ site.baseurl }}/installation/) | Install Safire and quick start guide |
 | [Configuration]({{ site.baseurl }}/configuration/) | All configuration options and parameters |
-| [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Discovery, Public clients, Confidential clients |
+| [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | App Launch (Public, Confidential Symmetric, Confidential Asymmetric) and Backend Services |
 | [UDAP]({{ site.baseurl }}/udap/) | UDAP protocol overview and planned support |
 | [Security Guide]({{ site.baseurl }}/security/) | HTTPS, credential protection, token storage, key rotation |
 | [Advanced Examples]({{ site.baseurl }}/advanced/) | Caching, multi-server, token management, complete Rails integration |
@@ -35,6 +35,11 @@ A lean Ruby gem implementing **[SMART on FHIR](https://hl7.org/fhir/smart-app-la
 - Confidential Asymmetric Client (private_key_jwt with RS384/ES384)
 - POST-Based Authorization
 
+### SMART on FHIR Backend Services
+
+- System-to-system token requests (`client_credentials` grant)
+- JWT assertion authentication (RS384/ES384) — no user interaction, redirect, or PKCE
+
 ### UDAP
 
 > Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details (coming soon).
@@ -47,7 +52,7 @@ A Sinatra-based demo app is included to help you explore Safire's features:
 bin/demo
 ```
 
-Visit http://localhost:4567 to test SMART discovery, authorization flows, and token management.
+Visit http://localhost:4567 to test SMART discovery, authorization flows, token management, and backend services token requests.
 
 See [`examples/sinatra_app/README.md`](https://github.com/vanessuniq/safire/tree/main/examples/sinatra_app) for details.
 

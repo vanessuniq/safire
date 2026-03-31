@@ -24,9 +24,12 @@ Confidential asymmetric clients authenticate using **`private_key_jwt`** — a s
 Safire implements `private_key_jwt` per [SMART App Launch STU 2.2.0](https://hl7.org/fhir/smart-app-launch/client-confidential-asymmetric.html).
 
 Suitable for:
-- Backend services where sharing a secret out-of-band is impractical
+- Server-side apps authenticating in the authorization code flow without sharing a secret out-of-band
 - Multi-tenant platforms where independent key rotation per tenant is valuable
 - Deployments requiring the highest level of client authentication assurance
+
+{: .note }
+> The key pair setup and JWT assertion mechanism described here are also used by the **[Backend Services]({% link smart-on-fhir/backend-services/index.md %})** flow (`client_credentials` grant), which applies the same `private_key_jwt` authentication without a user-facing redirect.
 
 ---
 

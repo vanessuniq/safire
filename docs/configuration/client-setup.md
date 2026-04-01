@@ -23,10 +23,12 @@ Pass configuration as a Hash — Safire wraps it in a `ClientConfig` automatical
 
 ```ruby
 client = Safire::Client.new(
-  base_url:     'https://fhir.example.com/r4',
-  client_id:    'my_client_id',
-  redirect_uri: 'https://myapp.com/callback',
-  scopes:       ['openid', 'profile', 'patient/*.read']
+  {
+    base_url:     'https://fhir.example.com/r4',
+    client_id:    'my_client_id',
+    redirect_uri: 'https://myapp.com/callback',
+    scopes:       ['openid', 'profile', 'patient/*.read']
+  }
 )
 ```
 

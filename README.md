@@ -52,10 +52,12 @@ require 'safire'
 
 # Step 1 — Create a client (Hash config or Safire::ClientConfig.new)
 client = Safire::Client.new(
-  base_url:     'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
-  client_id:    'my_client_id',
-  redirect_uri: 'https://myapp.example.com/callback',
-  scopes:       ['openid', 'profile', 'patient/*.read']
+  {
+    base_url:     'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
+    client_id:    'my_client_id',
+    redirect_uri: 'https://myapp.example.com/callback',
+    scopes:       ['openid', 'profile', 'patient/*.read']
+  }
 )
 
 # Step 2 — Discover SMART metadata (lazy — only called when needed)
@@ -110,11 +112,13 @@ No user interaction, redirect URI, or PKCE required — the client authenticates
 
 ```ruby
 client = Safire::Client.new(
-  base_url:    'https://fhir.example.com',
-  client_id:   'my_backend_client',
-  private_key: OpenSSL::PKey::RSA.new(File.read('private_key.pem')),
-  kid:         'my-key-id-123',
-  scopes:      ['system/Patient.rs', 'system/Observation.rs']
+  {
+    base_url:    'https://fhir.example.com',
+    client_id:   'my_backend_client',
+    private_key: OpenSSL::PKey::RSA.new(File.read('private_key.pem')),
+    kid:         'my-key-id-123',
+    scopes:      ['system/Patient.rs', 'system/Observation.rs']
+  }
 )
 
 token_data = client.request_backend_token

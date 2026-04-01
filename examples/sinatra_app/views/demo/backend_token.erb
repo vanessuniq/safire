@@ -1,0 +1,93 @@
+<div class="page-header">
+  <h1>Backend Services Token Request</h1>
+</div>
+
+<section class="token-results">
+  <h2>Server: <%= h(@server.name) %></h2>
+  <p class="server-url"><code><%= h(@server.base_url) %></code></p>
+
+  <% unless asymmetric_credentials_configured? %>
+    <div class="error-box">
+      <strong>Credentials not configured.</strong> Set <code>ASYMMETRIC_PRIVATE_KEY_PEM</code> and
+      <code>ASYMMETRIC_KID</code> environment variables to enable Backend Services.
+      See the <a href="https://github.com/vanessuniq/safire/tree/main/examples/sinatra_app#setting-up-asymmetric-authentication">README</a>
+      for setup instructions.
+    </div>
+  <% end %>
+
+  <% if @token_response %>
+    <div class="<%= @valid ? 'success-box' : 'warning-box' %>">
+      Token obtained. SMART compliance check (<code>flow: :backend_services</code>):
+      <strong><%= @valid ? 'PASSED' : 'FAILED — see application logs for details' %></strong>
+    </div>
+
+    <div class="token-section">
+      <h3>Access Token</h3>
+      <div class="token-display">
+        <code class="token-value"><%= @token_response['access_token'] %></code>
+      </div>
+    </div>
+
+    <div class="token-section">
+      <h3>Token Details</h3>
+      <dl class="details-list">
+        <dt>Token Type</dt>
+        <dd><%= @token_response['token_type'] || 'Not specified' %></dd>
+
+        <dt>Expires In</dt>
+        <dd><%= @token_response['expires_in'] ? "#{@token_response['expires_in']} seconds" : 'Not specified' %></dd>
+
+        <dt>Scope</dt>
+        <dd>
+          <% if @token_response['scope'] %>
+            <% @token_response['scope'].split(' ').each do |scope| %>
+              <span class="badge badge-scope"><%= scope %></span>
+            <% end %>
+          <% else %>
+            <em>Not specified</em>
+          <% end %>
+        </dd>
+      </dl>
+    </div>
+
+    <div class="token-section">
+      <h3>Full Response</h3>
+      <pre class="json-display"><%= JSON.pretty_generate(@token_response) %></pre>
+    </div>
+
+    <div class="form-actions">
+      <form action="/demo/<%= @server.id %>/backend-token" method="post" style="display:inline;">
+        <button type="submit" class="btn btn-primary">Request New Token</button>
+      </form>
+      <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Back to Server</a>
+    </div>
+
+  <% else %>
+    <p>
+      Request a backend services access token using the <code>client_credentials</code> grant.
+      No user interaction or redirect is required.
+    </p>
+
+    <form action="/demo/<%= @server.id %>/backend-token" method="post" class="demo-form">
+      <div class="form-group">
+        <label for="scopes">Scopes <span class="optional">(optional)</span></label>
+        <input type="text" id="scopes" name="scopes"
+               placeholder="system/Patient.rs system/Observation.rs"
+               class="form-input">
+        <p class="form-hint">Space or comma-separated. Defaults to <code>system/*.rs</code> when omitted.</p>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary"
+                <%= 'disabled' unless asymmetric_credentials_configured? %>>
+          Request Token
+        </button>
+        <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  <% end %>
+</section>
+
+<div class="back-link">
+  <a href="/servers/<%= @server.id %>">&larr; Back to Server</a>
+</div>

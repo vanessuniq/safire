@@ -16,8 +16,9 @@ A Sinatra-based web application that demonstrates the features of the Safire gem
   - Confidential Symmetric (client_secret with Basic Auth)
   - Confidential Asymmetric (private_key_jwt with JWT assertion)
 - **Token Management**: View obtained tokens and test token refresh functionality
+- **Backend Services**: Request system-to-system access tokens via the `client_credentials` grant (no user interaction) when the server advertises support
 - **Session Reset**: Clear all OAuth and token session data via the "Reset Session" button in the navigation bar
-- **JWKS Endpoint**: Serves the app's public key at `/.well-known/jwks.json` for asymmetric auth
+- **JWKS Endpoint**: Serves the app's public key at `/.well-known/jwks.json` for asymmetric auth and backend services
 
 ## Quick Start
 
@@ -126,6 +127,18 @@ To test EHR launch with the SMART sandbox:
 - `http://localhost:4567/launch?client_type=confidential_symmetric` - Confidential client with Basic Auth
 - `http://localhost:4567/launch?client_type=confidential_asymmetric` - Confidential client with JWT assertion
 
+### Backend Services Token Request
+
+If the server advertises `client_credentials` grant support, the "Backend Services" card appears on the server detail page:
+
+1. Navigate to a server detail page
+2. Click "Request Backend Token"
+3. Optionally enter custom scopes (defaults to `system/*.rs`)
+4. Click "Request Token"
+5. View the access token, expiry, granted scopes, and SMART compliance check result
+
+Requires `ASYMMETRIC_PRIVATE_KEY_PEM` and `ASYMMETRIC_KID` to be configured (same key pair used for confidential asymmetric App Launch).
+
 ### Token Refresh
 
 After completing an authorization flow, if the server issued a refresh token:
@@ -168,7 +181,8 @@ examples/sinatra_app/
         ├── discovery.erb
         ├── authorize.erb
         ├── tokens.erb
-        └── refresh.erb
+        ├── refresh.erb
+        └── backend_token.erb
 ```
 
 ## Endpoints
@@ -178,6 +192,8 @@ examples/sinatra_app/
 | `/.well-known/jwks.json` | JWKS endpoint serving the app's public key |
 | `/launch` | EHR/Portal launch endpoint |
 | `/callback` | OAuth2 callback handler |
+| `GET /demo/:id/backend-token` | Backend Services token request form |
+| `POST /demo/:id/backend-token` | Submits the backend services token request |
 | `POST /reset-session` | Clears all OAuth and token session data |
 
 ## License

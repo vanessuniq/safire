@@ -13,6 +13,14 @@ require_relative 'models/fhir_server'
 
 # Sinatra demo application for Safire gem
 class SafireDemo < Sinatra::Base
+  # In-memory metadata cache shared across requests (keyed by server base_url)
+  METADATA_CACHE_TTL = 300 # seconds
+
+  @metadata_cache = {}
+  class << self
+    attr_reader :metadata_cache
+  end
+
   configure :development do
     register Sinatra::Reloader
   end
@@ -122,6 +130,7 @@ class SafireDemo < Sinatra::Base
   get '/servers/:id' do
     @server = FhirServer.find(params[:id])
     halt 404, 'Server not found' unless @server
+    @metadata = cached_server_metadata(@server)
     erb :'servers/show'
   end
 
@@ -168,11 +177,11 @@ class SafireDemo < Sinatra::Base
     @server = FhirServer.find(params[:server_id])
     halt 404, 'Server not found' unless @server
 
-    begin
-      @safire_client = build_safire_client(@server)
-      @metadata = @safire_client.server_metadata
-    rescue Safire::Errors::Error => e
-      set_flash(:error, flash_error_message('Server connection failed', e))
+    @safire_client = build_safire_client(@server)
+    @metadata = cached_server_metadata(@server, client: @safire_client)
+
+    unless @metadata
+      set_flash(:error, 'Server discovery failed — check the server URL and try again.')
       redirect "/servers/#{@server.id}"
     end
   end
@@ -202,6 +211,34 @@ class SafireDemo < Sinatra::Base
     rescue Safire::Errors::Error => e
       set_flash(:error, flash_error_message('Authorization failed', e))
       redirect "/servers/#{@server.id}"
+    end
+  end
+
+  # Backend Services - request form
+  get '/demo/:server_id/backend-token' do
+    erb :'demo/backend_token'
+  end
+
+  # Backend Services - request token
+  post '/demo/:server_id/backend-token' do
+    unless asymmetric_credentials_configured?
+      set_flash(:error, 'Backend Services requires ASYMMETRIC_PRIVATE_KEY_PEM and ASYMMETRIC_KID to be set.')
+      redirect "/demo/#{@server.id}/backend-token"
+      return
+    end
+
+    begin
+      scopes = params[:scopes].to_s.strip.empty? ? ['system/*.rs'] : parse_scopes(params[:scopes])
+      @token_response = @safire_client.request_backend_token(
+        scopes: scopes,
+        private_key: asymmetric_private_key,
+        kid: ENV.fetch('ASYMMETRIC_KID', nil)
+      )
+      @valid = @safire_client.token_response_valid?(@token_response, flow: :backend_services)
+      erb :'demo/backend_token'
+    rescue Safire::Errors::Error => e
+      set_flash(:error, flash_error_message('Backend Services token request failed', e))
+      redirect "/demo/#{@server.id}/backend-token"
     end
   end
 
@@ -392,6 +429,26 @@ class SafireDemo < Sinatra::Base
 
     client_type = client_type_param.to_s.strip.to_sym
     %i[public confidential_symmetric confidential_asymmetric].include?(client_type) ? client_type : :public
+  end
+
+  def cached_server_metadata(server, client: nil)
+    entry = SafireDemo.metadata_cache[server.base_url]
+    return entry[:metadata] if fresh_cache?(entry)
+
+    fetch_and_cache_metadata(server, client)
+  end
+
+  def fresh_cache?(entry)
+    entry && Time.now.to_i - entry[:fetched_at] < METADATA_CACHE_TTL
+  end
+
+  def fetch_and_cache_metadata(server, client)
+    client ||= Safire::Client.new({ base_url: server.base_url, client_id: server.client_id })
+    metadata = client.server_metadata
+    SafireDemo.metadata_cache[server.base_url] = { metadata: metadata, fetched_at: Time.now.to_i }
+    metadata
+  rescue Safire::Errors::Error
+    nil
   end
 
   def build_safire_client(server, client_type: :public)

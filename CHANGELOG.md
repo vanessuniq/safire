@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `token_response_valid?` accepts both `"Bearer"` (SMART App Launch spec) and `"bearer"`
   (SMART Backend Services spec) as valid `token_type` values; the non-compliance warning
   now references the expected value for the active flow
+- `SmartMetadata#supports_backend_services?` returns `true` when the server advertises the
+  `client_credentials` grant type and supports `private_key_jwt` authentication
+  (i.e. `grant_types_supported` includes `"client_credentials"` and
+  `supports_asymmetric_auth?` is `true`)
 
 ### Changed
 

@@ -25,7 +25,7 @@ The question is: what should compliance checks do when they find a violation?
 
 **Option B — Warn and return false:** log a warning via `Safire.logger` for each violation found, then return `false`. Never raise.
 
-Option A treats a non-compliant server as an unrecoverable error. In practice, some production FHIR servers have minor token response non-compliance (e.g. `token_type: "bearer"` in lowercase rather than `"Bearer"`) but are otherwise functional. Raising an exception would prevent Safire from working with those servers entirely, with no way for callers to override the decision.
+Option A treats a non-compliant server as an unrecoverable error. In practice, some production FHIR servers have minor token response non-compliance (e.g. returning `token_type: "BEARER"` instead of the spec-required value) but are otherwise functional. Raising an exception would prevent Safire from working with those servers entirely, with no way for callers to override the decision.
 
 Option B lets the caller decide what to do: they can check the return value, observe the warnings in their logs, and choose to proceed or abort. This is consistent with how Ruby standard library methods (e.g. `URI.parse`, `JSON.parse` with `rescue nil`) handle validation — surface the issue, let the caller decide.
 
@@ -38,9 +38,9 @@ There is also a clear boundary: **the caller controls the config** (configuratio
 Compliance validation methods use the **warn + return false** pattern:
 
 ```ruby
-def token_response_valid?(response)
+def token_response_valid?(response, flow: :app_launch)
   # ...
-  Safire.logger.warn("SMART token response non-compliance: token_type is #{...}; expected 'Bearer'")
+  Safire.logger.warn("SMART token response non-compliance: token_type is #{...}; expected 'Bearer' (SMART App Launch spec)")
   false
 end
 
@@ -72,3 +72,4 @@ Configuration validation (`ClientConfig#validate!`, `Smart#validate!`) raises `C
 **Trade-offs:**
 - Callers who do not call `token_response_valid?` get no compliance signal at all — non-compliant responses are silently accepted; this is intentional (opt-in, not opt-out)
 - The distinction between "warn + return false" and "raise" must be maintained consistently — new validation methods should follow the same rule: server behaviour → warn; caller configuration → raise
+- `token_response_valid?` accepts a `flow:` keyword argument (`:app_launch` default, `:backend_services`) that adjusts which fields are required and what the warning messages say. For example, `token_type` must be `"Bearer"` (App Launch spec) or `"bearer"` (Backend Services spec), and `expires_in` is RECOMMENDED for App Launch but REQUIRED for Backend Services. Callers opt in to the stricter backend-services validation by passing `flow: :backend_services`

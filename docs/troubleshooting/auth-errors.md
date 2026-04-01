@@ -96,6 +96,9 @@ auth_data = client.authorization_url(
 )
 ```
 
+{: .note }
+> **Backend Services:** `request_backend_token` does not raise this error — it defaults to `["system/*.rs"]` when no scopes are configured. Pass `scopes:` to override: `client.request_backend_token(scopes: ['system/Patient.rs'])`.
+
 ### State mismatch on callback
 
 **Symptom:** authorization callback fails or state validation raises an error.

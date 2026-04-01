@@ -105,7 +105,7 @@ metadata = client.server_metadata
 client.client_type = :confidential_asymmetric if metadata.supports_asymmetric_auth?
 ```
 
-For a decision guide on which client type to use, see [SMART on FHIR — Choosing a Client Type]({{ site.baseurl }}/smart-on-fhir/).
+For a decision guide on which workflow to use, see [SMART on FHIR — Choosing a Workflow]({{ site.baseurl }}/smart-on-fhir/).
 
 ---
 
@@ -122,7 +122,7 @@ The following attributes are validated:
 | Attribute | Validated when |
 |-----------|----------------|
 | `base_url` | Always |
-| `redirect_uri` | Always |
+| `redirect_uri` | When provided (required for App Launch; not used in Backend Services) |
 | `issuer` | When provided (defaults to `base_url`) |
 | `authorization_endpoint` | When provided |
 | `token_endpoint` | When provided |

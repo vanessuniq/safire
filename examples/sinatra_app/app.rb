@@ -216,6 +216,12 @@ class SafireDemo < Sinatra::Base
 
   # Backend Services - request form
   get '/demo/:server_id/backend-token' do
+    unless @metadata&.supports_backend_services?
+      set_flash(:error, 'This server does not advertise the client_credentials grant.')
+      redirect "/servers/#{@server.id}"
+      return
+    end
+
     erb :'demo/backend_token'
   end
 

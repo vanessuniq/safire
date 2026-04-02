@@ -24,7 +24,7 @@
     <div class="token-section">
       <h3>Access Token</h3>
       <div class="token-display">
-        <code class="token-value"><%= @token_response['access_token'] %></code>
+        <code class="token-value"><%= h(@token_response['access_token']) %></code>
       </div>
     </div>
 
@@ -52,7 +52,7 @@
 
     <div class="token-section">
       <h3>Full Response</h3>
-      <pre class="json-display"><%= JSON.pretty_generate(@token_response) %></pre>
+      <pre class="json-display"><%= h(JSON.pretty_generate(@token_response)) %></pre>
     </div>
 
     <div class="form-actions">

@@ -165,12 +165,12 @@ class BackendTokenManager
   private
 
   def needs_refresh?
-    @token_data.nil? || Time.current >= (@expires_at - EXPIRY_BUFFER)
+    @token_data.nil? || Time.now >= (@expires_at - EXPIRY_BUFFER)
   end
 
   def refresh!
     @token_data = @client.request_backend_token
-    @expires_at = Time.current + @token_data['expires_in'].to_i
+    @expires_at = Time.now + @token_data['expires_in'].to_i
   end
 end
 

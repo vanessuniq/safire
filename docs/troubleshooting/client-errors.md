@@ -123,7 +123,7 @@ client.request_backend_token(
 )
 ```
 
-See [Backend Services — Prerequisites]({% link smart-on-fhir/backend-services/index.md %}#prerequisites) for key generation steps.
+See [Backend Services — Prerequisites]({% link smart-on-fhir/backend-services/index.md %}#prerequisites-registration-keys-and-jwks) for key generation steps.
 
 ---
 

@@ -207,6 +207,12 @@ RSpec.describe Safire::Protocols::SmartMetadata do
       expect(metadata.supports_backend_services?).to be(false)
     end
 
+    it 'returns false when grant_types_supported is nil' do
+      data = full_metadata.except('grant_types_supported')
+      metadata = described_class.new(data)
+      expect(metadata.supports_backend_services?).to be(false)
+    end
+
     it 'returns false when supports_asymmetric_auth? is false' do
       smart_metadata.capabilities.delete('client-confidential-asymmetric')
       expect(smart_metadata.supports_backend_services?).to be(false)

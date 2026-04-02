@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    safire (0.0.1)
+    safire (0.1.0)
       activesupport (~> 8.0.0)
       addressable (~> 2.8)
       faraday (~> 2.14)

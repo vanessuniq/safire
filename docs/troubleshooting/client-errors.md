@@ -97,6 +97,36 @@ Verify the public key registered with the server matches the private key you are
 
 ---
 
+## Backend Services Errors
+
+### `ConfigurationError`: Missing `private_key` or `kid`
+
+```
+Safire::Errors::ConfigurationError: Configuration missing: private_key, kid
+```
+
+`request_backend_token` validates `private_key` and `kid` when building the JWT assertion. Ensure both are in config or passed as overrides:
+
+```ruby
+# In config (preferred)
+config = Safire::ClientConfig.new(
+  private_key: OpenSSL::PKey::RSA.new(File.read(ENV['SMART_PRIVATE_KEY_PATH'])),
+  kid:         ENV.fetch('SMART_KEY_ID'),
+  # ...
+)
+client = Safire::Client.new(config)
+
+# Or override per call
+client.request_backend_token(
+  private_key: OpenSSL::PKey::RSA.new(File.read(ENV['SMART_PRIVATE_KEY_PATH'])),
+  kid:         ENV.fetch('SMART_KEY_ID')
+)
+```
+
+See [Backend Services — Prerequisites]({% link smart-on-fhir/backend-services/index.md %}#prerequisites-registration-keys-and-jwks) for key generation steps.
+
+---
+
 ## Network Errors
 
 ### `NetworkError`: Connection refused or timeout

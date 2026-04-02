@@ -143,6 +143,15 @@ module Safire
            token_endpoint_auth_methods_supported.include?('client_secret_basic'))
       end
 
+      # Checks if the server supports the SMART Backend Services workflow.
+      # @return [Boolean] true if the server advertises the client_credentials grant type
+      #   and supports private_key_jwt authentication (via {#supports_asymmetric_auth?})
+      def supports_backend_services?
+        grant_types_supported.present? &&
+          grant_types_supported.include?('client_credentials') &&
+          supports_asymmetric_auth?
+      end
+
       # Checks if the server supports confidential asymmetric authentication.
       # @return [Boolean] true if server has capability, auth methods not advertised or includes private_key_jwt,
       #   and has supported algorithms

@@ -58,6 +58,18 @@
         <p class="disabled-note"><em>Complete authorization flow first to enable token refresh.</em></p>
       <% end %>
     </div>
+
+    <% if @metadata&.supports_backend_services? %>
+      <div class="action-card">
+        <h3>Backend Services</h3>
+        <p>Request an access token via the <code>client_credentials</code> grant — no user interaction or redirect required.</p>
+        <% if asymmetric_credentials_configured? %>
+          <a href="/demo/<%= @server.id %>/backend-token" class="btn btn-primary">Request Backend Token</a>
+        <% else %>
+          <p class="disabled-note"><em>Set <code>ASYMMETRIC_PRIVATE_KEY_PEM</code> and <code>ASYMMETRIC_KID</code> to enable.</em></p>
+        <% end %>
+      </div>
+    <% end %>
   </div>
 </section>
 

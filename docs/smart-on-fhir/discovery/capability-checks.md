@@ -52,7 +52,16 @@ metadata.supports_openid_connect?
 # POST-based authorization
 metadata.supports_post_based_authorization?
 # => true if capabilities include "authorize-post"
+
+# Backend Services (client_credentials grant, no user interaction)
+metadata.supports_backend_services?
+# => true if:
+#    grant_types_supported includes "client_credentials"
+#    AND supports_asymmetric_auth? (private_key_jwt with RS384/ES384)
 ```
+
+{: .note }
+> `supports_backend_services?` checks `grant_types_supported` rather than a capability flag — it combines a grant type check with `supports_asymmetric_auth?` because the SMART Backend Services flow always authenticates via JWT assertion (`private_key_jwt`).
 
 ---
 
@@ -115,6 +124,21 @@ def configure_client_type(client)
   else
     raise 'Server does not support any known client types'
   end
+end
+```
+
+**Backend Services is a separate workflow** — it uses the `client_credentials` grant rather than `authorization_code`, so `client_type` is not relevant. Check `supports_backend_services?` independently:
+
+```ruby
+metadata = client.server_metadata
+
+if metadata.supports_backend_services?
+  token_data = client.request_backend_token(
+    private_key: private_key,
+    kid:         kid
+  )
+else
+  raise 'Server does not support the Backend Services (client_credentials) flow'
 end
 ```
 

@@ -196,6 +196,29 @@ RSpec.describe Safire::Protocols::SmartMetadata do
     end
   end
 
+  describe '#supports_backend_services?' do
+    it 'returns true when client_credentials grant and asymmetric auth are both supported' do
+      expect(smart_metadata.supports_backend_services?).to be(true)
+    end
+
+    it 'returns false when client_credentials is not in grant_types_supported' do
+      data = full_metadata.merge('grant_types_supported' => ['authorization_code'])
+      metadata = described_class.new(data)
+      expect(metadata.supports_backend_services?).to be(false)
+    end
+
+    it 'returns false when grant_types_supported is nil' do
+      data = full_metadata.except('grant_types_supported')
+      metadata = described_class.new(data)
+      expect(metadata.supports_backend_services?).to be(false)
+    end
+
+    it 'returns false when supports_asymmetric_auth? is false' do
+      smart_metadata.capabilities.delete('client-confidential-asymmetric')
+      expect(smart_metadata.supports_backend_services?).to be(false)
+    end
+  end
+
   describe '#asymmetric_signing_algorithms_supported' do
     it 'returns intersection of server and supported algorithms' do
       data = full_metadata.merge('token_endpoint_auth_signing_alg_values_supported' => %w[RS384 RS256 ES384])

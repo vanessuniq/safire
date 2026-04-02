@@ -71,10 +71,12 @@ A quick smoke test to confirm the gem is installed and SMART discovery is workin
 require 'safire'
 
 client = Safire::Client.new(
-  base_url:     'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
-  client_id:    'test',
-  redirect_uri: 'https://example.com/callback',
-  scopes:       ['openid', 'profile', 'patient/*.read']
+  {
+    base_url:     'https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir',
+    client_id:    'test',
+    redirect_uri: 'https://example.com/callback',
+    scopes:       ['openid', 'profile', 'patient/*.read']
+  }
 )
 
 metadata = client.server_metadata

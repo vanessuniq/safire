@@ -74,6 +74,7 @@
 
       <h4>Other Features</h4>
       <ul>
+        <li>Backend Services (<code>client_credentials</code>): <%= @metadata.supports_backend_services? ? 'Yes' : 'No' %></li>
         <li>OpenID Connect SSO: <%= @metadata.supports_openid_connect? ? 'Yes' : 'No' %></li>
         <li>POST-based Authorization: <%= @metadata.supports_post_based_authorization? ? 'Yes' : 'No' %></li>
       </ul>

@@ -1,0 +1,6 @@
+extends: substitution
+message: "Use 'SMART App Launch' or 'SMART' instead of '%s'."
+level: error
+ignorecase: false
+swap:
+  'SMART on FHIR': 'SMART App Launch'

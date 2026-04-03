@@ -60,5 +60,8 @@ specs
 # unless supporting rvm < 1.11.0 or doing something fancy, ignore this:
 .rvmrc
 
+# Vale prose linter — downloaded packages (not committed)
+.vale/styles/write-good/
+
 # Used by RuboCop. Remote config files pulled in from inherit_from directive.
 # .rubocop-https?--*

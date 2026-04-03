@@ -10,6 +10,26 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    name: Prose lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Vale lint
+        uses: errata-ai/vale-action@v2
+        with:
+          files: docs/
+          fail_on_error: true
+          filter_mode: nofilter
+          reporter: github-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     runs-on: ubuntu-latest
     steps:

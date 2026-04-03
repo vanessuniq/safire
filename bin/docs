@@ -1,2 +1,15 @@
 #!/bin/sh
 bundle exec yard doc --no-private --output-dir docs/api -m markdown
+
+# Fix YARD navigation bug: nav iframe links are relative to the iframe base URL,
+# but app.js resolves them against the parent window URL (which changes on navigation).
+# Convert them to absolute URLs in the iframe before posting the navigate message.
+ruby -e '
+  file = "docs/api/js/full_list.js"
+  content = File.read(file)
+  content.sub!(
+    "url: \$clicked.find(\x27.object_link a\x27).attr(\x27href\x27),",
+    "url: new URL(\$clicked.find(\x27.object_link a\x27).attr(\x27href\x27), window.location.href).href,"
+  )
+  File.write(file, content)
+'

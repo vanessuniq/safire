@@ -18,10 +18,10 @@ module Safire
   #     Optionally provided.
   # @!attribute [r] authorization_endpoint
   #   @return [String] URL of the server’s OAuth2 Authorization Endpoint.
-  # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
+  #   =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   # @!attribute [r] token_endpoint
   #   @return [String] URL of the server's OAuth2 Token Endpoint.
-  # =>  Optional, will be retrieved from the well-known smart-configuration if not provided
+  #   =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   # @!attribute [r] private_key
   #   @return [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil] the private key for signing
   #     JWT assertions in confidential asymmetric auth. Can be an OpenSSL key object or PEM string.

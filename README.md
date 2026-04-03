@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a lean Ruby library that implements [SMART App Launch](https://hl7.org/fhir/smart-app-launch/) and [UDAP](https://hl7.org/fhir/us/udap-security/) client protocols for healthcare applications.
+Safire is a Ruby gem implementing the [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) specification and the [UDAP Security](https://hl7.org/fhir/us/udap-security/) protocol for healthcare client applications. It handles OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
 
 ---
 

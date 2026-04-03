@@ -13,7 +13,7 @@ nav_order: 2
 
 ## Context
 
-Safire must support multiple authorization protocols (SMART on FHIR, UDAP) from a single public entry point. There are several ways to structure this:
+Safire must support multiple authorization protocols (SMART App Launch, UDAP) from a single public entry point. There are several ways to structure this:
 
 **Option A — Monolithic `Client`:** implement all protocol logic directly inside `Safire::Client`. Simple at first, but grows unbounded as each protocol adds methods, and makes it impossible to test protocol logic in isolation.
 

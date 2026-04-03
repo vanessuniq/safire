@@ -13,7 +13,7 @@ nav_order: 6
 
 ## Context
 
-SMART on FHIR clients need the authorization server's endpoints (`authorization_endpoint`, `token_endpoint`) to build authorization URLs and request tokens. These are obtained by fetching `/.well-known/smart-configuration`. There are two approaches:
+SMART clients need the authorization server's endpoints (`authorization_endpoint`, `token_endpoint`) to build authorization URLs and request tokens. These are obtained by fetching `/.well-known/smart-configuration`. There are two approaches:
 
 **Option A — eager discovery:** fetch metadata in `Smart#initialize`.
 

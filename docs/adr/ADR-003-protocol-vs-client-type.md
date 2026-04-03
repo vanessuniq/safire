@@ -13,7 +13,7 @@ nav_order: 3
 
 ## Context
 
-`Safire::Client` needs to support multiple healthcare authorization protocols (SMART on FHIR, UDAP) and, within SMART, multiple client authentication methods (public, confidential symmetric, confidential asymmetric). There are two ways to model this:
+`Safire::Client` needs to support multiple healthcare authorization protocols (SMART, UDAP) and, within SMART, multiple client authentication methods (public, confidential symmetric, confidential asymmetric). There are two ways to model this:
 
 **Option A — flat enum:** a single parameter enumerating every combination.
 

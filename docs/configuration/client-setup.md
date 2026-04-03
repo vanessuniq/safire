@@ -107,7 +107,7 @@ metadata = client.server_metadata
 client.client_type = :confidential_asymmetric if metadata.supports_asymmetric_auth?
 ```
 
-For a decision guide on which workflow to use, see [SMART on FHIR — Choosing a Workflow]({{ site.baseurl }}/smart-on-fhir/).
+For a decision guide on which workflow to use, see [SMART App Launch — Choosing a Workflow]({{ site.baseurl }}/smart-on-fhir/).
 
 ---
 
@@ -157,4 +157,4 @@ config.inspect
 ## Next Steps
 
 - [Logging]({{ site.baseurl }}/configuration/logging/) — configure Safire's logger and HTTP request logging
-- [SMART on FHIR Workflows]({{ site.baseurl }}/smart-on-fhir/) — step-by-step authorization flow guides
+- [SMART App Launch Workflows]({{ site.baseurl }}/smart-on-fhir/) — step-by-step authorization flow guides

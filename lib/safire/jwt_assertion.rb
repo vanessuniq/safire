@@ -3,7 +3,7 @@ require 'openssl'
 require 'securerandom'
 
 module Safire
-  # Generates JWT client assertions for SMART on FHIR confidential asymmetric authentication.
+  # Generates JWT client assertions for SMART confidential asymmetric authentication.
   #
   # This class creates signed JWTs according to the SMART App Launch STU 2.2.0 specification
   # for private_key_jwt client authentication.

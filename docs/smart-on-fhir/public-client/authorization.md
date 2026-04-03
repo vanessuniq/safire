@@ -2,7 +2,7 @@
 layout: default
 title: Authorization
 parent: Public Client Workflow
-grand_parent: SMART on FHIR
+grand_parent: SMART
 nav_order: 1
 ---
 

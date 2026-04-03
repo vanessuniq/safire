@@ -1,7 +1,7 @@
 module Safire
   module Protocols
-    # SMART Metadata obtained from SMART on FHIR discovery endpoint. Attributes are defined
-    # as per [SMART on FHIR specification](https://build.fhir.org/ig/HL7/smart-app-launch/conformance.html#using-well-known)
+    # SMART Metadata obtained from SMART discovery endpoint. Attributes are defined
+    # as per [SMART App Launch specification](https://build.fhir.org/ig/HL7/smart-app-launch/conformance.html#using-well-known)
     #
     # @!attribute [r] issuer
     #   @return [String] conveying this system’s OpenID Connect Issuer URL. Required if the server’s

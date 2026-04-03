@@ -2,7 +2,7 @@
 layout: default
 title: Authorization
 parent: Confidential Asymmetric Client Workflow
-grand_parent: SMART on FHIR
+grand_parent: SMART
 nav_order: 1
 ---
 

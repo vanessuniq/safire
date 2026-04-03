@@ -1,14 +1,14 @@
 ---
 layout: default
-title: SMART on FHIR
+title: SMART
 nav_order: 4
 has_children: true
 permalink: /smart-on-fhir/
 ---
 
-# SMART on FHIR
+# SMART App Launch
 
-This section provides step-by-step guides for implementing SMART on FHIR authorization flows with Safire.
+This section provides step-by-step guides for implementing SMART authorization flows with Safire.
 
 ## Available Workflows
 

@@ -5,25 +5,20 @@
 [![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a lean Ruby library that implements [SMART on FHIR](https://hl7.org/fhir/smart-app-launch/) and [UDAP](https://hl7.org/fhir/us/udap-security/) client protocols for healthcare applications.
+Safire is a lean Ruby library that implements [SMART App Launch](https://hl7.org/fhir/smart-app-launch/) and [UDAP](https://hl7.org/fhir/us/udap-security/) client protocols for healthcare applications.
 
 ---
 
 ## Features
 
-### SMART on FHIR App Launch (v2.2.0)
+### SMART App Launch (v2.2.0)
 
 - Discovery (`/.well-known/smart-configuration`)
 - Public Client (PKCE)
 - Confidential Symmetric Client (`client_secret` + HTTP Basic Auth)
 - Confidential Asymmetric Client (`private_key_jwt` with RS384/ES384)
 - POST-Based Authorization
-
-### SMART on FHIR Backend Services
-
-- System-to-system access token request (`client_credentials` grant)
-- JWT assertion authentication (RS384/ES384) — no user interaction, redirect, or PKCE
-- Scope defaults to `system/*.rs` when not configured
+- Backend Services (`client_credentials` grant, JWT assertion, no user interaction or PKCE; scope defaults to `system/*.rs`)
 
 ### UDAP
 

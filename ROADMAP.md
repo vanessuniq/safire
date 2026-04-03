@@ -10,7 +10,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 ## Implemented Features
 
-### SMART on FHIR App Launch (v2.2.0)
+### SMART App Launch (v2.2.0)
 
 - **Discovery** — lazy fetch of `/.well-known/smart-configuration`; metadata cached per client instance
 - **Public Client** — PKCE-only authorization code flow (RS256/ES256)
@@ -19,16 +19,13 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **POST-Based Authorization** — form-encoded authorization requests
 - **JWT Assertion Builder** — signed JWT assertions with configurable `kid` and expiry
 - **PKCE** — automatic code verifier and challenge generation
-
-### SMART on FHIR Backend Services
-
 - **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; scope defaults to `system/*.rs` when not configured
 
 ---
 
 ## Planned Features
 
-### SMART on FHIR
+### SMART App Launch
 
 - **Dynamic Client Registration** — programmatic client registration per [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591)
 

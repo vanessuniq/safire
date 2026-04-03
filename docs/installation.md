@@ -93,6 +93,6 @@ If you see an authorization endpoint URL, the gem is working. For troubleshootin
 | | |
 |-|-|
 | [Configuration]({{ site.baseurl }}/configuration/) | Client credentials, logging, and protocol selection |
-| [SMART on FHIR]({{ site.baseurl }}/smart-on-fhir/) | Authorization flows for public and confidential clients |
+| [SMART App Launch]({{ site.baseurl }}/smart-on-fhir/) | Authorization flows for public, confidential clients, and Backend Services |
 | [Security Guide]({{ site.baseurl }}/security/) | HTTPS requirements, credential protection, token storage |
 | [API Reference]({{ site.baseurl }}/api/){:target="_blank"} | Complete YARD documentation |

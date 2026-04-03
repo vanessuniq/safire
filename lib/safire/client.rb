@@ -1,7 +1,7 @@
 module Safire
-  # Unified facade client for SMART on FHIR and (future) UDAP authorization flows.
+  # Unified facade client for SMART and (future) UDAP authorization flows.
   #
-  # This class is the main entry point for integrating SMART on FHIR authorization via Safire.
+  # This class is the main entry point for integrating SMART authorization via Safire.
   # It supports discovery of server metadata and provides a unified interface for building
   # authorization URLs, exchanging authorization codes, refreshing tokens, and requesting
   # backend services access tokens (client_credentials grant).

@@ -24,7 +24,7 @@ nav_order: 5
 
 UDAP (Unified Data Access Profiles) is a security framework for healthcare data exchange defined by the [UDAP Security Implementation Guide](https://hl7.org/fhir/us/udap-security/). It extends standard OAuth 2.0 with X.509 certificate-based identity, dynamic client registration, and trust community models — designed primarily for backend system-to-system integration and cross-organizational data access.
 
-UDAP is a separate protocol from SMART on FHIR. In Safire, it is selected via `protocol: :udap` rather than a `client_type:`. Watch the [GitHub repository](https://github.com/vanessuniq/safire) for release announcements.
+UDAP is a separate protocol from SMART. In Safire, it is selected via `protocol: :udap` rather than a `client_type:`. Watch the [GitHub repository](https://github.com/vanessuniq/safire) for release announcements.
 
 ---
 
@@ -59,9 +59,9 @@ UDAP is a separate protocol from SMART on FHIR. In Safire, it is selected via `p
 
 ---
 
-## Comparison with SMART on FHIR
+## Comparison with SMART
 
-| Feature | SMART on FHIR | UDAP |
+| Feature | SMART | UDAP |
 |---------|---------------|------|
 | Primary use case | User-facing apps, EHR launch | B2B, backend services, cross-org access |
 | Client registration | Pre-registered per server, optional DCR (recommended) | Dynamic (DCR) or pre-registered |

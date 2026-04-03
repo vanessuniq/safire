@@ -1,6 +1,6 @@
 # Safire Demo Application
 
-A Sinatra-based web application that demonstrates the features of the Safire gem for SMART on FHIR authorization.
+A Sinatra-based web application that demonstrates the features of the Safire gem for SMART authorization.
 
 ## Features
 

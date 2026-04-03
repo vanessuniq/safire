@@ -1,6 +1,6 @@
 module Safire
   module Protocols
-    # SMART on FHIR OAuth2 implementation for app launch (authorization code, token exchange, refresh)
+    # SMART OAuth2 implementation for app launch (authorization code, token exchange, refresh)
     # and backend services (client credentials) flows.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not instantiate it directly —
@@ -324,7 +324,7 @@ module Safire
         return true if %w[Bearer bearer].include?(response['token_type'])
 
         expected = if flow == :backend_services
-                     "'bearer' (SMART Backend Services spec)"
+                     "'bearer' (SMART App Launch Backend Services)"
                    else
                      "'Bearer' (SMART App Launch spec)"
                    end

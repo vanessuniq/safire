@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Public Client Workflow
-parent: SMART on FHIR
+parent: SMART
 nav_order: 2
 has_children: true
 permalink: /smart-on-fhir/public-client/
@@ -12,7 +12,7 @@ permalink: /smart-on-fhir/public-client/
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-This guide demonstrates SMART on FHIR public client integration in a **Rails application**. The patterns shown here can be adapted for Sinatra or other Ruby web frameworks.
+This guide demonstrates SMART App Launch public client integration in a **Rails application**. The patterns shown here can be adapted for Sinatra or other Ruby web frameworks.
 </div>
 
 ---

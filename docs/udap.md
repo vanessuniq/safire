@@ -2,6 +2,7 @@
 layout: default
 title: UDAP
 nav_order: 5
+description: "Overview of planned UDAP Security protocol support in Safire, including UDAP discovery, dynamic client registration, JWT client authentication, and tiered OAuth for healthcare data exchange."
 ---
 
 # UDAP

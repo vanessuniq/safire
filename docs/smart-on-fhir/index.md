@@ -4,6 +4,7 @@ title: SMART
 nav_order: 4
 has_children: true
 permalink: /smart-on-fhir/
+description: "Step-by-step guides for SMART App Launch OAuth 2.0 flows in Ruby, covering public client (PKCE), confidential symmetric, confidential asymmetric (private_key_jwt), and Backend Services (system-to-system)."
 ---
 
 # SMART App Launch

@@ -11,7 +11,7 @@ permalink: /troubleshooting/
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-Common issues and solutions when integrating SMART on FHIR with Safire.
+Common issues and solutions when integrating with Safire.
 </div>
 
 ## Table of contents

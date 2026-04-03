@@ -26,7 +26,7 @@ Safire::Errors::DiscoveryError: Failed to discover SMART configuration from
 https://fhir.example.com/.well-known/smart-configuration (HTTP 404)
 ```
 
-**Causes:** the server does not support SMART on FHIR, `base_url` includes an extra path segment, or the server uses a non-standard discovery path.
+**Causes:** the server does not support SMART App Launch, `base_url` includes an extra path segment, or the server uses a non-standard discovery path.
 
 Verify the endpoint manually:
 

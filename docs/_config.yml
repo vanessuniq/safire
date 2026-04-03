@@ -19,7 +19,7 @@
 # in the templates via {{ site.myvariable }}.
 
 title: Safire Documentation
-description: SMART on FHIR and UDAP implementation library for Ruby
+description: SMART App Launch and UDAP implementation library for Ruby
 baseurl: /safire
 url: https://vanessuniq.github.io
 

@@ -12,7 +12,7 @@ permalink: /smart-on-fhir/discovery/
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-SMART on FHIR discovery allows clients to dynamically learn about a FHIR server's authorization capabilities before initiating the OAuth flow.
+SMART discovery allows clients to dynamically learn about a FHIR server's authorization capabilities before initiating the OAuth flow.
 </div>
 
 ---
@@ -54,7 +54,7 @@ begin
 rescue Safire::Errors::DiscoveryError => e
   case e.message
   when /404/
-    puts 'FHIR server does not support SMART on FHIR'
+    puts 'FHIR server does not support SMART App Launch'
   when /timeout/i
     puts 'Discovery request timed out'
   when /expected JSON object/

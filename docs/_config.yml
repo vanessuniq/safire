@@ -19,7 +19,10 @@
 # in the templates via {{ site.myvariable }}.
 
 title: Safire Documentation
+tagline: Ruby gem for SMART App Launch and UDAP protocols
 description: SMART App Launch and UDAP implementation library for Ruby
+author: Vanessa Fotso
+lang: en-US
 baseurl: /safire
 url: https://vanessuniq.github.io
 

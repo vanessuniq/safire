@@ -7,7 +7,11 @@ Gem::Specification.new do |spec|
   spec.authors               = ['Vanessa Fotso']
   spec.email                 = ['vanessuniq@gmail.com']
   spec.summary               = 'SMART App Launch and UDAP implementation for Ruby'
-  spec.description           = 'A Ruby gem implementing SMART App Launch (v2.2.0) and UDAP protocols for clients.'
+  spec.description           = 'A Ruby gem implementing the SMART App Launch 2.2.0 specification and UDAP Security ' \
+                               'protocol for healthcare client applications. It supports OAuth 2.0 authorization ' \
+                               'against HL7 FHIR servers, including PKCE, private_key_jwt assertions (RS384 and ' \
+                               'ES384), confidential client flows, and the Backend Services system-to-system ' \
+                               '(client_credentials) grant.'
   spec.homepage              = 'https://github.com/vanessuniq/safire'
   spec.license               = 'Apache-2.0'
   spec.required_ruby_version = Gem::Requirement.new('>= 4.0.2')

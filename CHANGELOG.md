@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Corrected spec name throughout: "SMART on FHIR" → "SMART App Launch" per the
-  [SMART App Launch IG](https://hl7.org/fhir/smart-app-launch/); Backend Services is
-  presented as a feature within the spec, not a separate spec
-
 ### Added
 
 - SMART Backend Services Authorization flow (`client_credentials` grant) via
@@ -34,10 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Corrected spec name throughout: "SMART on FHIR" → "SMART App Launch" per the
+  [SMART App Launch IG](https://hl7.org/fhir/smart-app-launch/); Backend Services is
+  presented as a feature within the spec, not a separate spec
 - `redirect_uri` and `authorization_endpoint` are now optional in `Safire::Protocols::Smart`;
   both are validated only when `authorization_url` is called (app launch flow)
 - `redirect_uri` is now optional in `Safire::ClientConfig` to support backend services
   clients that operate without a redirect URI; the field is still validated when provided
+
+### Fixed
+
+- YARD API docs nav links broken after in-page navigation: relative hrefs from the nav
+  iframe were resolved against the parent window URL (which changes on each navigation)
+  instead of the iframe base; `bin/docs` now patches the generated `full_list.js` to
+  resolve links to absolute URLs before messaging the parent
 
 ## [0.1.0] - 2026-03-25
 

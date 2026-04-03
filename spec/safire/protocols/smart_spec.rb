@@ -963,7 +963,7 @@ RSpec.describe Safire::Protocols::Smart do
           response = backend_response.merge('token_type' => 'BEARER')
           result = client.token_response_valid?(response, flow: :backend_services)
           expect(result).to be(false)
-          expect(Safire.logger).to have_received(:warn).with(/token_type.*SMART Backend Services spec/)
+          expect(Safire.logger).to have_received(:warn).with(/token_type.*SMART App Launch Backend Services/)
         end
       end
     end

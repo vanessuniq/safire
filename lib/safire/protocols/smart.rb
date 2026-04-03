@@ -324,7 +324,7 @@ module Safire
         return true if %w[Bearer bearer].include?(response['token_type'])
 
         expected = if flow == :backend_services
-                     "'bearer' (SMART Backend Services spec)"
+                     "'bearer' (SMART App Launch Backend Services)"
                    else
                      "'Bearer' (SMART App Launch spec)"
                    end

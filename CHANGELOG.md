@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Corrected spec name throughout: "SMART on FHIR" → "SMART App Launch" per the
+  [SMART App Launch IG](https://hl7.org/fhir/smart-app-launch/); Backend Services is
+  presented as a feature within the spec, not a separate spec
+
 ### Added
 
 - SMART Backend Services Authorization flow (`client_credentials` grant) via
@@ -19,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when `flow: :backend_services`, also validates `expires_in` presence (required per
   SMART Backend Services spec)
 - `token_response_valid?` accepts both `"Bearer"` (SMART App Launch spec) and `"bearer"`
-  (SMART Backend Services spec) as valid `token_type` values; the non-compliance warning
+  (SMART Backend Services) as valid `token_type` values; the non-compliance warning
   now references the expected value for the active flow
 - `SmartMetadata#supports_backend_services?` returns `true` when the server advertises the
   `client_credentials` grant type and supports `private_key_jwt` authentication
@@ -39,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Safire::Client` facade with `protocol:` (`:smart`) and `client_type:`
   (`:public`, `:confidential_symmetric`, `:confidential_asymmetric`) keywords
-- SMART on FHIR App Launch 2.2.0 support via `Safire::Protocols::Smart`:
+- SMART App Launch 2.2.0 support via `Safire::Protocols::Smart`:
   - Server metadata discovery from `/.well-known/smart-configuration`
   - Authorization URL builder for GET and POST-based authorization
     (`authorize-post` capability)

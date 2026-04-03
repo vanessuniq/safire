@@ -1,6 +1,6 @@
 module Safire
   # Client configuration entity providing necessary attributes to perform different
-  # auth flows such as SMART on FHIR puclic, confidential symmetric, confidential asymmetric
+  # auth flows such as SMART public, confidential symmetric, confidential asymmetric
   # clients, and backend services.
   # The ClientConfig instance is passed to Safire::Client upon initialization.
   #

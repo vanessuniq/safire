@@ -2,7 +2,7 @@
 layout: default
 title: Token Request
 parent: Backend Services Workflow
-grand_parent: SMART on FHIR
+grand_parent: SMART
 nav_order: 1
 ---
 

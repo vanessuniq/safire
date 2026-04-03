@@ -2,7 +2,7 @@
 layout: default
 title: Capability Checks and Client Selection
 parent: SMART Discovery
-grand_parent: SMART on FHIR
+grand_parent: SMART
 nav_order: 2
 ---
 

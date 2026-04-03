@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Backend Services Workflow
-parent: SMART on FHIR
+parent: SMART
 nav_order: 6
 has_children: true
 permalink: /smart-on-fhir/backend-services/

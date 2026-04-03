@@ -1,7 +1,7 @@
 ---
 layout: default
 title: POST-Based Authorization
-parent: SMART on FHIR
+parent: SMART
 nav_order: 5
 has_toc: true
 ---

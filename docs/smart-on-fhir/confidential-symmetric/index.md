@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Confidential Symmetric Client Workflow
-parent: SMART on FHIR
+parent: SMART
 nav_order: 3
 has_children: true
 permalink: /smart-on-fhir/confidential-symmetric/

@@ -2,7 +2,7 @@
 layout: default
 title: Metadata Fields and Validation
 parent: SMART Discovery
-grand_parent: SMART on FHIR
+grand_parent: SMART
 nav_order: 1
 ---
 

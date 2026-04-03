@@ -1,7 +1,7 @@
 ---
 layout: default
 title: SMART Discovery
-parent: SMART on FHIR
+parent: SMART
 nav_order: 1
 has_children: true
 permalink: /smart-on-fhir/discovery/

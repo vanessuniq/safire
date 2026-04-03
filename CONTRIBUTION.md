@@ -116,7 +116,7 @@ bundle exec rubocop -a
 # Good: Clear, documented, follows conventions
 module Safire
   module Protocols
-    # Handles SMART on FHIR metadata discovery
+    # Handles SMART metadata discovery
     class SmartMetadata
       # Checks if the server supports EHR-initiated launches
       #
@@ -211,12 +211,21 @@ end
    bundle exec yard doc
    ```
 
-4. Verify Jekyll docs build (if you modified docs/):
+4. Verify Jekyll docs build (if you modified `docs/`):
    ```bash
    cd docs && bundle install && bundle exec jekyll build
    ```
 
-5. Rebase on latest main:
+5. Check docs prose with Vale (if you modified `docs/`):
+   ```bash
+   vale --minAlertLevel suggestion docs/
+   ```
+
+   Vale enforces terminology consistency and flags style suggestions. The CI gate blocks on `error`-level violations only (banned terms such as "SMART on FHIR"). Suggestions and warnings are advisory.
+
+   **If you add a new technical term** (an API method name, parameter, acronym, or library name) to the docs, add it to `.vale/styles/Vocab/Safire/accept.txt` so Vale does not flag it as unknown when spell checking is later enabled. One term per line, preserving the section structure in that file.
+
+6. Rebase on latest main:
    ```bash
    git fetch upstream
    git rebase upstream/main

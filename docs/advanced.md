@@ -32,14 +32,7 @@ class SmartMetadataService
 
   def self.fetch(base_url)
     Rails.cache.fetch("smart_metadata:#{base_url}", expires_in: CACHE_TTL) do
-      config = Safire::ClientConfig.new(
-        base_url:     base_url,
-        client_id:    'discovery_only',
-        redirect_uri: 'https://example.com',
-        scopes:       []
-      )
-      client = Safire::Client.new(config)
-      client.server_metadata.to_hash
+      Safire::Client.new({ base_url: base_url }).server_metadata.to_hash
     end
   end
 

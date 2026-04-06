@@ -117,7 +117,7 @@ end
 begin
   token_data = client.request_backend_token
 rescue Safire::Errors::ConfigurationError => e
-  # private_key or kid missing from config and not passed at call time
+  # client_id, private_key, or kid missing — only private_key and kid can be overridden at call time
   Rails.logger.error("Backend services misconfigured: #{e.message}")
   raise
 rescue Safire::Errors::TokenError => e

@@ -45,6 +45,9 @@ config = Safire::ClientConfig.new(
 client = Safire::Client.new(config)
 ```
 
+{: .note }
+> `client_id` is the only authorization parameter validated at call time rather than at construction. `authorization_url`, `request_access_token`, `refresh_token`, and `request_backend_token` each raise `Safire::Errors::ConfigurationError` if `client_id` is absent when called. This means you can build a `ClientConfig` before a `client_id` has been issued — for example, when registering with a new server before any flow begins.
+
 ---
 
 ## Protocol and Client Type

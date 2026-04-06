@@ -9,7 +9,8 @@ module Safire
   # Configuration is provided via {Safire::ClientConfig} or a Hash. Key attributes:
   #
   # * :base_url [String] FHIR base URL used for SMART discovery
-  # * :client_id [String] OAuth2 client identifier
+  # * :client_id [String, nil] OAuth2 client identifier — optional at initialization;
+  #     required by all authorization flows and validated at call time
   # * :redirect_uri [String] redirect URI registered with the authorization server;
   #     required for app launch, not required for backend services
   # * :scopes [Array<String>] default scopes; falls back to +["system/*.rs"]+ for

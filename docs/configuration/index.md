@@ -41,12 +41,12 @@ flowchart TD
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `base_url` | String | Yes | — | FHIR server base URL |
-| `client_id` | String | Yes | — | OAuth2 client identifier |
-| `redirect_uri` | String | Yes | — | Registered callback URL |
+| `client_id` | String | No | — | OAuth2 client identifier — required by all authorization flows; validated at call time, not at construction |
+| `redirect_uri` | String | No | — | Registered callback URL — required for App Launch flows; not used in Backend Services |
 | `protocol:` | Symbol | No | `:smart` | Authorization protocol — `:smart` or `:udap` |
 | `client_type:` | Symbol | No | `:public` | SMART client type — `:public`, `:confidential_symmetric`, or `:confidential_asymmetric` |
 | `client_secret` | String | No | — | Required for `:confidential_symmetric` |
-| `private_key` | OpenSSL::PKey / String | No | — | RSA/EC private key; required for `:confidential_asymmetric` |
+| `private_key` | OpenSSL::PKey / String | No | — | RSA/EC private key; required for `:confidential_asymmetric` and Backend Services |
 | `kid` | String | No | — | Key ID matching the public key registered with the server |
 | `jwt_algorithm` | String | No | auto | `RS384` or `ES384`; auto-detected from key type |
 | `jwks_uri` | String | No | — | URL to client's public JWKS, included as `jku` in JWT header |

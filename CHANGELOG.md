@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `client_id` is now optional at `ClientConfig` and `Protocols::Smart` initialization;
+  all authorization flows (`authorization_url`, `request_access_token`, `refresh_token`,
+  `request_backend_token`) validate its presence at call time and raise
+  `Safire::Errors::ConfigurationError` if it is absent
+- `Protocols::Smart#token_endpoint` now raises `Safire::Errors::DiscoveryError` when
+  the discovery response does not include a `token_endpoint` field, rather than silently
+  passing `nil` to the HTTP client
+
 ## [0.2.0] - 2026-04-04
 
 ### Added

@@ -207,16 +207,9 @@ RSpec.describe Safire::Protocols::Smart do
       expect(client.client_secret).to be_nil
     end
 
-    it 'raises ConfigurationError when a required attribute is missing' do
-      %i[client_id base_url].each do |attr|
-        expect { described_class.new(Safire::ClientConfig.new(config_attrs.except(attr))) }
-          .to raise_error(Safire::Errors::ConfigurationError, /#{attr}/)
-      end
-    end
-
-    it 'initializes successfully without redirect_uri and authorization_endpoint' do
-      cfg = Safire::ClientConfig.new(config_attrs.except(:redirect_uri, :authorization_endpoint))
-      expect { described_class.new(cfg) }.not_to raise_error
+    it 'allows client_id to be omitted on initialization' do
+      client = described_class.new(Safire::ClientConfig.new(config_attrs.except(:client_id)))
+      expect(client.client_id).to be_nil
     end
 
     it 'gives each instance its own distinct HTTPClient' do
@@ -225,14 +218,6 @@ RSpec.describe Safire::Protocols::Smart do
 
       expect(client1.instance_variable_get(:@http_client))
         .not_to be(client2.instance_variable_get(:@http_client))
-    end
-
-    it 'fetches endpoints from well-known when not provided' do
-      stub_well_known
-      cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint, :token_endpoint))
-      client = described_class.new(cfg)
-      expect(client.authorization_endpoint).to eq(smart_metadata_body['authorization_endpoint'])
-      expect(client.token_endpoint).to eq(smart_metadata_body['token_endpoint'])
     end
   end
 
@@ -289,6 +274,29 @@ RSpec.describe Safire::Protocols::Smart do
 
       stub_well_known(base_url: 'https://fhir.example.com')
       expect { described_class.new(config).server_metadata }.not_to raise_error
+    end
+  end
+
+  # ---------- Endpoint Resolution ----------
+
+  describe 'endpoint resolution' do
+    context 'when endpoints are absent from config' do
+      it 'resolves both from well-known discovery' do
+        stub_well_known
+        cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint, :token_endpoint))
+        client = described_class.new(cfg)
+        expect(client.authorization_endpoint).to eq(smart_metadata_body['authorization_endpoint'])
+        expect(client.token_endpoint).to eq(smart_metadata_body['token_endpoint'])
+      end
+    end
+
+    context 'when token_endpoint is absent from the discovery response' do
+      it 'raises DiscoveryError with a descriptive message' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:token_endpoint))
+        stub_well_known(body: smart_metadata_body.except('token_endpoint'))
+        expect { described_class.new(cfg).token_endpoint }
+          .to raise_error(Safire::Errors::DiscoveryError, /token_endpoint/)
+      end
     end
   end
 
@@ -421,6 +429,14 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when client_id is not configured' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id))
+        expect { described_class.new(cfg).authorization_url }
+          .to raise_error(Safire::Errors::ConfigurationError, /client_id/)
+      end
+    end
+
     context 'when authorization_endpoint cannot be resolved' do
       it 'raises ConfigurationError' do
         cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint))
@@ -538,6 +554,15 @@ RSpec.describe Safire::Protocols::Smart do
         token_response
         expect(WebMock).to(have_requested(:post, config_attrs[:token_endpoint])
           .with { |req| !req.headers.key?('Authorization') })
+      end
+    end
+
+    context 'when client_id is not configured' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id))
+        expect do
+          described_class.new(cfg).request_access_token(code: 'code', code_verifier: 'verifier')
+        end.to raise_error(Safire::Errors::ConfigurationError, /client_id/)
       end
     end
 
@@ -691,6 +716,14 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when client_id is not configured' do
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id))
+        expect { described_class.new(cfg).refresh_token(refresh_token: 'token') }
+          .to raise_error(Safire::Errors::ConfigurationError, /client_id/)
+      end
+    end
+
     it 'raises TokenError on invalid refresh token' do
       stub_token_post(
         body_matcher: {
@@ -832,6 +865,14 @@ RSpec.describe Safire::Protocols::Smart do
 
         expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
           .with(body: hash_including('scope' => 'system/*.rs'))
+      end
+    end
+
+    context 'when client_id is not configured' do
+      it 'raises ConfigurationError — client_id is required for JWT assertion claims' do
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:client_id))
+        expect { described_class.new(cfg).request_backend_token }
+          .to raise_error(Safire::Errors::ConfigurationError, /client_id/)
       end
     end
 

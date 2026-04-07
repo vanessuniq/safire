@@ -13,9 +13,6 @@ module Safire
     #
     # @note For internal use by {Safire::Client} only.
     # @api private
-    #
-    # @raise [Safire::Errors::ConfigurationError]
-    #   if required configuration attributes are missing or invalid
     class Smart
       include Behaviours
 
@@ -25,9 +22,9 @@ module Safire
         private_key kid jwt_algorithm jwks_uri
       ].freeze
 
-      # Attributes that are not required during validation
+      # Attributes that are not required during initialization; validated per-flow when needed
       OPTIONAL_ATTRIBUTES = %i[
-        redirect_uri authorization_endpoint scopes client_secret private_key kid jwt_algorithm jwks_uri
+        client_id redirect_uri authorization_endpoint scopes client_secret private_key kid jwt_algorithm jwks_uri
       ].freeze
 
       WELL_KNOWN_PATH = '/.well-known/smart-configuration'.freeze
@@ -42,8 +39,6 @@ module Safire
         @client_type = client_type.to_sym
         @http_client = Safire::HTTPClient.new
         @issuer ||= base_url
-
-        validate!
       end
 
       def authorization_endpoint
@@ -51,10 +46,10 @@ module Safire
       end
 
       def token_endpoint
-        @token_endpoint ||= server_metadata.token_endpoint
+        @token_endpoint ||= discovered_token_endpoint
       end
 
-      # Retrieves and parses SMART on FHIR configuration metadata from the FHIR server.
+      # Retrieves and parses SMART configuration metadata from the FHIR server.
       #
       # This method sends a GET request to the server's
       # +/.well-known/smart-configuration+ endpoint, validates the response format,
@@ -93,12 +88,13 @@ module Safire
       #   * :state [String] state parameter for CSRF protection; store and verify on callback
       #   * :code_verifier [String] PKCE code verifier for the token exchange
       #   * :params [Hash] (POST only) authorization parameters to submit as the request body
-      # @raise [Errors::ConfigurationError] if method is invalid, scopes are missing,
+      # @raise [Errors::ConfigurationError] if method is invalid, +client_id+/scopes are missing,
       #   or +redirect_uri+ / +authorization_endpoint+ are not configured or resolvable via discovery
       def authorization_url(launch: nil, custom_scopes: nil, method: :get)
         method = method.to_sym
         custom_scopes ||= scopes
         validate_authorization_method(method)
+        validate_client_id!
         validate_presence_of_scopes(custom_scopes)
         validate_app_launch_attrs!
 
@@ -125,10 +121,13 @@ module Safire
       #   * "refresh_token"           [String] refresh token, if issued (optional)
       #   * "authorization_details"   [Hash] additional authorization details, if provided (optional)
       #   * Context parameters such as "patient" or "encounter" MAY be present, depending on server behavior.
+      # @raise [Safire::Errors::ConfigurationError] if +client_id+ is missing,
+      #   or if +private_key+/+kid+ are absent for +:confidential_asymmetric+
       # @raise [Safire::Errors::TokenError] if the request fails or response is invalid.
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error.
       def request_access_token(code:, code_verifier:, client_secret: self.client_secret,
                                private_key: self.private_key, kid: self.kid)
+        validate_client_id!
         Safire.logger.info('Requesting access token using authorization code...')
 
         response = @http_client.post(
@@ -152,10 +151,13 @@ module Safire
       # @param kid [String, nil] optional; key ID for asymmetric auth (overrides configured)
       # @return [Hash] token response parsed from the authorization server.
       #   See {#request_access_token} for token response format.
+      # @raise [Safire::Errors::ConfigurationError] if +client_id+ is missing,
+      #   or if +private_key+/+kid+ are absent for +:confidential_asymmetric+
       # @raise [Safire::Errors::TokenError] if the refresh request fails or the response is invalid.
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error.
       def refresh_token(refresh_token:, scopes: nil, client_secret: self.client_secret,
                         private_key: self.private_key, kid: self.kid)
+        validate_client_id!
         Safire.logger.info('Refreshing access token...')
 
         response = @http_client.post(
@@ -188,11 +190,12 @@ module Safire
       #   * "token_type"  [String] token type, value +"Bearer"+ (required)
       #   * "expires_in"  [Integer] lifetime of the access token in seconds (required per Backend Services spec)
       #   * "scope"       [String] authorized scopes (required)
-      # @raise [Safire::Errors::ConfigurationError] if private_key or kid are missing
+      # @raise [Safire::Errors::ConfigurationError] if +client_id+, +private_key+, or +kid+ are missing
       # @raise [Safire::Errors::TokenError] if the server returns an error or invalid response
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
       def request_backend_token(scopes: nil, private_key: self.private_key, kid: self.kid)
         scopes ||= self.scopes.presence || ['system/*.rs']
+        validate_client_id!
 
         Safire.logger.info('Requesting backend services access token (client_credentials grant)...')
 
@@ -246,13 +249,6 @@ module Safire
 
       private
 
-      def validate!
-        missing = (ATTRIBUTES - OPTIONAL_ATTRIBUTES).select { |attr| send(attr).blank? }
-        return if missing.empty?
-
-        raise Errors::ConfigurationError.new(missing_attributes: missing)
-      end
-
       def validate_authorization_method(method)
         return if %i[get post].include?(method)
 
@@ -280,6 +276,12 @@ module Safire
         return if missing.empty?
 
         raise Errors::ConfigurationError.new(missing_attributes: missing)
+      end
+
+      def validate_client_id!
+        return if client_id.present?
+
+        raise Errors::ConfigurationError.new(missing_attributes: [:client_id])
       end
 
       def validate_presence_of_scopes(scopes_value)
@@ -380,7 +382,7 @@ module Safire
       def client_auth_params(private_key:, kid:)
         case client_type
         when :public
-          { client_id: client_id }
+          { client_id: }
         when :confidential_asymmetric
           jwt_assertion_params(private_key:, kid:)
         else
@@ -408,10 +410,10 @@ module Safire
         validate_asymmetric_credentials!(private_key, kid)
 
         assertion = Safire::JWTAssertion.new(
-          client_id: client_id,
-          token_endpoint: token_endpoint,
-          private_key: private_key,
-          kid: kid,
+          client_id:,
+          token_endpoint:,
+          private_key:,
+          kid:,
           algorithm: jwt_algorithm,
           jku: jwks_uri
         )
@@ -443,6 +445,16 @@ module Safire
         )
       rescue JSON::ParserError
         Errors::TokenError.new(status:)
+      end
+
+      def discovered_token_endpoint
+        endpoint = server_metadata.token_endpoint
+        return endpoint if endpoint.present?
+
+        raise Errors::DiscoveryError.new(
+          endpoint: well_known_endpoint,
+          error_description: "response missing required field 'token_endpoint'"
+        )
       end
 
       def well_known_endpoint

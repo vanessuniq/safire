@@ -10,7 +10,10 @@ module Safire
   #   @return [String] the URL of the FHIR service from which the app wishes to retrieve FHIR data.
   #     Optionally provided. Will default to `base_url` if not provided.
   # @!attribute [r] client_id
-  #   @return [String] the client identifier issued to the app by the authorization server
+  #   @return [String, nil] the client identifier issued to the app by the authorization server.
+  #     Optional at initialization — required by all authorization flows. Omit only when
+  #     performing Dynamic Client Registration (RFC 7591) to obtain a +client_id+ before
+  #     any flow begins.
   # @!attribute [r] redirect_uri
   #   @return [String] the redirect URI registered by the app with the authorization server
   # @!attribute [r] scopes
@@ -155,15 +158,9 @@ module Safire
     end
 
     def validate!
-      required_attrs = %i[base_url client_id]
-      nil_vars = required_attrs.select { |attr| send(attr).nil? }
+      raise Errors::ConfigurationError.new(missing_attributes: [:base_url]) if base_url.nil?
 
-      if nil_vars.empty?
-        validate_uris!
-        return
-      end
-
-      raise Errors::ConfigurationError.new(missing_attributes: nil_vars)
+      validate_uris!
     end
   end
 end

@@ -75,6 +75,26 @@ The response must be a JSON object (`{...}`) with at least `authorization_endpoi
 
 ## Authorization Errors
 
+### `ConfigurationError`: Missing `client_id`
+
+```
+Safire::Errors::ConfigurationError: Configuration missing: client_id
+```
+
+`client_id` is optional at construction but required by every authorization method. It is validated at call time, not when the client is created. Ensure `client_id` is set in `ClientConfig` before calling any flow method:
+
+```ruby
+config = Safire::ClientConfig.new(
+  base_url:  'https://fhir.example.com',
+  client_id: ENV.fetch('SMART_CLIENT_ID'),
+  # ...
+)
+```
+
+This error is raised by `authorization_url`, `request_access_token`, `refresh_token`, and `request_backend_token`.
+
+---
+
 ### `ConfigurationError`: Missing scopes
 
 ```

@@ -1,0 +1,45 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Please review this pull request for the Safire Ruby gem — an OAuth 2.0 client
+            library implementing SMART App Launch 2.2.0 and UDAP Security for healthcare
+            FHIR applications.
+
+            Focus on:
+            - Correctness and protocol compliance (OAuth 2.0, SMART App Launch, RFC 7591)
+            - Security: credential handling, token exposure, input validation at trust boundaries
+            - Ruby quality and elegance — flag anything that could be simpler or cleaner
+            - Rubocop patterns: guard clause spacing, single quotes, `described_class` in specs,
+              `receive_messages` for multiple stubs, `instance_double` over `double`
+            - Test coverage: edge cases, error paths, and correct layer (do not test ClientConfig
+              behaviour from Smart specs, and vice versa)
+            - YARD docs: accuracy and completeness for any public API changes
+            - CHANGELOG: does the PR update `[Unreleased]` for any user-facing change?
+
+            Use `gh pr comment` for overall feedback.
+            Use `mcp__github_inline_comment__create_inline_comment` (with `confirmed: true`)
+            for specific line-level issues.
+            Only post GitHub comments — do not reply as messages.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

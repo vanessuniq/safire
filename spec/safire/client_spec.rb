@@ -385,9 +385,19 @@ RSpec.describe Safire::Client do
   # ---------- Dynamic Client Registration ----------
 
   describe '#register_client' do
-    it 'raises NotImplementedError' do
-      expect { described_class.new(config).register_client }
-        .to raise_error(NotImplementedError)
+    let(:registration_endpoint) { "#{base_url}/register" }
+    let(:client_metadata) { { client_name: 'My App', grant_types: ['authorization_code'] } }
+    let(:registration_response) { { 'client_id' => 'dyn_abc123', 'client_name' => 'My App' } }
+
+    before do
+      stub_request(:post, registration_endpoint)
+        .to_return(status: 201, body: registration_response.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+    end
+
+    it 'delegates to the protocol and returns the registration response' do
+      result = described_class.new(config).register_client(client_metadata, registration_endpoint:)
+      expect(result['client_id']).to eq('dyn_abc123')
     end
   end
 end

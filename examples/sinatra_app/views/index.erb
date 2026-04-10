@@ -1,25 +1,47 @@
 <h1>Welcome to Safire Demo</h1>
 
-<p>This application demonstrates the features of the <strong>Safire</strong> gem - a SMART & UDAP Ruby library.</p>
+<p>
+  This application demonstrates the capabilities of the <strong>Safire</strong> gem —
+  a Ruby client for SMART App Launch 2.2.0 and UDAP.
+</p>
 
 <section class="info-box">
   <h2>Getting Started</h2>
-  <p>To use this demo:</p>
-  <ol>
-    <li>Choose an existing FHIR server from the list below, or add a new one</li>
-    <li>To add a new server, first register this demo client with your FHIR server to obtain credentials (client_id, client_secret, etc.)</li>
-    <li>Use this callback URL when registering: <code><%= redirect_uri %></code></li>
-  </ol>
+  <p>Choose how you want to connect to a FHIR authorization server:</p>
+
+  <div class="action-cards" style="margin-top: 1rem;">
+    <div class="action-card">
+      <h3>Register Dynamically</h3>
+      <p>
+        Don't have credentials yet? Register this application with a SMART server using
+        the <strong>OAuth 2.0 Dynamic Client Registration Protocol</strong> (RFC 7591).
+        The server assigns a <code>client_id</code> and a server entry is created automatically.
+      </p>
+      <a href="/register" class="btn btn-primary">Register with a Server</a>
+    </div>
+
+    <div class="action-card">
+      <h3>Add Server Manually</h3>
+      <p>
+        Already have a <code>client_id</code>? Enter your credentials directly to configure
+        a server entry and start exploring authorization flows.
+      </p>
+      <p class="form-hint">
+        Callback URL to register with your server:<br>
+        <code><%= redirect_uri %></code>
+      </p>
+      <a href="/servers/new" class="btn btn-secondary">Add Server</a>
+    </div>
+  </div>
 </section>
 
 <section class="servers-section">
   <div class="section-header">
     <h2>Configured Servers</h2>
-    <a href="/servers/new" class="btn btn-primary">Add Server</a>
   </div>
 
   <% if @servers.empty? %>
-    <p class="empty-state">No servers configured yet. Click "Add Server" to get started.</p>
+    <p class="empty-state">No servers configured yet. Register dynamically or add one manually to get started.</p>
   <% else %>
     <div class="server-list">
       <% @servers.each do |server| %>
@@ -29,7 +51,7 @@
             <p class="server-url"><%= h(server.base_url) %></p>
             <p class="server-meta">
               <% if server.confidential? %>
-                <span class="badge badge-info">Client Secret Configured</span>
+                <span class="badge badge-info">Confidential Client</span>
               <% end %>
             </p>
           </div>

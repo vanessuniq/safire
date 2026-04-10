@@ -1,0 +1,183 @@
+<div class="page-header">
+  <h1>Register with a Server</h1>
+</div>
+
+<section class="auth-config">
+  <p>
+    Register this application with a SMART authorization server using the
+    <a href="https://datatracker.ietf.org/doc/html/rfc7591" target="_blank" rel="noopener">OAuth 2.0 Dynamic Client Registration Protocol</a>
+    (RFC 7591), as encouraged by SMART App Launch 2.2.0. The server assigns a
+    <code>client_id</code> and saves it as a new server entry automatically.
+  </p>
+
+  <form action="/register" method="post" class="demo-form">
+
+    <%# ── Server Info ───────────────────────────────────────────────────── %>
+    <div class="form-section">
+      <h3>Server</h3>
+      <p class="form-help">Identify the server you want to register with and give it a local name.</p>
+
+      <div class="form-group">
+        <label for="name">Server Name <span class="required">*</span></label>
+        <input type="text" id="name" name="name"
+               value="<%= h(params[:name]) %>"
+               placeholder="My FHIR Server"
+               class="form-input">
+        <p class="form-hint">A local label for your own reference — not sent to the server.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="base_url">Base URL <span class="required">*</span></label>
+        <input type="text" id="base_url" name="base_url"
+               value="<%= h(params[:base_url]) %>"
+               placeholder="https://fhir.example.com"
+               class="form-input">
+        <p class="form-hint">
+          The FHIR server root. The <code>registration_endpoint</code> will be discovered
+          from <code>/.well-known/smart-configuration</code> unless overridden below.
+        </p>
+      </div>
+    </div>
+
+    <%# ── Client Identity ──────────────────────────────────────────────── %>
+    <div class="form-section">
+      <h3>Client Identity</h3>
+      <p class="form-help">
+        These values identify this application to the authorization server. They are derived
+        from the app's own configuration and submitted as-is — not editable.
+      </p>
+      <div class="identity-card">
+        <dl class="details-list">
+          <dt>Client Name</dt>
+          <dd><code><%= h(ENV.fetch('CLIENT_NAME', 'Safire Demo App')) %></code></dd>
+
+          <dt>Client URI</dt>
+          <dd><code><%= h(client_uri) %></code></dd>
+
+          <dt>Redirect URI</dt>
+          <dd><code><%= h(redirect_uri) %></code></dd>
+        </dl>
+      </div>
+    </div>
+
+    <%# ── Registration Choices ─────────────────────────────────────────── %>
+    <div class="form-section">
+      <h3>Registration Choices</h3>
+      <p class="form-help">
+        Configure the access and authentication capabilities this client will use.
+      </p>
+
+      <div class="form-group">
+        <label>Grant Types</label>
+        <div class="checkbox-group">
+          <label class="checkbox-option">
+            <input type="checkbox" name="grant_types[]" value="authorization_code" checked>
+            <span>
+              <strong><code>authorization_code</code></strong> — SMART App Launch
+              <span class="radio-description">User-facing authorization with redirect and PKCE.</span>
+            </span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="grant_types[]" value="client_credentials">
+            <span>
+              <strong><code>client_credentials</code></strong> — Backend Services
+              <span class="radio-description">Server-to-server access with no user interaction.</span>
+            </span>
+          </label>
+          <label class="checkbox-option">
+            <input type="checkbox" name="grant_types[]" value="refresh_token">
+            <span>
+              <strong><code>refresh_token</code></strong> — Token Refresh
+              <span class="radio-description">Silently renew access tokens without re-authorization.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="token_endpoint_auth_method">Token Endpoint Auth Method</label>
+        <select id="token_endpoint_auth_method" name="token_endpoint_auth_method" class="form-input">
+          <option value="none">none — public client (no secret)</option>
+          <option value="client_secret_basic">client_secret_basic — HTTP Basic Auth</option>
+          <option value="private_key_jwt">private_key_jwt — signed JWT assertion</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="scope">Scope <span class="optional">(optional)</span></label>
+        <input type="text" id="scope" name="scope"
+               value="<%= h(params[:scope]) %>"
+               placeholder="openid profile patient/*.read"
+               class="form-input">
+        <p class="form-hint">Space-separated scopes this client intends to request. Also stored as the server's configured scopes.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-option" style="display:inline-flex; width:auto;">
+          <input type="checkbox" name="include_jwks_uri" value="1"
+                 <%= 'checked' if asymmetric_credentials_configured? %>
+                 <%= 'disabled' unless asymmetric_credentials_configured? %>>
+          <span>
+            Include <code>jwks_uri</code>
+            <span class="radio-description">
+              Required for <code>private_key_jwt</code> — points the server to this app's public key endpoint.
+            </span>
+          </span>
+        </label>
+        <% if asymmetric_credentials_configured? %>
+          <p class="form-hint">Will submit: <code><%= h(jwks_uri) %></code></p>
+        <% else %>
+          <p class="form-hint warning-text">
+            Asymmetric credentials not configured. Set <code>ASYMMETRIC_PRIVATE_KEY_PEM</code>
+            and <code>ASYMMETRIC_KID</code> to enable.
+          </p>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ── Server-Side Options ──────────────────────────────────────────── %>
+    <div class="form-section">
+      <h3>Server-Side Options <span class="optional">(optional)</span></h3>
+
+      <div class="form-group">
+        <label for="registration_endpoint">Registration Endpoint</label>
+        <input type="text" id="registration_endpoint" name="registration_endpoint"
+               value="<%= h(params[:registration_endpoint]) %>"
+               placeholder="https://auth.example.com/register"
+               class="form-input">
+        <p class="form-hint">
+          Leave blank to discover from <code>/.well-known/smart-configuration</code>.
+          Required if the server does not advertise a <code>registration_endpoint</code>.
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label for="initial_access_token">Initial Access Token</label>
+        <input type="text" id="initial_access_token" name="initial_access_token"
+               placeholder="Token value — type prefix added automatically"
+               class="form-input">
+        <p class="form-hint">
+          Some servers require a bearer token to protect the registration endpoint (RFC 7591 §3.1).
+          Enter the raw token value; the prefix below is prepended automatically.
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label for="token_type">Token Type</label>
+        <select id="token_type" name="token_type" class="form-input" style="max-width:220px;">
+          <option value="Bearer" selected>Bearer</option>
+          <option value="MAC">MAC</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Register Client</button>
+      <a href="/" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</section>
+
+<div class="back-link">
+  <a href="/">&larr; Back to Servers</a>
+</div>

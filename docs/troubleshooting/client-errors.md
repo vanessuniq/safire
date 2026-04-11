@@ -17,6 +17,48 @@ nav_order: 3
 
 ---
 
+## Dynamic Client Registration Errors
+
+### `DiscoveryError`: Server does not advertise a registration endpoint
+
+```
+Safire::Errors::DiscoveryError: Failed to discover SMART configuration from https://...: server does not advertise a 'registration_endpoint'
+```
+
+The server either does not support Dynamic Client Registration or its registration endpoint is not published in `/.well-known/smart-configuration`. Pass the endpoint explicitly or register manually through the server's developer portal:
+
+```ruby
+registration = client.register_client(
+  metadata,
+  registration_endpoint: 'https://auth.example.com/register'
+)
+```
+
+### `RegistrationError`: Server rejected the registration request
+
+```
+Safire::Errors::RegistrationError: Client registration failed — HTTP 400 — invalid_redirect_uri — Redirect URI must use HTTPS
+```
+
+The server returned an OAuth 2.0 error response. Check `e.error_code` and `e.error_description` for the specific reason, correct the metadata, and retry:
+
+```ruby
+rescue Safire::Errors::RegistrationError => e
+  puts e.status            # 400
+  puts e.error_code        # "invalid_redirect_uri"
+  puts e.error_description # "Redirect URI must use HTTPS"
+```
+
+### `RegistrationError`: 2xx response missing `client_id`
+
+```
+Safire::Errors::RegistrationError: Registration response missing client_id; received fields: error, error_description
+```
+
+The server returned a successful HTTP status but did not include `client_id`. This typically means the server returned an error body with a 2xx status code, which is a server-side bug. Check `e.received_fields` to see what was returned.
+
+---
+
 ## Confidential Symmetric Client Errors
 
 ### `ConfigurationError`: Missing `client_secret`

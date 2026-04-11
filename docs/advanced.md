@@ -135,11 +135,11 @@ class TokenManager
     token_params  = { refresh_token: session[:refresh_token] }
     response      = client.refresh_token(token_params)
 
-    session[:access_token]     = response[:access_token]
-    session[:refresh_token]    = response[:refresh_token] || session[:refresh_token]
-    session[:token_expires_at] = Time.current + response[:expires_in].to_i.seconds
+    session[:access_token]     = response['access_token']
+    session[:refresh_token]    = response['refresh_token'] || session[:refresh_token]
+    session[:token_expires_at] = Time.current + response['expires_in'].to_i.seconds
 
-    response[:access_token]
+    response['access_token']
   end
 end
 ```
@@ -171,9 +171,9 @@ Override the default scopes for specific actions without reconfiguring the clien
 
 ```ruby
 def launch_with_scopes(client, extra_scopes: [])
-  base_scopes  = ['openid', 'profile', 'patient/*.read']
-  merged       = (base_scopes + extra_scopes).uniq
-  client.authorization_url(scope_override: merged)
+  base_scopes = ['openid', 'profile', 'patient/*.read']
+  merged      = (base_scopes + extra_scopes).uniq
+  client.authorization_url(custom_scopes: merged)
 end
 
 # Requesting additional write access for a specific workflow
@@ -200,11 +200,11 @@ class SmartAuthController < ApplicationController
 
   # Step 1 — Redirect user to the authorization server
   def launch
-    auth_url = @client.authorization_url
-    session[:pkce_verifier] = @client.code_verifier
-    session[:state]         = @client.state
+    auth_data = @client.authorization_url
+    session[:code_verifier] = auth_data[:code_verifier]
+    session[:state]         = auth_data[:state]
 
-    redirect_to auth_url, allow_other_host: true
+    redirect_to auth_data[:auth_url], allow_other_host: true
   end
 
   # Step 2 — Handle the authorization server callback
@@ -214,15 +214,19 @@ class SmartAuthController < ApplicationController
       return
     end
 
-    token_response = @client.exchange_code_for_token(
+    unless params[:state] == session.delete(:state)
+      redirect_to root_path, alert: 'Invalid state parameter'
+      return
+    end
+
+    token_response = @client.request_access_token(
       code:          params[:code],
-      state:         params[:state],
-      pkce_verifier: session.delete(:pkce_verifier)
+      code_verifier: session.delete(:code_verifier)
     )
 
-    session[:access_token]     = token_response[:access_token]
-    session[:refresh_token]    = token_response[:refresh_token]
-    session[:token_expires_at] = Time.current + token_response[:expires_in].to_i.seconds
+    session[:access_token]     = token_response['access_token']
+    session[:refresh_token]    = token_response['refresh_token']
+    session[:token_expires_at] = Time.current + token_response['expires_in'].to_i.seconds
 
     redirect_to dashboard_path
   end

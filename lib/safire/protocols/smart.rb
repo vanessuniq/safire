@@ -241,7 +241,7 @@ module Safire
       def register_client(metadata, registration_endpoint: nil, authorization: nil)
         endpoint = registration_endpoint.presence || discovered_registration_endpoint
         headers  = { content_type: 'application/json' }
-      headers['Authorization'] = authorization if authorization.present?
+        headers['Authorization'] = authorization if authorization.present?
 
         Safire.logger.info('Registering client via Dynamic Client Registration (RFC 7591)...')
 
@@ -485,7 +485,7 @@ module Safire
       def oauth_error_from(faraday_error, error_class)
         response = faraday_error.response
         status   = response&.dig(:status)
-      body     = JSON.parse(response&.dig(:body).to_s)
+        body = JSON.parse(response&.dig(:body).to_s)
 
         error_class.new(
           status:,

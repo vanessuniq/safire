@@ -200,5 +200,18 @@ RSpec.describe 'SMART Dynamic Client Registration End-to-End Flow', type: :integ
         end.to raise_error(Safire::Errors::NetworkError)
       end
     end
+
+    context 'when a network error occurs during discovery' do
+      before do
+        stub_request(:get, "#{base_url}/.well-known/smart-configuration")
+          .to_raise(Faraday::ConnectionFailed)
+      end
+
+      it 'raises NetworkError' do
+        expect do
+          Safire::Client.new({ base_url: }).register_client(client_metadata)
+        end.to raise_error(Safire::Errors::NetworkError)
+      end
+    end
   end
 end

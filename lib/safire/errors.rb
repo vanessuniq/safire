@@ -207,12 +207,10 @@ module Safire
     class RegistrationError < OAuthError
       attr_reader :received_fields
 
-      # rubocop:disable Style/ArgumentsForwarding
       def initialize(received_fields: nil, **kwargs)
         @received_fields = received_fields
         super(**kwargs)
       end
-      # rubocop:enable Style/ArgumentsForwarding
 
       private
 

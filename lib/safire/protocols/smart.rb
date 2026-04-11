@@ -435,7 +435,7 @@ module Safire
         headers = { content_type: 'application/x-www-form-urlencoded' }
 
         if client_type == :confidential_symmetric
-          headers[:Authorization] = authentication_header(secret.presence || client_secret)
+          headers['Authorization'] = authentication_header(secret.presence || client_secret)
         end
 
         headers

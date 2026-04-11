@@ -50,7 +50,7 @@ Suitable for:
 
 ## Prerequisites: Keys, JWKS, and Algorithm
 
-Before writing any flow code, you need a key pair, a key ID, and a way for the authorization server to verify your public key.
+Before writing any flow code, you need a key pair, a key ID, and a way for the authorization server to verify your public key. If the server supports RFC 7591, you can register dynamically using Safire's `register_client` — see the [Dynamic Client Registration]({% link smart-on-fhir/dynamic-client-registration/index.md %}) guide.
 
 ### Generating a Key Pair
 

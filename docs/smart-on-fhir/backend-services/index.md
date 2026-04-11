@@ -56,7 +56,7 @@ Suitable for:
 
 ### Client Registration
 
-Before making any token requests, the client **SHALL** register with the authorization server following the [confidential asymmetric client registration](https://hl7.org/fhir/smart-app-launch/client-confidential-asymmetric.html#registering-a-client-communicating-public-keys) steps defined in the SMART App Launch specification. Registration communicates the client's public key(s) to the server, either via a JWKS URI or by uploading the JWKS directly.
+Before making any token requests, the client **SHALL** register with the authorization server following the [confidential asymmetric client registration](https://hl7.org/fhir/smart-app-launch/client-confidential-asymmetric.html#registering-a-client-communicating-public-keys) steps defined in the SMART App Launch specification. Registration communicates the client's public key(s) to the server, either via a JWKS URI or by uploading the JWKS directly. If the server supports RFC 7591, you can automate this step with Safire's `register_client` — see the [Dynamic Client Registration]({% link smart-on-fhir/dynamic-client-registration/index.md %}) guide.
 
 ### Key Pair and JWKS
 

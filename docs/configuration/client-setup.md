@@ -46,7 +46,7 @@ client = Safire::Client.new(config)
 ```
 
 {: .note }
-> `client_id` is the only authorization parameter validated at call time rather than at construction. `authorization_url`, `request_access_token`, `refresh_token`, and `request_backend_token` each raise `Safire::Errors::ConfigurationError` if `client_id` is absent when called. This means you can build a `ClientConfig` before a `client_id` has been issued — for example, when registering with a new server before any flow begins.
+> `client_id` is the only authorization parameter validated at call time rather than at construction. `authorization_url`, `request_access_token`, `refresh_token`, and `request_backend_token` each raise `Safire::Errors::ConfigurationError` if `client_id` is absent when called. This means you can build a client without a `client_id` and call `register_client` to obtain one at runtime. See [Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) for details.
 
 ---
 
@@ -160,4 +160,5 @@ config.inspect
 ## Next Steps
 
 - [Logging]({{ site.baseurl }}/configuration/logging/) — configure Safire's logger and HTTP request logging
+- [Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) — obtain a `client_id` at runtime using RFC 7591
 - [SMART App Launch Workflows]({{ site.baseurl }}/smart-on-fhir/) — step-by-step authorization flow guides

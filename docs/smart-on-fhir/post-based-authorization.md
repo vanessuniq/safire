@@ -2,7 +2,7 @@
 layout: default
 title: POST-Based Authorization
 parent: SMART
-nav_order: 5
+nav_order: 6
 has_toc: true
 ---
 

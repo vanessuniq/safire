@@ -4,7 +4,7 @@ title: SMART
 nav_order: 4
 has_children: true
 permalink: /smart-on-fhir/
-description: "Step-by-step guides for SMART App Launch OAuth 2.0 flows in Ruby, covering public client (PKCE), confidential symmetric, confidential asymmetric (private_key_jwt), and Backend Services (system-to-system)."
+description: "Step-by-step guides for SMART App Launch OAuth 2.0 flows in Ruby, covering Dynamic Client Registration (RFC 7591), public client (PKCE), confidential symmetric, confidential asymmetric (private_key_jwt), and Backend Services (system-to-system)."
 ---
 
 # SMART App Launch
@@ -16,6 +16,7 @@ This section provides step-by-step guides for implementing SMART authorization f
 | Workflow | Description |
 |----------|-------------|
 | [SMART Discovery]({% link smart-on-fhir/discovery/index.md %}) | Fetching and using SMART configuration metadata |
+| [Dynamic Client Registration]({% link smart-on-fhir/dynamic-client-registration/index.md %}) | Register a client at runtime using RFC 7591 to obtain a `client_id` |
 | [Public Client]({% link smart-on-fhir/public-client/index.md %}) | Authorization flow for browser-based and mobile applications |
 | [Confidential Symmetric Client]({% link smart-on-fhir/confidential-symmetric/index.md %}) | Authorization flow for server-side applications with client secrets |
 | [Confidential Asymmetric Client]({% link smart-on-fhir/confidential-asymmetric/index.md %}) | Authorization flow using private_key_jwt (RSA/EC key pair) |

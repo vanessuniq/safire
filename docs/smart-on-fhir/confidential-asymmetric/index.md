@@ -2,7 +2,7 @@
 layout: default
 title: Confidential Asymmetric Client Workflow
 parent: SMART
-nav_order: 4
+nav_order: 5
 has_children: true
 permalink: /smart-on-fhir/confidential-asymmetric/
 ---

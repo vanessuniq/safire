@@ -13,6 +13,7 @@ Safire is a Ruby gem implementing the [SMART App Launch 2.2.0](https://hl7.org/f
 
 ### SMART App Launch (v2.2.0)
 
+- Dynamic Client Registration (RFC 7591): obtain a `client_id` at runtime by POSTing client metadata to the server's registration endpoint
 - Discovery (`/.well-known/smart-configuration`)
 - Public Client (PKCE)
 - Confidential Symmetric Client (`client_secret` + HTTP Basic Auth)
@@ -154,7 +155,7 @@ bin/demo
 # Visit http://localhost:4567
 ```
 
-Demonstrates SMART discovery, all authorization flows, token refresh, and backend services token requests. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
+Demonstrates Dynamic Client Registration, SMART discovery, all authorization flows, token refresh, and backend services token requests. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
 
 ---
 

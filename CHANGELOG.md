@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Safire::Client#register_client` implements the OAuth 2.0 Dynamic Client Registration
+  Protocol (RFC 7591): POSTs client metadata to the server's registration endpoint and
+  returns the response as a Hash containing at minimum a `client_id`
+  - Endpoint is resolved from SMART discovery (`registration_endpoint` field) when not
+    supplied explicitly via the `registration_endpoint:` keyword argument
+  - Supports an optional initial access token via the `authorization:` keyword argument
+    (full `Authorization` header value including token type prefix)
+  - Raises `Safire::Errors::DiscoveryError` when no registration endpoint is available,
+    `Safire::Errors::RegistrationError` on server error or a 2xx response missing
+    `client_id`, and `Safire::Errors::NetworkError` on transport failure
+- `Safire::Errors::RegistrationError` — new error class for Dynamic Client Registration
+  failures; inherits from `Safire::Errors::OAuthError` with `status`, `error_code`,
+  `error_description`, and `received_fields` attributes
+- `Safire::Errors::OAuthError` — new shared base class for `RegistrationError`,
+  `TokenError`, and `AuthError`; provides `status`, `error_code`, and
+  `error_description` attributes and can be used as a single rescue point for any
+  server-side OAuth protocol error
+
 ### Changed
 
 - `client_id` is now optional at `ClientConfig` and `Protocols::Smart` initialization;

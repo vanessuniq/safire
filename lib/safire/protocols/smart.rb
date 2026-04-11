@@ -241,7 +241,7 @@ module Safire
       def register_client(metadata, registration_endpoint: nil, authorization: nil)
         endpoint = registration_endpoint.presence || discovered_registration_endpoint
         headers  = { content_type: 'application/json' }
-        headers[:Authorization] = authorization if authorization.present?
+      headers['Authorization'] = authorization if authorization.present?
 
         Safire.logger.info('Registering client via Dynamic Client Registration (RFC 7591)...')
 

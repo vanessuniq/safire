@@ -1080,7 +1080,7 @@ RSpec.describe Safire::Protocols::Smart do
 
         expect(WebMock).to(have_requested(:post, registration_endpoint).with do |req|
           body = JSON.parse(req.body)
-          req.headers['Content-Type'].start_with?('application/json') &&
+        req.headers['Content-Type'].start_with?('application/json') &&
             req.headers['Accept'] == 'application/json' &&
             body['client_name'] == 'My App' &&
             body['redirect_uris'] == ['https://app.example.com/callback']

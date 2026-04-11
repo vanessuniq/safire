@@ -485,7 +485,7 @@ module Safire
       def oauth_error_from(faraday_error, error_class)
         response = faraday_error.response
         status   = response&.dig(:status)
-        body     = JSON.parse(response&.dig(:body))
+      body     = JSON.parse(response&.dig(:body).to_s)
 
         error_class.new(
           status:,

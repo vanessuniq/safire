@@ -1023,9 +1023,202 @@ RSpec.describe Safire::Protocols::Smart do
   # ---------- Dynamic Client Registration ----------
 
   describe '#register_client' do
-    it 'raises NotImplementedError' do
-      expect { described_class.new(config).register_client }
-        .to raise_error(NotImplementedError)
+    let(:registration_endpoint) { 'https://fhir.example.com/register' }
+    let(:client_metadata) do
+      {
+        client_name: 'My App',
+        redirect_uris: ['https://app.example.com/callback'],
+        grant_types: ['authorization_code'],
+        token_endpoint_auth_method: 'private_key_jwt',
+        jwks_uri: 'https://app.example.com/.well-known/jwks.json'
+      }
+    end
+    let(:registration_response) do
+      {
+        'client_id' => 'registered_client_id_abc',
+        'client_name' => 'My App',
+        'redirect_uris' => ['https://app.example.com/callback'],
+        'grant_types' => ['authorization_code'],
+        'token_endpoint_auth_method' => 'private_key_jwt'
+      }
+    end
+    # Temp-client pattern: no client_id at registration time
+    let(:no_client_id_config) { Safire::ClientConfig.new(config_attrs.except(:client_id)) }
+
+    def stub_registration(endpoint: registration_endpoint, status: 200, body: registration_response)
+      stub_request(:post, endpoint)
+        .to_return(status: status, body: body.to_json, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    context 'with explicit registration_endpoint' do
+      before { stub_registration }
+
+      it 'returns the registration response as a Hash' do
+        result = described_class.new(no_client_id_config)
+                                .register_client(client_metadata, registration_endpoint:)
+        expect(result).to eq(registration_response)
+      end
+
+      it 'does not require client_id to be pre-set (supports the temp-client pattern)' do
+        expect do
+          described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+        end.not_to raise_error
+      end
+
+      it 'POSTs metadata as JSON with correct Content-Type and body fields' do
+        described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+
+        expect(WebMock).to(have_requested(:post, registration_endpoint).with do |req|
+          body = JSON.parse(req.body)
+          req.headers['Content-Type'].start_with?('application/json') &&
+              body['client_name'] == 'My App' &&
+              body['redirect_uris'] == ['https://app.example.com/callback']
+        end)
+      end
+
+      it 'includes the Authorization header when provided' do
+        described_class.new(no_client_id_config).register_client(
+          client_metadata,
+          registration_endpoint:,
+          authorization: 'Bearer initial-access-token'
+        )
+
+        expect(WebMock).to have_requested(:post, registration_endpoint)
+          .with(headers: { 'Authorization' => 'Bearer initial-access-token' })
+      end
+
+      it 'omits the Authorization header when not provided' do
+        described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+
+        expect(WebMock).to(have_requested(:post, registration_endpoint)
+          .with { |req| req.headers.keys.none? { |k| k.casecmp('authorization').zero? } })
+      end
+    end
+
+    context 'when registration_endpoint uses HTTP on a non-localhost host' do
+      it 'raises ConfigurationError' do
+        expect do
+          described_class.new(no_client_id_config).register_client(
+            client_metadata, registration_endpoint: 'http://remote.example.com/register'
+          )
+        end.to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+      end
+    end
+
+    context 'when registration_endpoint is a malformed URI' do
+      it 'raises ConfigurationError' do
+        expect do
+          described_class.new(no_client_id_config).register_client(
+            client_metadata, registration_endpoint: 'not-a-uri'
+          )
+        end.to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+      end
+    end
+
+    context 'when registration_endpoint uses HTTP on localhost' do
+      before { stub_registration(endpoint: 'http://localhost:3000/register') }
+
+      it 'does not raise (localhost exception)' do
+        expect do
+          described_class.new(no_client_id_config).register_client(
+            client_metadata, registration_endpoint: 'http://localhost:3000/register'
+          )
+        end.not_to raise_error
+      end
+    end
+
+    context 'when registration_endpoint falls back to discovery' do
+      let(:smart_metadata_with_dcr) do
+        smart_metadata_body.merge('registration_endpoint' => registration_endpoint)
+      end
+
+      before do
+        stub_well_known(body: smart_metadata_with_dcr)
+        stub_registration
+      end
+
+      it 'uses the registration_endpoint advertised in SMART metadata' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id, :authorization_endpoint, :token_endpoint))
+        described_class.new(cfg).register_client(client_metadata)
+
+        expect(WebMock).to have_requested(:post, registration_endpoint)
+      end
+    end
+
+    context 'when no registration_endpoint is available' do
+      before { stub_well_known } # discovery response does NOT include registration_endpoint
+
+      it 'raises DiscoveryError directing the caller to provide the endpoint explicitly' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id, :authorization_endpoint, :token_endpoint))
+        expect { described_class.new(cfg).register_client(client_metadata) }
+          .to raise_error(Safire::Errors::DiscoveryError, /registration_endpoint/)
+      end
+    end
+
+    context 'when the server returns an HTTP error with RFC 7591 fields' do
+      before do
+        stub_request(:post, registration_endpoint).to_return(
+          status: 400,
+          body: { 'error' => 'invalid_redirect_uri', 'error_description' => 'Must be HTTPS' }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'raises RegistrationError with typed HTTP error attributes' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+        end
+        expect(error).to be_a(Safire::Errors::RegistrationError)
+        expect(error.status).to eq(400)
+        expect(error.error_code).to eq('invalid_redirect_uri')
+        expect(error.error_description).to eq('Must be HTTPS')
+        expect(error.message).to match(/400/)
+        expect(error.message).to match(/invalid_redirect_uri/)
+      end
+    end
+
+    context 'when 2xx response is missing client_id (structural failure)' do
+      before do
+        stub_request(:post, registration_endpoint).to_return(
+          status: 201,
+          body: { 'client_name' => 'My App', 'expires_at' => 9999 }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'raises RegistrationError with received_fields but no values' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+        end
+        expect(error).to be_a(Safire::Errors::RegistrationError)
+        expect(error.received_fields).to contain_exactly('client_name', 'expires_at')
+        expect(error.message).to match(/client_name/)
+        expect(error.message).not_to match(/My App/)
+      end
+    end
+
+    context 'when the response body is not a JSON object' do
+      before do
+        stub_request(:post, registration_endpoint).to_return(
+          status: 200, body: '["not","a","hash"]', headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'raises RegistrationError' do
+        expect do
+          described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+        end.to raise_error(Safire::Errors::RegistrationError)
+      end
+    end
+
+    context 'when a network error occurs' do
+      before { stub_request(:post, registration_endpoint).to_raise(Faraday::ConnectionFailed) }
+
+      it 'raises NetworkError' do
+        expect do
+          described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+        end.to raise_error(Safire::Errors::NetworkError)
+      end
     end
   end
 end

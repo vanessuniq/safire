@@ -53,6 +53,10 @@ metadata.supports_openid_connect?
 metadata.supports_post_based_authorization?
 # => true if capabilities include "authorize-post"
 
+# Dynamic Client Registration (RFC 7591)
+metadata.supports_dynamic_registration?
+# => true if registration_endpoint is present in the server's SMART metadata
+
 # Backend Services (client_credentials grant, no user interaction)
 metadata.supports_backend_services?
 # => true if:
@@ -62,6 +66,9 @@ metadata.supports_backend_services?
 
 {: .note }
 > `supports_backend_services?` checks `grant_types_supported` rather than a capability flag — it combines a grant type check with `supports_asymmetric_auth?` because the SMART Backend Services flow always authenticates via JWT assertion (`private_key_jwt`).
+
+{: .note }
+> `supports_dynamic_registration?` checks only for the presence of `registration_endpoint` in the server's SMART metadata. SMART App Launch 2.2.0 defines no dedicated capability string for DCR, so the endpoint field is the sole signal.
 
 ---
 

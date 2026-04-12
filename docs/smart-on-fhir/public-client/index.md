@@ -2,7 +2,7 @@
 layout: default
 title: Public Client Workflow
 parent: SMART
-nav_order: 2
+nav_order: 3
 has_children: true
 permalink: /smart-on-fhir/public-client/
 ---

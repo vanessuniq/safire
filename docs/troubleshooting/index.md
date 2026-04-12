@@ -29,11 +29,12 @@ Safire raises typed errors so you can handle each failure category separately:
 | Error class | When raised |
 |-------------|-------------|
 | `Safire::Errors::ConfigurationError` | Missing or invalid client configuration — caught at construction time |
-| `Safire::Errors::DiscoveryError` | SMART metadata fetch failed (HTTP error, invalid JSON) |
+| `Safire::Errors::DiscoveryError` | SMART metadata fetch failed (HTTP error, invalid JSON, missing field) |
+| `Safire::Errors::RegistrationError` | Dynamic Client Registration failed (server error, or 2xx response missing `client_id`) |
 | `Safire::Errors::TokenError` | Token exchange or refresh failed (OAuth error, missing fields) |
 | `Safire::Errors::NetworkError` | Transport-level failure (connection refused, timeout, blocked redirect) |
 
-All Safire errors inherit from `Safire::Errors::Error`, so you can catch everything with a single rescue if needed.
+`RegistrationError`, `TokenError`, and `AuthError` share a common base class `Safire::Errors::OAuthError` with `status`, `error_code`, and `error_description` attributes — you can rescue all three in one clause using `OAuthError`. All Safire errors inherit from `Safire::Errors::Error` for a single catch-all rescue.
 
 ```ruby
 begin

@@ -118,9 +118,23 @@ RSpec.describe Safire::Errors do
     end
   end
 
-  describe Safire::Errors::TokenError do
+  describe Safire::Errors::OAuthError do
     it 'is a Safire::Errors::Error' do
       expect(described_class.superclass).to eq(Safire::Errors::Error)
+    end
+
+    it 'raises NotImplementedError when instantiated directly (abstract class)' do
+      expect { described_class.new }.to raise_error(NotImplementedError)
+    end
+  end
+
+  describe Safire::Errors::TokenError do
+    it 'is a Safire::Errors::OAuthError' do
+      expect(described_class.superclass).to eq(Safire::Errors::OAuthError)
+    end
+
+    it 'is a Safire::Errors::Error' do
+      expect(described_class.new).to be_a(Safire::Errors::Error)
     end
 
     context 'when HTTP failure (status + OAuth2 fields)' do
@@ -159,6 +173,15 @@ RSpec.describe Safire::Errors do
       end
     end
 
+    context 'when structural failure with empty received_fields' do
+      subject(:error) { described_class.new(received_fields: []) }
+
+      it 'falls through to the generic message when no fields were received' do
+        expect(error.message).to match(/Token request failed/)
+        expect(error.message).not_to match(/received fields/)
+      end
+    end
+
     context 'with no arguments' do
       it 'has a generic fallback message' do
         expect(described_class.new.message).to match(/[Tt]oken/)
@@ -166,33 +189,13 @@ RSpec.describe Safire::Errors do
     end
   end
 
-  describe Safire::Errors::NetworkError do
-    it 'is a Safire::Errors::Error' do
-      expect(described_class.superclass).to eq(Safire::Errors::Error)
-    end
-
-    context 'with error_description' do
-      subject(:error) { described_class.new(error_description: 'Connection refused') }
-
-      it 'exposes error_description' do
-        expect(error.error_description).to eq('Connection refused')
-      end
-
-      it 'includes the description in the message' do
-        expect(error.message).to match(/Connection refused/)
-      end
-    end
-
-    context 'with no arguments' do
-      it 'has a generic fallback message' do
-        expect(described_class.new.message).to match(/[Hh][Tt][Tt][Pp]|[Nn]etwork/)
-      end
-    end
-  end
-
   describe Safire::Errors::AuthError do
+    it 'is a Safire::Errors::OAuthError' do
+      expect(described_class.superclass).to eq(Safire::Errors::OAuthError)
+    end
+
     it 'is a Safire::Errors::Error' do
-      expect(described_class.superclass).to eq(Safire::Errors::Error)
+      expect(described_class.new).to be_a(Safire::Errors::Error)
     end
 
     context 'with status and OAuth2 fields' do
@@ -220,6 +223,71 @@ RSpec.describe Safire::Errors do
     end
   end
 
+  describe Safire::Errors::RegistrationError do
+    it 'is a Safire::Errors::OAuthError' do
+      expect(described_class.superclass).to eq(Safire::Errors::OAuthError)
+    end
+
+    it 'is a Safire::Errors::Error' do
+      expect(described_class.new).to be_a(Safire::Errors::Error)
+    end
+
+    context 'when HTTP failure (status + RFC 7591 fields)' do
+      subject(:error) do
+        described_class.new(
+          status: 400,
+          error_code: 'invalid_redirect_uri',
+          error_description: 'The redirect_uri is not valid'
+        )
+      end
+
+      it 'exposes status, error_code, and error_description' do
+        expect(error.status).to eq(400)
+        expect(error.error_code).to eq('invalid_redirect_uri')
+        expect(error.error_description).to eq('The redirect_uri is not valid')
+      end
+
+      it 'builds a message from typed attributes' do
+        expect(error.message).to match(/400/)
+        expect(error.message).to match(/invalid_redirect_uri/)
+        expect(error.message).to match(/The redirect_uri is not valid/)
+      end
+    end
+
+    context 'when structural failure (missing client_id in 2xx response)' do
+      subject(:error) { described_class.new(received_fields: %w[client_secret expires_at]) }
+
+      it 'exposes received_fields' do
+        expect(error.received_fields).to eq(%w[client_secret expires_at])
+      end
+
+      it 'builds a message naming the received fields' do
+        expect(error.message).to match(/client_secret/)
+        expect(error.message).to match(/expires_at/)
+      end
+
+      it 'does not include field values in the message' do
+        error_with_secret = described_class.new(received_fields: %w[client_secret])
+        expect(error_with_secret.message).not_to match(/s3cr3t/)
+      end
+    end
+
+    context 'when structural failure with empty received_fields' do
+      subject(:error) { described_class.new(received_fields: []) }
+
+      it 'falls through to the generic message when no fields were received' do
+        expect(error.message).to match(/Client registration failed/)
+        expect(error.message).not_to match(/received fields/)
+      end
+    end
+
+    context 'with no arguments' do
+      it 'has a generic fallback message' do
+        expect(described_class.new.message).to match(/[Rr]egistration/)
+      end
+    end
+  end
+
   describe Safire::Errors::CertificateError do
     it 'is a Safire::Errors::Error' do
       expect(described_class.superclass).to eq(Safire::Errors::Error)
@@ -242,6 +310,30 @@ RSpec.describe Safire::Errors do
     context 'with no arguments' do
       it 'has a generic fallback message' do
         expect(described_class.new.message).to match(/[Cc]ertificate/)
+      end
+    end
+  end
+
+  describe Safire::Errors::NetworkError do
+    it 'is a Safire::Errors::Error' do
+      expect(described_class.superclass).to eq(Safire::Errors::Error)
+    end
+
+    context 'with error_description' do
+      subject(:error) { described_class.new(error_description: 'Connection refused') }
+
+      it 'exposes error_description' do
+        expect(error.error_description).to eq('Connection refused')
+      end
+
+      it 'includes the description in the message' do
+        expect(error.message).to match(/Connection refused/)
+      end
+    end
+
+    context 'with no arguments' do
+      it 'has a generic fallback message' do
+        expect(described_class.new.message).to match(/[Hh][Tt][Tt][Pp]|[Nn]etwork/)
       end
     end
   end
@@ -278,12 +370,24 @@ RSpec.describe Safire::Errors do
         Safire::Errors::ConfigurationError.new,
         Safire::Errors::DiscoveryError.new(endpoint: 'https://example.com'),
         Safire::Errors::TokenError.new,
-        Safire::Errors::NetworkError.new,
         Safire::Errors::AuthError.new,
+        Safire::Errors::RegistrationError.new,
+        Safire::Errors::NetworkError.new,
         Safire::Errors::CertificateError.new,
         Safire::Errors::ValidationError.new
       ]
+
       expect(errors).to all(be_a(Safire::Errors::Error))
+    end
+
+    it 'can rescue OAuth protocol errors as Safire::Errors::OAuthError' do
+      errors = [
+        Safire::Errors::TokenError.new,
+        Safire::Errors::AuthError.new,
+        Safire::Errors::RegistrationError.new
+      ]
+
+      expect(errors).to all(be_a(Safire::Errors::OAuthError))
     end
   end
 end

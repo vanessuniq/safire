@@ -72,6 +72,10 @@ class SafireDemo < Sinatra::Base
       nil
     end
 
+    def client_uri
+      "#{request.scheme}://#{request.host_with_port}"
+    end
+
     def jwks_uri
       "#{request.scheme}://#{request.host_with_port}/.well-known/jwks.json"
     end
@@ -166,6 +170,40 @@ class SafireDemo < Sinatra::Base
     server.destroy
     set_flash(:success, "Server '#{server.name}' deleted successfully!")
     redirect '/'
+  end
+
+  # ============================================
+  # Dynamic Client Registration
+  # ============================================
+
+  # Show the DCR form — register this app to a server and create a server entry
+  get '/register' do
+    erb :'servers/register'
+  end
+
+  # Perform DCR — register this app with the server, then create a server entry
+  # with the client_id (and optional client_secret) returned by the server
+  post '/register' do
+    pre_errors = validate_registration_params
+    unless pre_errors.empty?
+      set_flash(:error, pre_errors.join(', '))
+      erb :'servers/register'
+      return
+    end
+
+    @server = build_server_from_registration(perform_registration)
+
+    if @server.valid?
+      @server.save
+      set_flash(:success, "Client registered — '#{@server.name}' saved with client_id: #{@server.client_id}")
+      redirect "/servers/#{@server.id}"
+    else
+      set_flash(:error, @server.errors.join(', '))
+      erb :'servers/register'
+    end
+  rescue Safire::Errors::Error => e
+    set_flash(:error, flash_error_message('Dynamic Client Registration failed', e))
+    erb :'servers/register'
   end
 
   # ============================================
@@ -428,6 +466,60 @@ class SafireDemo < Sinatra::Base
 
   def parse_scopes(scopes_str)
     scopes_str.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
+  end
+
+  def perform_registration
+    temp_client   = Safire::Client.new({ base_url: params[:base_url].strip })
+    endpoint      = params[:registration_endpoint].presence
+    authorization = build_authorization_header(params[:initial_access_token], params[:token_type])
+    temp_client.register_client(
+      build_registration_metadata,
+      registration_endpoint: endpoint,
+      authorization: authorization
+    )
+  end
+
+  def build_server_from_registration(registration)
+    FhirServer.new(
+      name: params[:name].strip,
+      base_url: params[:base_url].strip,
+      scopes: parse_scopes(params[:scope] || ''),
+      client_id: registration['client_id'],
+      client_secret: registration['client_secret']
+    )
+  end
+
+  def validate_registration_params
+    errors = []
+    errors << 'Name is required' if params[:name].to_s.strip.empty?
+    errors << 'Base URL is required' if params[:base_url].to_s.strip.empty?
+    errors
+  end
+
+  def build_registration_metadata
+    {
+      client_name: ENV.fetch('CLIENT_NAME', 'Safire Demo App'),
+      client_uri: client_uri,
+      redirect_uris: [redirect_uri],
+      grant_types: registration_grant_types,
+      token_endpoint_auth_method: params[:token_endpoint_auth_method].presence,
+      scope: params[:scope].presence,
+      jwks_uri: registration_jwks_uri
+    }.compact
+  end
+
+  def registration_grant_types
+    Array(params[:grant_types]).reject(&:empty?)
+  end
+
+  def registration_jwks_uri
+    jwks_uri if params[:include_jwks_uri] == '1' && asymmetric_credentials_configured?
+  end
+
+  def build_authorization_header(token, token_type)
+    return nil unless token.present?
+
+    "#{token_type.presence || 'Bearer'} #{token.strip}"
   end
 
   def parse_client_type(client_type_param)

@@ -122,6 +122,17 @@ RSpec.describe Safire::Protocols::SmartMetadata do
     end
   end
 
+  describe '#supports_dynamic_registration?' do
+    it 'returns true when registration_endpoint is present' do
+      expect(smart_metadata.supports_dynamic_registration?).to be(true)
+    end
+
+    it 'returns false when registration_endpoint is absent' do
+      metadata = described_class.new(full_metadata.except('registration_endpoint'))
+      expect(metadata.supports_dynamic_registration?).to be(false)
+    end
+  end
+
   describe '#supports_post_based_authorization?' do
     it 'returns true if "authorize-post" is in capabilities' do
       expect(smart_metadata.supports_post_based_authorization?).to be(true)

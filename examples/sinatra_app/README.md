@@ -4,6 +4,7 @@ A Sinatra-based web application that demonstrates the features of the Safire gem
 
 ## Features
 
+- **Dynamic Client Registration**: Register this application with a SMART server at runtime using RFC 7591 to obtain a `client_id` automatically
 - **Server Management**: Add, edit, and remove FHIR server configurations with support for public and confidential clients
 - **SMART Discovery**: View server capabilities from `/.well-known/smart-configuration` including supported scopes, capabilities, and endpoints
 - **Authorization Flows**: Test multiple launch types:
@@ -85,6 +86,17 @@ Asymmetric authentication uses JWT assertions signed with a private key. This is
 4. **Test**: The "Confidential Asymmetric" option will appear in the authorization form when the server supports it.
 
 ### Adding a FHIR Server
+
+The home page offers two paths depending on whether you already have a `client_id`.
+
+**Register Dynamically (RFC 7591)** — if the server advertises a `registration_endpoint`:
+
+1. Click "Register with a Server" on the home page
+2. Enter the server name and base URL
+3. Choose grant types, authentication method, and optional scope
+4. Click "Register Client" — the app POSTs your metadata to the server, receives a `client_id`, and saves the server entry automatically
+
+**Add Server Manually** — if you already have a `client_id`:
 
 1. Click "Add Server" on the home page
 2. Enter the server details:
@@ -176,7 +188,8 @@ examples/sinatra_app/
     ├── servers/
     │   ├── show.erb
     │   ├── new.erb
-    │   └── edit.erb
+    │   ├── edit.erb
+    │   └── register.erb
     └── demo/
         ├── discovery.erb
         ├── authorize.erb
@@ -190,6 +203,8 @@ examples/sinatra_app/
 | Path | Description |
 |------|-------------|
 | `/.well-known/jwks.json` | JWKS endpoint serving the app's public key |
+| `GET /register` | Dynamic Client Registration form |
+| `POST /register` | Submits the registration request and saves the new server entry |
 | `/launch` | EHR/Portal launch endpoint |
 | `/callback` | OAuth2 callback handler |
 | `GET /demo/:id/backend-token` | Backend Services token request form |

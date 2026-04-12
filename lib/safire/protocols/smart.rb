@@ -15,6 +15,7 @@ module Safire
     # @api private
     class Smart
       include Behaviours
+      include URIValidation
 
       ATTRIBUTES = %i[
         base_url client_id client_secret redirect_uri scopes issuer
@@ -210,6 +211,48 @@ module Safire
         raise token_error_from(e)
       end
 
+      # Dynamically registers this client with the authorization server (RFC 7591).
+      #
+      # Sends a POST request containing the client +metadata+ as JSON to the registration
+      # endpoint. The endpoint is taken from the +registration_endpoint:+ argument when
+      # provided; otherwise it is resolved from SMART discovery.
+      #
+      # On success, returns the raw registration response as a Hash containing at minimum
+      # a +client_id+ assigned by the server. Store these credentials durably and use them
+      # to build a new {Safire::Client} for subsequent authorization flows.
+      #
+      # @param metadata [Hash] client metadata per RFC 7591 §2. Keys may be symbols or
+      #   strings. Common fields: +:client_name+, +:redirect_uris+, +:grant_types+,
+      #   +:token_endpoint_auth_method+, +:jwks_uri+, +:scope+.
+      # @param registration_endpoint [String, nil] URL of the registration endpoint.
+      #   Falls back to the +registration_endpoint+ field in SMART discovery when nil.
+      #   Pass this explicitly to skip discovery.
+      # @param authorization [String, nil] full value for the HTTP +Authorization+ header;
+      #   required by some servers for initial access token protection (RFC 7591 §3.1),
+      #   e.g. +"Bearer <initial-access-token>"+.
+      # @return [Hash] registration response from the server, including:
+      #   * +"client_id"+ [String] assigned client identifier (required)
+      #   * +"client_secret"+ [String] client secret, if issued (confidential clients)
+      #   * all echoed metadata fields the server chooses to return
+      # @raise [Safire::Errors::DiscoveryError] if no +registration_endpoint+ is given
+      #   and the server does not advertise one in SMART metadata
+      # @raise [Safire::Errors::RegistrationError] if the server returns an error
+      #   response or a 2xx response missing +client_id+
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
+      def register_client(metadata, registration_endpoint: nil, authorization: nil)
+        validate_registration_endpoint_https!(registration_endpoint) if registration_endpoint.present?
+        endpoint = registration_endpoint.presence || discovered_registration_endpoint
+        headers  = { content_type: 'application/json' }
+        headers['Authorization'] = authorization if authorization.present?
+
+        Safire.logger.info('Registering client via Dynamic Client Registration (RFC 7591)...')
+
+        response = @http_client.post(endpoint, body: metadata.to_json, headers:)
+        parse_registration_response(response.body)
+      rescue Faraday::Error => e
+        raise registration_error_from(e)
+      end
+
       # Validates a token response for SMART compliance.
       #
       # Checks all required token response fields based on the authorization flow:
@@ -394,7 +437,7 @@ module Safire
         headers = { content_type: 'application/x-www-form-urlencoded' }
 
         if client_type == :confidential_symmetric
-          headers[:Authorization] = authentication_header(secret.presence || client_secret)
+          headers['Authorization'] = authentication_header(secret.presence || client_secret)
         end
 
         headers
@@ -434,17 +477,25 @@ module Safire
       end
 
       def token_error_from(faraday_error)
+        oauth_error_from(faraday_error, Errors::TokenError)
+      end
+
+      def registration_error_from(faraday_error)
+        oauth_error_from(faraday_error, Errors::RegistrationError)
+      end
+
+      def oauth_error_from(faraday_error, error_class)
         response = faraday_error.response
         status   = response&.dig(:status)
-        body     = JSON.parse(response&.dig(:body))
+        body = JSON.parse(response&.dig(:body).to_s)
 
-        Errors::TokenError.new(
+        error_class.new(
           status:,
           error_code: body.is_a?(Hash) ? body['error'] : nil,
           error_description: body.is_a?(Hash) ? body['error_description'] : nil
         )
       rescue JSON::ParserError
-        Errors::TokenError.new(status:)
+        error_class.new(status:)
       end
 
       def discovered_token_endpoint
@@ -455,6 +506,33 @@ module Safire
           endpoint: well_known_endpoint,
           error_description: "response missing required field 'token_endpoint'"
         )
+      end
+
+      def discovered_registration_endpoint
+        endpoint = server_metadata.registration_endpoint
+        return endpoint if endpoint.present?
+
+        raise Errors::DiscoveryError.new(
+          endpoint: well_known_endpoint,
+          error_description: "server does not advertise a 'registration_endpoint' — " \
+                             'the server may not support Dynamic Client Registration, ' \
+                             'or the endpoint must be passed explicitly via registration_endpoint:'
+        )
+      end
+
+      def validate_registration_endpoint_https!(endpoint)
+        case classify_uri(endpoint)
+        when :invalid   then raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
+        when :non_https then raise Errors::ConfigurationError.new(non_https_uri_attributes: [:registration_endpoint])
+        end
+      end
+
+      def parse_registration_response(body)
+        raise Errors::RegistrationError.new(error_description: 'response is not a JSON object') unless body.is_a?(Hash)
+
+        return body if body['client_id'].present?
+
+        raise Errors::RegistrationError.new(received_fields: body.keys)
       end
 
       def well_known_endpoint

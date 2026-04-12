@@ -24,6 +24,7 @@ end
 
 require 'pry'
 require 'webmock/rspec'
+require_relative 'support/error_helpers'
 
 if File.exist?('.env.test')
   require 'dotenv'
@@ -61,6 +62,8 @@ RSpec.configure do |config|
   # compatibility in RSpec 3). It causes shared context metadata to be
   # inherited by the metadata hash of host groups and examples, rather than
   # triggering implicit auto-inclusion in groups with matching metadata.
+  config.include ErrorHelpers
+
   config.shared_context_metadata_behavior = :apply_to_host_groups
 
   # Allows RSpec to persist some state between runs in order to support

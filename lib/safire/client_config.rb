@@ -58,6 +58,8 @@ module Safire
   #
   # @see Safire::ClientConfigBuilder
   class ClientConfig < Entity
+    include URIValidation
+
     ATTRIBUTES = %i[
       base_url issuer client_id client_secret redirect_uri
       scopes authorization_endpoint token_endpoint
@@ -140,21 +142,6 @@ module Safire
       end
 
       [invalid_uris, non_https_uris]
-    end
-
-    def classify_uri(value)
-      uri = Addressable::URI.parse(value)
-      return :invalid unless uri.scheme && uri.host
-
-      :non_https if uri.scheme != 'https' && !localhost_host?(uri.host)
-    rescue Addressable::URI::InvalidURIError
-      :invalid
-    end
-
-    # Returns true when the host is a local loopback address.
-    # HTTP is permitted for localhost to support development environments.
-    def localhost_host?(host)
-      %w[localhost 127.0.0.1].include?(host)
     end
 
     def validate!

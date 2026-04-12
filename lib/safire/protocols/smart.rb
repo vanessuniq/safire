@@ -15,6 +15,7 @@ module Safire
     # @api private
     class Smart
       include Behaviours
+      include URIValidation
 
       ATTRIBUTES = %i[
         base_url client_id client_secret redirect_uri scopes issuer
@@ -239,6 +240,7 @@ module Safire
       #   response or a 2xx response missing +client_id+
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
       def register_client(metadata, registration_endpoint: nil, authorization: nil)
+        validate_registration_endpoint_https!(registration_endpoint) if registration_endpoint.present?
         endpoint = registration_endpoint.presence || discovered_registration_endpoint
         headers  = { content_type: 'application/json' }
         headers['Authorization'] = authorization if authorization.present?
@@ -516,6 +518,13 @@ module Safire
                              'the server may not support Dynamic Client Registration, ' \
                              'or the endpoint must be passed explicitly via registration_endpoint:'
         )
+      end
+
+      def validate_registration_endpoint_https!(endpoint)
+        case classify_uri(endpoint)
+        when :invalid   then raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
+        when :non_https then raise Errors::ConfigurationError.new(non_https_uri_attributes: [:registration_endpoint])
+        end
       end
 
       def parse_registration_response(body)

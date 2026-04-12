@@ -1106,6 +1106,38 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when registration_endpoint uses HTTP on a non-localhost host' do
+      it 'raises ConfigurationError' do
+        expect do
+          described_class.new(no_client_id_config).register_client(
+            client_metadata, registration_endpoint: 'http://remote.example.com/register'
+          )
+        end.to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+      end
+    end
+
+    context 'when registration_endpoint is a malformed URI' do
+      it 'raises ConfigurationError' do
+        expect do
+          described_class.new(no_client_id_config).register_client(
+            client_metadata, registration_endpoint: 'not-a-uri'
+          )
+        end.to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+      end
+    end
+
+    context 'when registration_endpoint uses HTTP on localhost' do
+      before { stub_registration(endpoint: 'http://localhost:3000/register') }
+
+      it 'does not raise (localhost exception)' do
+        expect do
+          described_class.new(no_client_id_config).register_client(
+            client_metadata, registration_endpoint: 'http://localhost:3000/register'
+          )
+        end.not_to raise_error
+      end
+    end
+
     context 'when registration_endpoint falls back to discovery' do
       let(:smart_metadata_with_dcr) do
         smart_metadata_body.merge('registration_endpoint' => registration_endpoint)

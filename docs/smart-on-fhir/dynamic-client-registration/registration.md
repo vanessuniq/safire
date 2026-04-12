@@ -115,6 +115,18 @@ registration = client.register_client({ client_name: 'My App', ... })
 
 If the server does not advertise a `registration_endpoint`, Safire raises `Safire::Errors::DiscoveryError`. The error message explains that you must supply the endpoint explicitly or that the server may not support DCR.
 
+To check before calling `register_client`, use `supports_dynamic_registration?` on the server metadata. This is only relevant when you are relying on discovery — if you already hold the endpoint URL, pass it via `registration_endpoint:` and skip this check.
+
+```ruby
+metadata = client.server_metadata
+
+unless metadata.supports_dynamic_registration?
+  raise 'Server does not advertise a registration_endpoint — pass registration_endpoint: explicitly or use manual registration'
+end
+
+registration = client.register_client({ client_name: 'My App', ... })
+```
+
 ### Explicit endpoint
 
 Pass `registration_endpoint:` to bypass discovery entirely. This is useful when the server advertises the endpoint out-of-band, when you want to skip the discovery request, or when the server does not expose `/.well-known/smart-configuration`.

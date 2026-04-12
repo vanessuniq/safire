@@ -153,6 +153,22 @@ module Safire
       end
     end
 
+    # Shared mixin for {TokenError} and {RegistrationError}: provides the +received_fields+
+    # attribute and its constructor forwarding. Both classes report structural response failures
+    # where a required field (+access_token+ or +client_id+) is absent.
+    #
+    # @api private
+    module ReceivesFields
+      def self.included(base)
+        base.attr_reader :received_fields
+      end
+
+      def initialize(received_fields: nil, **)
+        @received_fields = received_fields
+        super(**)
+      end
+    end
+
     # Raised for token exchange or refresh failures.
     #
     # Two usage paths:
@@ -162,34 +178,20 @@ module Safire
     # @!attribute [r] received_fields
     #   @return [Array<String>, nil] field names present in an invalid token response (no values logged)
     class TokenError < OAuthError
-      attr_reader :received_fields
-
-      # rubocop:disable Style/ArgumentsForwarding
-      def initialize(received_fields: nil, **kwargs)
-        @received_fields = received_fields
-        super(**kwargs)
-      end
-      # rubocop:enable Style/ArgumentsForwarding
+      include ReceivesFields
 
       private
 
       def operation_label = 'Token request failed'
 
       def build_message
-        return "Missing access token in response; received fields: #{@received_fields.join(', ')}" if @received_fields
+        return super unless @received_fields&.any?
 
-        super
+        "Missing access token in response; received fields: #{@received_fields.join(', ')}"
       end
     end
 
     # Raised when an authorization request fails.
-    #
-    # @!attribute [r] status
-    #   @return [Integer, nil] HTTP status code
-    # @!attribute [r] error_code
-    #   @return [String, nil] OAuth2 +error+ field
-    # @!attribute [r] error_description
-    #   @return [String, nil] OAuth2 +error_description+ field
     class AuthError < OAuthError
       private
 
@@ -205,23 +207,16 @@ module Safire
     # @!attribute [r] received_fields
     #   @return [Array<String>, nil] field names present in a response missing +client_id+ (no values logged)
     class RegistrationError < OAuthError
-      attr_reader :received_fields
-
-      def initialize(received_fields: nil, **kwargs)
-        @received_fields = received_fields
-        super(**kwargs)
-      end
+      include ReceivesFields
 
       private
 
       def operation_label = 'Client registration failed'
 
       def build_message
-        if @received_fields
-          "Registration response missing client_id; received fields: #{@received_fields.join(', ')}"
-        else
-          super
-        end
+        return super unless @received_fields&.any?
+
+        "Registration response missing client_id; received fields: #{@received_fields.join(', ')}"
       end
     end
 

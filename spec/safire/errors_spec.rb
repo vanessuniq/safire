@@ -173,6 +173,15 @@ RSpec.describe Safire::Errors do
       end
     end
 
+    context 'when structural failure with empty received_fields' do
+      subject(:error) { described_class.new(received_fields: []) }
+
+      it 'falls through to the generic message when no fields were received' do
+        expect(error.message).to match(/Token request failed/)
+        expect(error.message).not_to match(/received fields/)
+      end
+    end
+
     context 'with no arguments' do
       it 'has a generic fallback message' do
         expect(described_class.new.message).to match(/[Tt]oken/)
@@ -260,6 +269,15 @@ RSpec.describe Safire::Errors do
       it 'does not include field values in the message' do
         error_with_secret = described_class.new(received_fields: %w[client_secret])
         expect(error_with_secret.message).not_to match(/s3cr3t/)
+      end
+    end
+
+    context 'when structural failure with empty received_fields' do
+      subject(:error) { described_class.new(received_fields: []) }
+
+      it 'falls through to the generic message when no fields were received' do
+        expect(error.message).to match(/Client registration failed/)
+        expect(error.message).not_to match(/received fields/)
       end
     end
 

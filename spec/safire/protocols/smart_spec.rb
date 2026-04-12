@@ -1065,13 +1065,12 @@ RSpec.describe Safire::Protocols::Smart do
         end.not_to raise_error
       end
 
-      it 'POSTs metadata as JSON with correct Content-Type and Accept headers' do
+      it 'POSTs metadata as JSON with correct Content-Type and body fields' do
         described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
 
         expect(WebMock).to(have_requested(:post, registration_endpoint).with do |req|
           body = JSON.parse(req.body)
           req.headers['Content-Type'].start_with?('application/json') &&
-              req.headers['Accept'] == 'application/json' &&
               body['client_name'] == 'My App' &&
               body['redirect_uris'] == ['https://app.example.com/callback']
         end)

@@ -108,21 +108,6 @@ RSpec.describe 'SMART Dynamic Client Registration End-to-End Flow', type: :integ
       end
     end
 
-    context 'when registration_endpoint is passed explicitly' do
-      # stub_discovery is inherited from the outer describe but should NOT be called —
-      # the explicit endpoint bypasses discovery entirely.
-      before { stub_registration_post }
-
-      it 'uses the explicit endpoint instead of discovery' do
-        client = Safire::Client.new({ base_url: })
-        result = client.register_client(client_metadata, registration_endpoint:)
-
-        expect(result['client_id']).to eq('dyn_client_abc123')
-        expect(WebMock).to have_requested(:post, registration_endpoint)
-        expect(WebMock).not_to have_requested(:get, "#{base_url}/.well-known/smart-configuration")
-      end
-    end
-
     context 'when an initial access token is required (RFC 7591 §3.1)' do
       before { stub_registration_post }
 
@@ -136,6 +121,22 @@ RSpec.describe 'SMART Dynamic Client Registration End-to-End Flow', type: :integ
         expect(WebMock).to have_requested(:post, registration_endpoint)
           .with(headers: { 'Authorization' => 'Bearer initial-access-token-xyz' })
       end
+    end
+  end
+
+  # ---------- Discovery Bypass ----------
+
+  describe 'Registration with explicit endpoint (no discovery)' do
+    # No stub_discovery here — any accidental discovery call raises a WebMock error.
+    before { stub_registration_post }
+
+    it 'uses the explicit endpoint and never calls /.well-known/smart-configuration' do
+      client = Safire::Client.new({ base_url: })
+      result = client.register_client(client_metadata, registration_endpoint:)
+
+      expect(result['client_id']).to eq('dyn_client_abc123')
+      expect(WebMock).to have_requested(:post, registration_endpoint)
+      expect(WebMock).not_to have_requested(:get, "#{base_url}/.well-known/smart-configuration")
     end
   end
 

@@ -19,6 +19,7 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.type != 'Bot'
     steps:
       - uses: actions/checkout@v6
         with:

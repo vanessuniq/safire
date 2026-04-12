@@ -103,6 +103,34 @@ module Safire
   #   )
   #   client = Safire::Client.new(config, client_type: :confidential_asymmetric)
   #   token_data = client.request_backend_token
+  #
+  # @example Dynamic Client Registration – obtain a client_id before authorization flows
+  #   # Step 1 – create a temporary client (no client_id required)
+  #   temp_client = Safire::Client.new({ base_url: 'https://fhir.example.com' })
+  #
+  #   # Step 2 – register and receive credentials
+  #   registration = temp_client.register_client(
+  #     {
+  #       client_name:                'My FHIR App',
+  #       redirect_uris:              ['https://myapp.example.com/callback'],
+  #       grant_types:                ['authorization_code'],
+  #       token_endpoint_auth_method: 'private_key_jwt',
+  #       jwks_uri:                   'https://myapp.example.com/.well-known/jwks.json'
+  #     }
+  #   )
+  #
+  #   # Step 3 – persist credentials durably (database, secrets manager, etc.)
+  #   client_id = registration['client_id']
+  #
+  #   # Step 4 – build a properly configured client for subsequent authorization flows
+  #   client = Safire::Client.new(
+  #     {
+  #       base_url:     'https://fhir.example.com',
+  #       client_id:    client_id,
+  #       redirect_uri: 'https://myapp.example.com/callback',
+  #       scopes:       ['openid', 'profile', 'patient/*.read']
+  #     }
+  #   )
   class Client
     extend Forwardable
 

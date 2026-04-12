@@ -172,6 +172,12 @@ module Safire
 
       # Feature support checks
 
+      # Checks whether the server supports Dynamic Client Registration (RFC 7591).
+      # @return [Boolean] true if the server advertises a +registration_endpoint+
+      def supports_dynamic_registration?
+        registration_endpoint.present?
+      end
+
       def supports_post_based_authorization?
         capability?('authorize-post')
       end

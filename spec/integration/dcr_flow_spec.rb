@@ -56,13 +56,6 @@ RSpec.describe 'SMART Dynamic Client Registration End-to-End Flow', type: :integ
 
   # ---------- Helpers ----------
 
-  def capture_error(klass)
-    yield
-    nil
-  rescue klass => e
-    e
-  end
-
   def stub_discovery
     stub_request(:get, "#{base_url}/.well-known/smart-configuration")
       .to_return(status: 200, body: smart_metadata.to_json,

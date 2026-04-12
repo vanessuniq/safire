@@ -1045,16 +1045,6 @@ RSpec.describe Safire::Protocols::Smart do
     # Temp-client pattern: no client_id at registration time
     let(:no_client_id_config) { Safire::ClientConfig.new(config_attrs.except(:client_id)) }
 
-    # Captures a raised error of the given class; returns nil if none is raised.
-    # Needed because RSpec's `end.to raise_error(Klass) do |e|` is a multi-line block chain
-    # (Style/MultilineBlockChain offense), so we capture manually instead.
-    def capture_error(klass)
-      yield
-      nil
-    rescue klass => e
-      e
-    end
-
     def stub_registration(endpoint: registration_endpoint, status: 200, body: registration_response)
       stub_request(:post, endpoint)
         .to_return(status: status, body: body.to_json, headers: { 'Content-Type' => 'application/json' })

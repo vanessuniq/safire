@@ -4,6 +4,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: number
 
 permissions:
   contents: read
@@ -22,24 +28,52 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Please review this pull request for the Safire Ruby gem — an OAuth 2.0 client
+            Please review PR #${{ github.event.pull_request.number || github.event.inputs.pr_number }} for the Safire Ruby gem — an OAuth 2.0 client
             library implementing SMART App Launch 2.2.0 and UDAP Security for healthcare
             FHIR applications.
 
             Focus on:
             - Correctness and protocol compliance (OAuth 2.0, SMART App Launch, RFC 7591)
             - Security: credential handling, token exposure, input validation at trust boundaries
-            - Ruby quality and elegance — flag anything that could be simpler or cleaner
+            - Ruby quality and elegance — flag anything that could be simpler, cleaner, DRY-er, or more idiomatic
             - Rubocop patterns: guard clause spacing, single quotes, `described_class` in specs,
               `receive_messages` for multiple stubs, `instance_double` over `double`
             - Test coverage: edge cases, error paths, and correct layer (do not test ClientConfig
               behaviour from Smart specs, and vice versa)
-            - YARD docs: accuracy and completeness for any public API changes
+            - Gap analysis: are there any important cases, features, or docs that are missing?
+            - Overall clarity and maintainability of the code, tests, and docs
+            - Code debt: flag any areas that are complex, brittle, or could be simplified
+            - README: clarity, accuracy, and completeness for any user-facing changes
+            - YARD docs & docs pages: accuracy and completeness for any public API changes
             - CHANGELOG: does the PR update `[Unreleased]` for any user-facing change?
 
             Use `gh pr comment` for overall feedback.
             Use `mcp__github_inline_comment__create_inline_comment` (with `confirmed: true`)
             for specific line-level issues.
             Only post GitHub comments — do not reply as messages.
+
+            At the very end of your summary `gh pr comment`, include exactly one of these
+            HTML markers on its own line with nothing after it:
+            - `<!-- REVIEW_DECISION: APPROVE -->` if there are no must-fix or should-fix issues
+            - `<!-- REVIEW_DECISION: REQUEST_CHANGES -->` if there are any must-fix or should-fix issues
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+
+      - name: Auto-approve if no blocking issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
+
+          # Find the most recent issue comment on this PR (Claude's summary via gh pr comment)
+          LATEST_COMMENT=$(gh api \
+            "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq 'sort_by(.created_at) | last | .body // ""')
+
+          if echo "$LATEST_COMMENT" | grep -q '<!-- REVIEW_DECISION: APPROVE -->'; then
+            echo "No blocking issues found — approving PR"
+            gh pr review "$PR_NUMBER" --approve \
+              --body "Approved by Claude Code: no must-fix or should-fix issues found."
+          else
+            echo "Blocking issues found or decision marker absent — skipping approval"
+          fi

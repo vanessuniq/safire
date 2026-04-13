@@ -1145,6 +1145,20 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when discovered registration_endpoint is non-HTTPS' do
+      let(:non_https_metadata) do
+        smart_metadata_body.merge('registration_endpoint' => 'http://fhir.example.com/register')
+      end
+
+      before { stub_well_known(body: non_https_metadata) }
+
+      it 'raises ConfigurationError' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id, :authorization_endpoint, :token_endpoint))
+        expect { described_class.new(cfg).register_client(client_metadata) }
+          .to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+      end
+    end
+
     context 'when no registration_endpoint is available' do
       before { stub_well_known } # discovery response does NOT include registration_endpoint
 

@@ -2,7 +2,7 @@ name: Claude PR Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -59,22 +59,3 @@ jobs:
             - `<!-- REVIEW_DECISION: REQUEST_CHANGES -->` if there are any must-fix or should-fix issues
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
-
-      - name: Auto-approve if no blocking issues
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_NUMBER="${{ github.event.pull_request.number || github.event.inputs.pr_number }}"
-
-          # Find the most recent issue comment on this PR (Claude's summary via gh pr comment)
-          LATEST_COMMENT=$(gh api \
-            "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            --jq 'sort_by(.created_at) | last | .body // ""')
-
-          if echo "$LATEST_COMMENT" | grep -q '<!-- REVIEW_DECISION: APPROVE -->'; then
-            echo "No blocking issues found — approving PR"
-            gh pr review "$PR_NUMBER" --approve \
-              --body "Approved by Claude Code: no must-fix or should-fix issues found."
-          else
-            echo "Blocking issues found or decision marker absent — skipping approval"
-          fi

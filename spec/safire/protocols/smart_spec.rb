@@ -587,19 +587,13 @@ RSpec.describe Safire::Protocols::Smart do
     context 'when invalid response (missing access_token)' do
       it 'raises TokenError' do
         stub_token_post(
-          body_matcher: {
-            'grant_type' => 'authorization_code',
-            'code' => 'auth_code_abc123',
-            'redirect_uri' => config_attrs[:redirect_uri],
-            'code_verifier' => 'test_code_verifier_xyz789',
-            'client_id' => config_attrs[:client_id]
-          },
+          body_matcher: public_auth_code_body,
           status: 200,
           body: { 'token_type' => 'Bearer', 'expires_in' => 3600 }
         )
         expect do
           described_class.new(config, client_type: :public)
-                         .request_access_token(code: 'auth_code_abc123', code_verifier: 'test_code_verifier_xyz789')
+                         .request_access_token(code: authorization_code, code_verifier:)
         end.to raise_error(Safire::Errors::TokenError, /Missing access token/)
       end
     end
@@ -1138,8 +1132,7 @@ RSpec.describe Safire::Protocols::Smart do
       end
 
       it 'uses the registration_endpoint advertised in SMART metadata' do
-        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id, :authorization_endpoint, :token_endpoint))
-        described_class.new(cfg).register_client(client_metadata)
+        described_class.new(no_client_id_config).register_client(client_metadata)
 
         expect(WebMock).to have_requested(:post, registration_endpoint)
       end
@@ -1153,8 +1146,7 @@ RSpec.describe Safire::Protocols::Smart do
       before { stub_well_known(body: non_https_metadata) }
 
       it 'raises ConfigurationError' do
-        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id, :authorization_endpoint, :token_endpoint))
-        expect { described_class.new(cfg).register_client(client_metadata) }
+        expect { described_class.new(no_client_id_config).register_client(client_metadata) }
           .to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
       end
     end
@@ -1163,8 +1155,7 @@ RSpec.describe Safire::Protocols::Smart do
       before { stub_well_known } # discovery response does NOT include registration_endpoint
 
       it 'raises DiscoveryError directing the caller to provide the endpoint explicitly' do
-        cfg = Safire::ClientConfig.new(config_attrs.except(:client_id, :authorization_endpoint, :token_endpoint))
-        expect { described_class.new(cfg).register_client(client_metadata) }
+        expect { described_class.new(no_client_id_config).register_client(client_metadata) }
           .to raise_error(Safire::Errors::DiscoveryError, /registration_endpoint/)
       end
     end
@@ -1188,6 +1179,19 @@ RSpec.describe Safire::Protocols::Smart do
         expect(error.error_description).to eq('Must be HTTPS')
         expect(error.message).to match(/400/)
         expect(error.message).to match(/invalid_redirect_uri/)
+      end
+    end
+
+    context 'when the Faraday response body is already a parsed Hash (middleware pre-parsed)' do
+      it 'extracts error_code and error_description from the Hash directly' do
+        faraday_err = instance_double(
+          Faraday::Error,
+          response: { status: 400, body: { 'error' => 'invalid_redirect_uri', 'error_description' => 'Must be HTTPS' } }
+        )
+        error = described_class.new(no_client_id_config).send(:registration_error_from, faraday_err)
+
+        expect(error.error_code).to eq('invalid_redirect_uri')
+        expect(error.error_description).to eq('Must be HTTPS')
       end
     end
 

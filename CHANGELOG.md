@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Protocol (RFC 7591): POSTs client metadata to the server's registration endpoint and
   returns the response as a Hash containing at minimum a `client_id`
   - Endpoint is resolved from SMART discovery (`registration_endpoint` field) when not
-    supplied explicitly via the `registration_endpoint:` keyword argument
+    supplied explicitly via the `registration_endpoint:` keyword argument; HTTPS is
+    enforced on the endpoint regardless of source
   - Supports an optional initial access token via the `authorization:` keyword argument
     (full `Authorization` header value including token type prefix)
   - Raises `Safire::Errors::DiscoveryError` when no registration endpoint is available,

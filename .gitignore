@@ -45,6 +45,7 @@ build-iPhoneSimulator/
 PLAN.md
 docs/api
 specs
+.claude/settings.local.json
 
 ## Environment normalization:
 /.bundle/

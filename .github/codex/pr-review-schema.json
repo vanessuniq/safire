@@ -16,11 +16,15 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["severity", "title", "body", "path", "line"],
+        "required": ["severity", "anchor", "title", "body", "path", "line"],
         "properties": {
           "severity": {
             "type": "string",
             "enum": ["must-fix", "should-fix", "nit", "question"]
+          },
+          "anchor": {
+            "type": "string",
+            "enum": ["inline", "context"]
           },
           "title": {
             "type": "string",

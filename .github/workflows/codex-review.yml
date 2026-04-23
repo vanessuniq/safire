@@ -60,7 +60,7 @@ jobs:
 
       - name: Run Codex review
         id: run_codex
-        uses: openai/codex-action@v1
+        uses: openai/codex-action@c25d10f3f498316d4b2496cc4c6dd58057a7b031 # v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           sandbox: read-only
@@ -105,11 +105,13 @@ jobs:
             If there are no findings, say that explicitly and briefly note any residual risk or testing gap.
 
             For `findings`:
-            - Include one item per distinct issue worth a line-level review comment
-            - Use repo-relative `path`
-            - Use the line number from the PR head revision in `line`
-            - Only set `path` and `line` when you are confident the issue maps to a changed line on the RIGHT side of the diff
-            - Use `null` for `path` and `line` when the issue is real but cannot be safely anchored inline
+            - Include one item per distinct issue
+            - Set `anchor` to `inline` for findings that should become GitHub inline review comments on changed RIGHT-side diff lines
+            - Set `anchor` to `context` for findings caused by the PR but best discussed in unchanged code, broader design, cleanup, or follow-on work
+            - Use repo-relative `path` when you know the relevant file
+            - Use the line number from the PR head revision in `line` when you know the relevant line
+            - For `inline` findings, only set `path` and `line` when you are confident the issue maps to a changed line on the RIGHT side of the diff
+            - For `context` findings, you may set `path` and `line` to reference unchanged code affected by the PR, or use `null` when the issue is broader
             - Keep each `body` concise, specific, and actionable
 
       - name: Post Codex review
@@ -127,8 +129,9 @@ jobs:
             const maxInlineComments = 20;
             const allowedSeverities = new Set(['must-fix', 'should-fix', 'nit', 'question']);
             const allowedDecisions = new Set(['APPROVE', 'REQUEST_CHANGES']);
+            const allowedAnchors = new Set(['inline', 'context']);
 
-            function parseHeadLinesFromPatch(patch) {
+            function parseChangedHeadLinesFromPatch(patch) {
               const lines = new Set();
               if (!patch) {
                 return lines;
@@ -154,7 +157,6 @@ jobs:
                 }
 
                 if (rawLine.startsWith(' ')) {
-                  lines.add(headLine);
                   headLine += 1;
                   continue;
                 }
@@ -201,7 +203,7 @@ jobs:
                 file.filename,
                 {
                   status: file.status,
-                  headLines: parseHeadLinesFromPatch(file.patch),
+                  changedHeadLines: parseChangedHeadLinesFromPatch(file.patch),
                 },
               ]),
             );
@@ -216,6 +218,7 @@ jobs:
               }
 
               const severity = allowedSeverities.has(finding.severity) ? finding.severity : 'question';
+              const anchor = allowedAnchors.has(finding.anchor) ? finding.anchor : 'context';
               const title = typeof finding.title === 'string' ? finding.title.trim() : '';
               const body = typeof finding.body === 'string' ? finding.body.trim() : '';
               const path = typeof finding.path === 'string' && finding.path.trim() ? finding.path.trim() : null;
@@ -228,10 +231,11 @@ jobs:
               const rendered = `**${severity}**: ${title}\n\n${body}`;
               const changedFile = path ? changedFiles.get(path) : null;
               const canInline = Boolean(
+                anchor === 'inline' &&
                 changedFile &&
                 line &&
                 changedFile.status !== 'removed' &&
-                changedFile.headLines.has(line),
+                changedFile.changedHeadLines.has(line),
               );
 
               if (canInline && inlineComments.length < maxInlineComments) {
@@ -249,7 +253,8 @@ jobs:
               }
 
               const location = path && line ? ` (${path}:${line})` : path ? ` (${path})` : '';
-              summaryFindings.push(`- **${severity}**: ${title}${location}\n${body}`);
+              const anchorNote = anchor === 'context' ? ' [context]' : '';
+              summaryFindings.push(`- **${severity}**: ${title}${anchorNote}${location}\n${body}`);
             }
 
             if (overflowCount > 0) {
@@ -258,7 +263,7 @@ jobs:
 
             const summarySuffix = [];
             if (summaryFindings.length > 0) {
-              summarySuffix.push('Fallback findings that could not be safely posted inline:\n');
+              summarySuffix.push('Additional findings and fallback items:\n');
               summarySuffix.push(summaryFindings.join('\n\n'));
             }
             summarySuffix.push(`<!-- REVIEW_DECISION: ${decision} -->`);

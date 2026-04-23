@@ -126,6 +126,12 @@ jobs:
             - For `context` findings, you may set `path` and `line` to reference unchanged code affected by the PR, or use `null` when the issue is broader
             - Keep each `body` concise, specific, and actionable
 
+      - name: Fail if Codex produced no review output
+        if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_codex.outputs.final-message == ''
+        run: |
+          echo "Codex completed without producing a final review message."
+          exit 1
+
       - name: Post Codex review
         if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_codex.outputs.final-message != ''
         uses: actions/github-script@v7
@@ -209,6 +215,17 @@ jobs:
 
             if (!summary) {
               core.setFailed('Codex review summary was empty.');
+              return;
+            }
+
+            const { data: currentPr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            if (currentPr.head.sha !== prHeadSha) {
+              core.setFailed(`PR head changed during review: expected ${prHeadSha}, found ${currentPr.head.sha}.`);
               return;
             }
 

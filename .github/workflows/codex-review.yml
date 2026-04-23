@@ -1,0 +1,276 @@
+name: Codex PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.type != 'Bot'
+    steps:
+      - name: Load PR metadata
+        id: pr_metadata
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const prNumber = context.eventName === 'workflow_dispatch'
+              ? Number(context.payload.inputs.pr_number)
+              : context.payload.pull_request.number;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('base_ref', pr.base.ref);
+            core.setOutput('base_sha', pr.base.sha);
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('title', pr.title);
+            core.setOutput('body', pr.body || '');
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          ref: refs/pull/${{ steps.pr_metadata.outputs.pr_number }}/merge
+
+      - name: Pre-fetch base and head refs for the PR
+        env:
+          PR_BASE_REF: ${{ steps.pr_metadata.outputs.base_ref }}
+          PR_NUMBER: ${{ steps.pr_metadata.outputs.pr_number }}
+        run: |
+          git fetch --no-tags origin \
+            "$PR_BASE_REF" \
+            "+refs/pull/$PR_NUMBER/head"
+
+      - name: Run Codex review
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          sandbox: read-only
+          output-schema-file: .github/codex/pr-review-schema.json
+          prompt: |
+            Please review PR #${{ steps.pr_metadata.outputs.pr_number }} for the Safire Ruby gem — an OAuth 2.0 client
+            library implementing SMART App Launch 2.2.0 and UDAP Security for healthcare
+            FHIR applications.
+
+            Review ONLY the changes introduced by the PR. Use this diff range:
+            `git log --oneline ${{ steps.pr_metadata.outputs.base_sha }}...${{ steps.pr_metadata.outputs.head_sha }}`
+            `git diff ${{ steps.pr_metadata.outputs.base_sha }}...${{ steps.pr_metadata.outputs.head_sha }}`
+
+            Pull request title:
+            ${{ steps.pr_metadata.outputs.title }}
+
+            Pull request body:
+            ${{ steps.pr_metadata.outputs.body }}
+
+            Focus on:
+            - Correctness and protocol compliance (OAuth 2.0, SMART App Launch, RFC 7591)
+            - Security: credential handling, token exposure, input validation at trust boundaries
+            - Ruby quality and elegance — flag anything that could be simpler, cleaner, DRY-er, or more idiomatic
+            - Rubocop patterns: guard clause spacing, single quotes, `described_class` in specs,
+              `receive_messages` for multiple stubs, `instance_double` over `double`
+            - Test coverage: edge cases, error paths, and correct layer (do not test ClientConfig
+              behaviour from Smart specs, and vice versa)
+            - Gap analysis: are there any important cases, features, or docs that are missing?
+            - Overall clarity and maintainability of the code, tests, and docs
+            - Code debt: flag any areas that are complex, brittle, or could be simplified
+            - README: clarity, accuracy, and completeness for any user-facing changes
+            - YARD docs & docs pages: accuracy and completeness for any public API changes
+            - CHANGELOG: does the PR update `[Unreleased]` for any user-facing change?
+
+            Return ONLY JSON matching the provided schema.
+            Set `decision` to:
+            - `REQUEST_CHANGES` if there are any must-fix or should-fix issues
+            - `APPROVE` if there are no must-fix or should-fix issues
+
+            Put the overall review in `summary` as GitHub-flavored Markdown.
+            If there are findings, list them first in severity order with brief file/line references when known.
+            If there are no findings, say that explicitly and briefly note any residual risk or testing gap.
+
+            For `findings`:
+            - Include one item per distinct issue worth a line-level review comment
+            - Use repo-relative `path`
+            - Use the line number from the PR head revision in `line`
+            - Only set `path` and `line` when you are confident the issue maps to a changed line on the RIGHT side of the diff
+            - Use `null` for `path` and `line` when the issue is real but cannot be safely anchored inline
+            - Keep each `body` concise, specific, and actionable
+
+      - name: Post Codex review
+        if: steps.run_codex.outputs.final-message != ''
+        uses: actions/github-script@v7
+        env:
+          CODEX_FINAL_MESSAGE: ${{ steps.run_codex.outputs.final-message }}
+          PR_NUMBER: ${{ steps.pr_metadata.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.pr_metadata.outputs.head_sha }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER);
+            const prHeadSha = process.env.PR_HEAD_SHA;
+            const maxInlineComments = 20;
+            const allowedSeverities = new Set(['must-fix', 'should-fix', 'nit', 'question']);
+            const allowedDecisions = new Set(['APPROVE', 'REQUEST_CHANGES']);
+
+            function parseHeadLinesFromPatch(patch) {
+              const lines = new Set();
+              if (!patch) {
+                return lines;
+              }
+
+              let headLine = null;
+
+              for (const rawLine of patch.split('\n')) {
+                const hunkMatch = rawLine.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+                if (hunkMatch) {
+                  headLine = Number(hunkMatch[1]);
+                  continue;
+                }
+
+                if (headLine === null) {
+                  continue;
+                }
+
+                if (rawLine.startsWith('+')) {
+                  lines.add(headLine);
+                  headLine += 1;
+                  continue;
+                }
+
+                if (rawLine.startsWith(' ')) {
+                  lines.add(headLine);
+                  headLine += 1;
+                  continue;
+                }
+
+                if (rawLine.startsWith('-')) {
+                  continue;
+                }
+              }
+
+              return lines;
+            }
+
+            let review;
+            try {
+              review = JSON.parse(process.env.CODEX_FINAL_MESSAGE);
+            } catch (error) {
+              core.setFailed(`Codex output was not valid JSON: ${error.message}`);
+              return;
+            }
+
+            if (!review || typeof review !== 'object') {
+              core.setFailed('Codex output was not a JSON object.');
+              return;
+            }
+
+            const decision = allowedDecisions.has(review.decision) ? review.decision : 'REQUEST_CHANGES';
+            const summary = typeof review.summary === 'string' ? review.summary.trim() : '';
+            const findings = Array.isArray(review.findings) ? review.findings : [];
+
+            if (!summary) {
+              core.setFailed('Codex review summary was empty.');
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+
+            const changedFiles = new Map(
+              files.map((file) => [
+                file.filename,
+                {
+                  status: file.status,
+                  headLines: parseHeadLinesFromPatch(file.patch),
+                },
+              ]),
+            );
+
+            const inlineComments = [];
+            const summaryFindings = [];
+            let overflowCount = 0;
+
+            for (const finding of findings) {
+              if (!finding || typeof finding !== 'object') {
+                continue;
+              }
+
+              const severity = allowedSeverities.has(finding.severity) ? finding.severity : 'question';
+              const title = typeof finding.title === 'string' ? finding.title.trim() : '';
+              const body = typeof finding.body === 'string' ? finding.body.trim() : '';
+              const path = typeof finding.path === 'string' && finding.path.trim() ? finding.path.trim() : null;
+              const line = Number.isInteger(finding.line) ? finding.line : null;
+
+              if (!title || !body) {
+                continue;
+              }
+
+              const rendered = `**${severity}**: ${title}\n\n${body}`;
+              const changedFile = path ? changedFiles.get(path) : null;
+              const canInline = Boolean(
+                changedFile &&
+                line &&
+                changedFile.status !== 'removed' &&
+                changedFile.headLines.has(line),
+              );
+
+              if (canInline && inlineComments.length < maxInlineComments) {
+                inlineComments.push({
+                  path,
+                  line,
+                  side: 'RIGHT',
+                  body: rendered,
+                });
+                continue;
+              }
+
+              if (canInline) {
+                overflowCount += 1;
+              }
+
+              const location = path && line ? ` (${path}:${line})` : path ? ` (${path})` : '';
+              summaryFindings.push(`- **${severity}**: ${title}${location}\n${body}`);
+            }
+
+            if (overflowCount > 0) {
+              summaryFindings.push(`- ${overflowCount} additional inline finding(s) were summarized here because the workflow caps inline comments at ${maxInlineComments}.`);
+            }
+
+            const summarySuffix = [];
+            if (summaryFindings.length > 0) {
+              summarySuffix.push('Fallback findings that could not be safely posted inline:\n');
+              summarySuffix.push(summaryFindings.join('\n\n'));
+            }
+            summarySuffix.push(`<!-- REVIEW_DECISION: ${decision} -->`);
+
+            const body = [summary, ...summarySuffix].filter(Boolean).join('\n\n');
+
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              commit_id: prHeadSha,
+              event: decision,
+              body,
+              comments: inlineComments,
+            });

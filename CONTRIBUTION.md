@@ -20,6 +20,9 @@ This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participatin
 ## Getting Started
 
 1. Fork the repository on GitHub
+
+   Note: Codex automated review currently runs only for same-repository branches because it requires repository secrets and reviews untrusted PR content. Fork-based PRs are still welcome, but maintainers will review them manually.
+
 2. Clone your fork locally:
    ```bash
    git clone https://github.com/YOUR_USERNAME/safire.git
@@ -230,6 +233,8 @@ end
    ```
 
 2. Open a Pull Request against `main`
+
+   Codex automated review only runs for same-repository branches. Pull requests from forks will receive maintainer review instead.
 
 3. Fill out the PR template with:
    - Summary of changes

@@ -209,8 +209,6 @@ jobs:
           PR_NUMBER: ${{ steps.pr_metadata.outputs.pr_number }}
           PR_HEAD_SHA: ${{ steps.pr_metadata.outputs.head_sha }}
         with:
-          # We intentionally use GITHUB_TOKEN here and accept that its approval
-          # may not count toward branch protection in all repository setups.
           github-token: ${{ github.token }}
           script: |
             const prBaseSha = process.env.PR_BASE_SHA;
@@ -299,14 +297,15 @@ jobs:
 
             const baseChanged = currentPr.base.sha !== prBaseSha;
 
-            const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+            const files = await github.paginate(github.rest.pulls.listFiles, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              basehead: `${prBaseSha}...${prHeadSha}`,
+              pull_number: prNumber,
+              per_page: 100,
             });
 
             const changedFiles = new Map(
-              (comparison.files || []).map((file) => [
+              files.map((file) => [
                 file.filename,
                 {
                   status: file.status,

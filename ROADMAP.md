@@ -1,6 +1,6 @@
 # Safire Roadmap
 
-## Current Release — v0.2.0
+## Current Release — v0.3.0
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
 
@@ -35,7 +35,34 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 ### Quality and Compliance
 
-- **Inferno SMART App Launch STU2.2 Test Suite** — full passing run against the [Inferno Framework](https://inferno-framework.github.io/)
+- **Inferno SMART App Launch STU 2.2 Test Suite** — compliance validation using
+  [Inferno](https://inferno-framework.github.io/) as a mock EHR authorization server,
+  with Safire's demo app acting as the SMART client. Delivered in two phases.
+
+  **Phase 1 — HTTP-only flows (no browser automation required)**
+  - Discovery (local conformance gate): Safire discovers Inferno's
+    `/.well-known/smart-configuration` and validates the parsed metadata via
+    `SmartMetadata#valid?`; this is a local parsing and conformance check,
+    not an Inferno-driven assertion
+  - Backend Services (Inferno-driven): JWT assertion construction, `client_credentials`
+    token request format, and token response validation against Inferno's mock token
+    endpoint
+  - Inferno test results published as a GitHub Actions artifact (static HTML report
+    generated from Inferno's JSON output)
+
+  **Phase 2 — Authorization code flows (browser automation via Capybara)**
+  - Standalone Patient Launch for all three client types: public (PKCE-only),
+    confidential symmetric (`client_secret_basic`), and confidential asymmetric
+    (`private_key_jwt`)
+  - EHR Launch: Inferno redirects the user agent to the demo app's `GET /launch`
+    endpoint with `iss` and `launch` as query parameters, exercising the EHR-initiated
+    authorization code flow as a separate Inferno test group
+  - Infrastructure: Docker Compose for a local Inferno instance, Capybara and headless
+    Chrome for OAuth consent screen automation
+
+  **Note on Client Registration:** Inferno's reference server documentation states that
+  there is currently no registration process and apps must use preconfigured client IDs,
+  so DCR is not covered under this Inferno-based plan.
 
 ---
 

@@ -235,6 +235,8 @@ jobs:
               return;
             }
 
+            const baseChanged = currentPr.base.sha !== prBaseSha;
+
             const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -281,6 +283,7 @@ jobs:
               const rendered = `**${severity}**: ${title}\n\n${body}`;
               const changedFile = path ? changedFiles.get(path) : null;
               const canInline = Boolean(
+                !baseChanged &&
                 anchor === 'inline' &&
                 changedFile &&
                 line &&
@@ -329,6 +332,9 @@ jobs:
             }
 
             const summarySuffix = [];
+            if (baseChanged) {
+              summarySuffix.push(`Inline comments were summarized instead of posted because the PR base changed during review: reviewed ${prBaseSha}, current ${currentPr.base.sha}.`);
+            }
             if (summaryFindings.length > 0) {
               summarySuffix.push('Additional findings and fallback items:\n');
               summarySuffix.push(summaryFindings.join('\n\n'));

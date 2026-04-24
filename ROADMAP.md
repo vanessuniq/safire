@@ -53,10 +53,16 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   - Standalone Patient Launch for all three client types: public (PKCE-only),
     confidential symmetric (`client_secret_basic`), and confidential asymmetric
     (`private_key_jwt`)
-  - Dynamic Client Registration: register via `register_client`, then complete an
-    authorization code flow with the returned `client_id`
+  - EHR Launch: Inferno initiates the flow by posting `launch` and `iss` parameters
+    to the demo app's `/launch` endpoint, exercising the EHR-initiated authorization
+    code flow as a separate Inferno test group
   - Infrastructure: Docker Compose for a local Inferno instance, Capybara and headless
     Chrome for OAuth consent screen automation
+
+  **Note on Client Registration:** Inferno's reference server documentation states that
+  there is currently no registration process and apps must use preconfigured client IDs,
+  so DCR is not covered under this Inferno-based plan. `register_client` is validated
+  separately via live integration tests against servers that support RFC 7591.
 
 ---
 

@@ -1,7 +1,10 @@
 name: Codex PR Review
 
 on:
-  pull_request:
+  # `pull_request_target` keeps the reviewer workflow definition on the trusted
+  # base branch, so a PR cannot rewrite the prompt, schema, or posting logic
+  # that reviews that same PR.
+  pull_request_target:
     types: [opened, synchronize, reopened]
     branches: [main]
   workflow_dispatch:
@@ -43,10 +46,9 @@ jobs:
             core.setOutput('title', pr.title);
             core.setOutput('body', pr.body || '');
 
-      # Fork PRs are intentionally skipped. Reviewing fork code would either
-      # run without repository secrets on `pull_request`, or require
-      # `pull_request_target`, which is too risky for this AI reviewer because
-      # untrusted code and PR metadata are part of the review context.
+      # Fork PRs are intentionally skipped. This workflow runs with trusted
+      # base-branch logic and repository secrets, then inspects PR content as
+      # untrusted data. We only allow that for same-repository branches.
       - name: Skip unsupported fork PRs
         if: steps.pr_metadata.outputs.same_repo != 'true'
         run: |

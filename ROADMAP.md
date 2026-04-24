@@ -42,7 +42,8 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
   **Phase 1 — HTTP-only flows (no browser automation required)**
   - Discovery compliance: Safire discovers Inferno's `/.well-known/smart-configuration`
-    and asserts full spec conformance via `SmartMetadata#valid?`
+    and validates required field presence, conditional fields, and PKCE method rules
+    via `SmartMetadata#valid?`
   - Backend Services compliance: JWT assertion construction, `client_credentials` token
     request format, and token response validation against Inferno's mock token endpoint
   - Inferno test results published as a GitHub Actions artifact (static HTML report

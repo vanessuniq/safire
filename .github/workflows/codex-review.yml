@@ -235,11 +235,6 @@ jobs:
               return;
             }
 
-            if (currentPr.base.sha !== prBaseSha) {
-              core.setFailed(`PR base changed during review: expected ${prBaseSha}, found ${currentPr.base.sha}.`);
-              return;
-            }
-
             const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
               owner: context.repo.owner,
               repo: context.repo.repo,

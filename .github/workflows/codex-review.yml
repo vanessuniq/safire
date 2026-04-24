@@ -43,9 +43,15 @@ jobs:
             core.setOutput('title', pr.title);
             core.setOutput('body', pr.body || '');
 
+      # Fork PRs are intentionally skipped. Reviewing fork code would either
+      # run without repository secrets on `pull_request`, or require
+      # `pull_request_target`, which is too risky for this AI reviewer because
+      # untrusted code and PR metadata are part of the review context.
       - name: Skip unsupported fork PRs
         if: steps.pr_metadata.outputs.same_repo != 'true'
-        run: echo "Skipping Codex review for fork-based PRs; this workflow only supports same-repo PRs."
+        run: |
+          echo "Skipping Codex review for fork-based PRs."
+          echo "This is intentional: the workflow needs repository secrets and inspects untrusted PR content."
 
       - uses: actions/checkout@v6
         if: steps.pr_metadata.outputs.same_repo == 'true'
@@ -60,7 +66,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PR_BASE_SHA: ${{ steps.pr_metadata.outputs.base_sha }}
         run: |
-          auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64)"
+          auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
           git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" \
             fetch --no-tags origin "$PR_BASE_SHA"
 
@@ -226,6 +232,11 @@ jobs:
 
             if (currentPr.head.sha !== prHeadSha) {
               core.setFailed(`PR head changed during review: expected ${prHeadSha}, found ${currentPr.head.sha}.`);
+              return;
+            }
+
+            if (currentPr.base.sha !== prBaseSha) {
+              core.setFailed(`PR base changed during review: expected ${prBaseSha}, found ${currentPr.base.sha}.`);
               return;
             }
 

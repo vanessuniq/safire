@@ -51,14 +51,18 @@ jobs:
         if: steps.pr_metadata.outputs.same_repo == 'true'
         with:
           fetch-depth: 0
+          persist-credentials: false
           ref: ${{ steps.pr_metadata.outputs.head_sha }}
 
       - name: Pre-fetch base commit for the PR diff
         if: steps.pr_metadata.outputs.same_repo == 'true'
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           PR_BASE_SHA: ${{ steps.pr_metadata.outputs.base_sha }}
         run: |
-          git fetch --no-tags origin "$PR_BASE_SHA"
+          auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64)"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" \
+            fetch --no-tags origin "$PR_BASE_SHA"
 
       - name: Run Codex review
         if: steps.pr_metadata.outputs.same_repo == 'true'
@@ -82,15 +86,11 @@ jobs:
             `git log --oneline ${{ steps.pr_metadata.outputs.base_sha }}...${{ steps.pr_metadata.outputs.head_sha }}`
             `git diff ${{ steps.pr_metadata.outputs.base_sha }}...${{ steps.pr_metadata.outputs.head_sha }}`
 
-            Untrusted PR title:
-            ```text
-            ${{ steps.pr_metadata.outputs.title }}
-            ```
+            Untrusted PR title (JSON string literal):
+            ${{ toJSON(steps.pr_metadata.outputs.title) }}
 
-            Untrusted PR body:
-            ```text
-            ${{ steps.pr_metadata.outputs.body }}
-            ```
+            Untrusted PR body (JSON string literal):
+            ${{ toJSON(steps.pr_metadata.outputs.body) }}
 
             Focus on:
             - Correctness and protocol compliance (OAuth 2.0, SMART App Launch, RFC 7591)

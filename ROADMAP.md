@@ -41,9 +41,9 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   and validates it against the spec. Delivered in two phases.
 
   **Phase 1 — HTTP-only flows (no browser automation required)**
-  - Discovery compliance: Safire discovers Inferno's `/.well-known/smart-configuration`
-    and validates required field presence, conditional fields, and PKCE method rules
-    via `SmartMetadata#valid?`
+  - Discovery: Safire discovers Inferno's `/.well-known/smart-configuration` and
+    validates the parsed metadata via `SmartMetadata#valid?`; this exercises Safire's
+    local parsing and conformance checks rather than an Inferno-driven assertion
   - Backend Services compliance: JWT assertion construction, `client_credentials` token
     request format, and token response validation against Inferno's mock token endpoint
   - Inferno test results published as a GitHub Actions artifact (static HTML report
@@ -53,9 +53,9 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   - Standalone Patient Launch for all three client types: public (PKCE-only),
     confidential symmetric (`client_secret_basic`), and confidential asymmetric
     (`private_key_jwt`)
-  - EHR Launch: Inferno initiates the flow by posting `launch` and `iss` parameters
-    to the demo app's `/launch` endpoint, exercising the EHR-initiated authorization
-    code flow as a separate Inferno test group
+  - EHR Launch: Inferno redirects the user agent to the demo app's `GET /launch`
+    endpoint with `iss` and `launch` as query parameters, exercising the EHR-initiated
+    authorization code flow as a separate Inferno test group
   - Infrastructure: Docker Compose for a local Inferno instance, Capybara and headless
     Chrome for OAuth consent screen automation
 

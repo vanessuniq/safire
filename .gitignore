@@ -45,6 +45,8 @@ build-iPhoneSimulator/
 PLAN.md
 docs/api
 specs
+.codex
+.codex/
 .claude/settings.local.json
 
 ## Environment normalization:

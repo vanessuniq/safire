@@ -70,6 +70,32 @@ jobs:
           git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" \
             fetch --no-tags origin "$PR_BASE_SHA"
 
+      - name: Load trusted Codex review schema
+        if: steps.pr_metadata.outputs.same_repo == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+
+            const { data } = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: '.github/codex/pr-review-schema.json',
+              ref: '${{ steps.pr_metadata.outputs.base_sha }}',
+            });
+
+            if (Array.isArray(data) || data.type !== 'file' || !data.content) {
+              core.setFailed('Trusted Codex review schema was not found.');
+              return;
+            }
+
+            await fs.promises.mkdir('.github/codex-trusted', { recursive: true });
+            await fs.promises.writeFile(
+              '.github/codex-trusted/pr-review-schema.json',
+              Buffer.from(data.content, data.encoding).toString('utf8'),
+            );
+
       - name: Run Codex review
         if: steps.pr_metadata.outputs.same_repo == 'true'
         id: run_codex
@@ -77,7 +103,7 @@ jobs:
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           sandbox: read-only
-          output-schema-file: .github/codex/pr-review-schema.json
+          output-schema-file: .github/codex-trusted/pr-review-schema.json
           prompt: |
             Please review PR #${{ steps.pr_metadata.outputs.pr_number }} for the Safire Ruby gem — an OAuth 2.0 client
             library implementing SMART App Launch 2.2.0 and UDAP Security for healthcare
@@ -115,8 +141,9 @@ jobs:
 
             Return ONLY JSON matching the provided schema.
             Set `decision` to:
-            - `REQUEST_CHANGES` if there are any must-fix or should-fix issues
-            - `APPROVE` if there are no must-fix or should-fix issues
+            - `REQUEST_CHANGES` if there are any must-fix issues
+            - `APPROVE` if there are no must-fix issues
+            Report `should-fix` findings as advisory items; they should not block approval.
 
             Put the overall review in `summary` as GitHub-flavored Markdown.
             If there are findings, list them first in severity order with brief file/line references when known.
@@ -256,7 +283,7 @@ jobs:
             const inlineComments = [];
             const summaryFindings = [];
             let overflowCount = 0;
-            let requiresChanges = false;
+            let hasMustFix = false;
             let invalidFindings = false;
 
             for (const finding of findings) {
@@ -266,8 +293,8 @@ jobs:
               }
 
               const severity = allowedSeverities.has(finding.severity) ? finding.severity : 'question';
-              if (severity === 'must-fix' || severity === 'should-fix') {
-                requiresChanges = true;
+              if (severity === 'must-fix') {
+                hasMustFix = true;
               }
               const anchor = allowedAnchors.has(finding.anchor) ? finding.anchor : 'context';
               const title = typeof finding.title === 'string' ? finding.title.trim() : '';
@@ -315,17 +342,18 @@ jobs:
               return;
             }
 
-            if (modelDecision === 'APPROVE' && requiresChanges) {
-              core.setFailed('Codex approved the PR despite must-fix or should-fix findings.');
+            if (modelDecision === 'APPROVE' && hasMustFix) {
+              core.setFailed('Codex approved the PR despite must-fix findings.');
               return;
             }
 
-            if (modelDecision === 'REQUEST_CHANGES' && !requiresChanges) {
-              core.setFailed('Codex requested changes without valid must-fix or should-fix findings.');
+            if (modelDecision === 'REQUEST_CHANGES' && !hasMustFix) {
+              core.setFailed('Codex requested changes without valid must-fix findings.');
               return;
             }
 
             const decision = modelDecision;
+            const reviewEvent = baseChanged ? 'COMMENT' : decision;
 
             if (overflowCount > 0) {
               summaryFindings.push(`- ${overflowCount} additional inline finding(s) were summarized here because the workflow caps inline comments at ${maxInlineComments}.`);
@@ -333,7 +361,7 @@ jobs:
 
             const summarySuffix = [];
             if (baseChanged) {
-              summarySuffix.push(`Inline comments were summarized instead of posted because the PR base changed during review: reviewed ${prBaseSha}, current ${currentPr.base.sha}.`);
+              summarySuffix.push(`The GitHub review was posted as a non-blocking comment, and inline comments were summarized, because the PR base changed during review: reviewed ${prBaseSha}, current ${currentPr.base.sha}.`);
             }
             if (summaryFindings.length > 0) {
               summarySuffix.push('Additional findings and fallback items:\n');
@@ -348,7 +376,7 @@ jobs:
               repo: context.repo.repo,
               pull_number: prNumber,
               commit_id: prHeadSha,
-              event: decision,
+              event: reviewEvent,
               body,
               comments: inlineComments,
             });

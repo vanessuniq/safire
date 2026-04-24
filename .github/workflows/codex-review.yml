@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Load PR metadata
         id: pr_metadata
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ github.token }}
           script: |
@@ -64,7 +64,7 @@ jobs:
 
       - name: Load trusted Codex review schema
         if: steps.pr_metadata.outputs.same_repo == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -125,7 +125,7 @@ jobs:
 
       - name: Prepare Codex review input
         if: steps.pr_metadata.outputs.same_repo == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PR_BASE_SHA: ${{ steps.pr_metadata.outputs.base_sha }}
           PR_BODY: ${{ steps.pr_metadata.outputs.body }}
@@ -257,7 +257,7 @@ jobs:
 
       - name: Post Codex review
         if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_codex.outputs.final-message != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CODEX_FINAL_MESSAGE: ${{ steps.run_codex.outputs.final-message }}
           PR_BASE_SHA: ${{ steps.pr_metadata.outputs.base_sha }}

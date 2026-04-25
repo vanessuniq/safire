@@ -26,18 +26,20 @@ module Safire
   # * :smart (default) — SMART App Launch 2.2.0
   # * :udap             — UDAP Security (future; not yet implemented)
   #
-  # The +client_type:+ keyword controls how the SMART client authenticates at the token endpoint:
+  # The +client_type:+ keyword controls how the SMART client authenticates at the token endpoint.
+  # Defaults to +nil+, which resolves to +:public+ for SMART. For UDAP, +client_type:+ is not
+  # applicable — passing any explicit value raises +ConfigurationError+.
   #
-  # * :public (default)             — no client authentication; client_id sent in request body
+  # * :public             — no client authentication; client_id sent in request body (SMART default)
   # * :confidential_symmetric       — HTTP Basic auth using client_secret
   # * :confidential_asymmetric      — private_key_jwt assertion (JWT signed with private key)
   #
-  # client_type is validated for :smart and ignored for :udap. UDAP clients authenticate via
-  # signed JWT assertions (Authentication Token / AnT) with an X.509 certificate chain in the
-  # x5c JOSE header; the authentication method is not user-configurable for UDAP. DCR is
-  # typically performed once to obtain a client_id, which is then reused as iss/sub in every
-  # subsequent AnT. The unregistered client flow (§8.1) allows client_credentials grant without
-  # prior DCR when identity can be fully determined from certificate attributes alone.
+  # UDAP clients authenticate via signed JWT assertions (Authentication Token / AnT) with an
+  # X.509 certificate chain in the x5c JOSE header; the authentication method is not
+  # user-configurable for UDAP. DCR is typically performed once to obtain a client_id, which is
+  # then reused as iss/sub in every subsequent AnT. The unregistered client flow (§8.1) allows
+  # client_credentials grant without prior DCR when identity can be fully determined from
+  # certificate attributes alone.
   #
   # @note Future kwargs (not yet implemented):
   #
@@ -45,9 +47,6 @@ module Safire
   #     :b2b          — client_credentials grant, server-to-server
   #     :b2c          — authorization_code grant, user-facing
   #     :tiered_oauth — authorization_code + IdP identity delegation
-  #
-  #   When protocol: :udap is fully implemented, client_type: will default to nil
-  #   (not applicable) and the flow: kwarg will drive B2B vs B2C selection.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration
@@ -136,15 +135,8 @@ module Safire
 
     VALID_PROTOCOLS = %i[smart udap].freeze
 
-    PROTOCOL_CLASSES = {
-      smart: Protocols::Smart
-      # udap: Protocols::Udap  # future
-    }.freeze
-
     # Valid client_type values per protocol.
-    # nil means the protocol does not use client_type (e.g. UDAP authenticates via signed
-    # JWT assertions with an X.509 certificate chain; the authentication method is not
-    # user-configurable for UDAP).
+    # nil means client_type is not applicable for that protocol; any explicit value raises ConfigurationError.
     PROTOCOL_CLIENT_TYPES = {
       smart: %i[public confidential_symmetric confidential_asymmetric],
       udap: nil # UDAP authenticates via signed JWT assertions (AnT) with X.509 certificate chain
@@ -158,12 +150,13 @@ module Safire
 
     attr_reader :config, :protocol, :client_type
 
-    def initialize(config, protocol: :smart, client_type: :public)
+    def initialize(config, protocol: :smart, client_type: nil)
       @protocol    = protocol.to_sym
-      @client_type = client_type.to_sym
+      @client_type = client_type&.to_sym
       @config      = build_config(config)
 
       validate_protocol!
+      resolve_client_type!
       validate_client_type!
     end
 
@@ -184,13 +177,7 @@ module Safire
     #     client.client_type = :confidential_symmetric
     #   end
     def client_type=(new_client_type)
-      if PROTOCOL_CLIENT_TYPES[@protocol].nil?
-        Safire.logger.warn(
-          "client_type is not configurable for protocol: :#{@protocol}; " \
-          'UDAP clients authenticate via signed JWT assertions — ignoring'
-        )
-        return
-      end
+      raise_client_type_not_applicable!(new_client_type) if PROTOCOL_CLIENT_TYPES[@protocol].nil?
 
       @client_type = new_client_type.to_sym
       validate_client_type!
@@ -200,7 +187,14 @@ module Safire
     private
 
     def protocol_client
-      @protocol_client ||= PROTOCOL_CLASSES.fetch(@protocol).new(config, client_type:)
+      @protocol_client ||= build_protocol_client
+    end
+
+    def build_protocol_client
+      case @protocol
+      when :smart then Protocols::Smart.new(config, client_type:)
+      when :udap  then raise NotImplementedError, 'UDAP protocol client is not yet implemented'
+      end
     end
 
     def build_config(config)
@@ -219,14 +213,31 @@ module Safire
       )
     end
 
+    def resolve_client_type!
+      @client_type = :public if @protocol == :smart && @client_type.nil?
+    end
+
     def validate_client_type!
       valid_types = PROTOCOL_CLIENT_TYPES[@protocol]
-      return if valid_types.nil? || valid_types.include?(@client_type)
+      if valid_types.nil?
+        return if @client_type.nil?
+
+        raise_client_type_not_applicable!(@client_type)
+      end
+      return if valid_types.include?(@client_type)
 
       raise Errors::ConfigurationError.new(
         invalid_attribute: :client_type,
         invalid_value: @client_type,
         valid_values: valid_types
+      )
+    end
+
+    def raise_client_type_not_applicable!(value)
+      raise Errors::ConfigurationError.new(
+        invalid_attribute: :client_type,
+        invalid_value: value,
+        valid_values: ["N/A (client_type is not applicable for protocol :#{@protocol})"]
       )
     end
   end

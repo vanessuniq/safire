@@ -153,6 +153,17 @@ RSpec.describe Safire::Client do
     end
   end
 
+  # ---------- UDAP (not yet implemented) ----------
+
+  describe 'UDAP delegation' do
+    it 'raises NotImplementedError when a delegated method is called' do
+      client = described_class.new(config, protocol: :udap)
+
+      expect { client.server_metadata }
+        .to raise_error(NotImplementedError, /UDAP protocol client is not yet implemented/)
+    end
+  end
+
   # ---------- Authorization URL ----------
 
   describe '#authorization_url' do

@@ -42,22 +42,30 @@ class Client
   def_delegators :protocol_client,
                  :server_metadata, :authorization_url,
                  :request_access_token, :refresh_token,
+                 :request_backend_token,
                  :token_response_valid?, :register_client
 
   private
 
   def protocol_client
-    @protocol_client ||= PROTOCOL_CLASSES.fetch(@protocol).new(config, client_type:)
+    @protocol_client ||= build_protocol_client
+  end
+
+  def build_protocol_client
+    case @protocol
+    when :smart then Protocols::Smart.new(config, client_type:)
+    when :udap  then raise NotImplementedError, 'UDAP protocol client is not yet implemented'
+    end
   end
 end
 ```
 
-Protocol implementations (`Protocols::Smart`, future `Protocols::Udap`) include `Protocols::Behaviours` to declare the required interface. Adding a new protocol requires:
+Protocol implementations (`Protocols::Smart`, `Protocols::Udap`) include `Protocols::Behaviours` to declare the required interface. Adding a new protocol requires:
 1. Implementing the `Behaviours` interface in a new class
-2. Adding the class to `PROTOCOL_CLASSES`
+2. Adding a `when` branch to `build_protocol_client` in `Client`
 3. Adding its valid client types to `PROTOCOL_CLIENT_TYPES`
 
-No changes to `Client` itself.
+The original design aimed for "no changes to `Client` itself" when adding a protocol. That invariant was intentionally relaxed: protocols have different constructor signatures (`Smart` takes `client_type:`, `Udap` does not), and a small explicit `case` in `build_protocol_client` is preferable to forcing every protocol into a uniform constructor it does not need.
 
 **Why `Forwardable` over `method_missing`:** `Forwardable` is explicit — the delegated method list is visible in the class body, easy to grep, and YARD-documented. `method_missing` is implicit, difficult to introspect, and catches typos silently.
 
@@ -77,3 +85,4 @@ No changes to `Client` itself.
 **Trade-offs:**
 - `Client` itself has no runtime behaviour — all logic lives in protocol classes; contributors must know to look in `Protocols::Smart` for SMART logic, not in `Client`
 - `def_delegators` does not forward keyword arguments transparently in all Ruby versions — method signatures in `Behaviours` must be compatible with delegation
+- Adding a new protocol requires a one-line change to `build_protocol_client` in `Client`; this is a small, contained cost that buys protocol-specific constructor freedom

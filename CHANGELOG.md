@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Ruby requirement changed from >= 4.0.2 to >= 4.0.3.
 - `Safire::Client` now raises `ConfigurationError` when `client_type:` is passed explicitly for
   `protocol: :udap`, both at construction and via `client_type=`; previously the value was
   ignored silently

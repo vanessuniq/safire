@@ -55,8 +55,9 @@ module Safire
   #   @return [Symbol] the selected protocol (:smart or :udap)
   #
   # @!attribute [r] client_type
-  #   @return [Symbol] the client authentication method
-  #     (:public, :confidential_symmetric, or :confidential_asymmetric)
+  #   @return [Symbol, nil] the SMART client authentication method
+  #     (:public, :confidential_symmetric, or :confidential_asymmetric);
+  #     nil for protocol: :udap where client authentication is not user-configurable
   #
   # @see Safire::ClientConfig
   # @see Safire::Protocols::Smart
@@ -152,7 +153,7 @@ module Safire
 
     def initialize(config, protocol: :smart, client_type: nil)
       @protocol    = protocol.to_sym
-      @client_type = client_type&.to_sym
+      @client_type = normalize_client_type(client_type)
       @config      = build_config(config)
 
       validate_protocol!
@@ -179,7 +180,7 @@ module Safire
     def client_type=(new_client_type)
       raise_client_type_not_applicable!(new_client_type) if PROTOCOL_CLIENT_TYPES[@protocol].nil?
 
-      @client_type = new_client_type.to_sym
+      @client_type = normalize_client_type(new_client_type)
       validate_client_type!
       @protocol_client&.client_type = @client_type
     end
@@ -238,6 +239,17 @@ module Safire
         invalid_attribute: :client_type,
         invalid_value: value,
         valid_values: ["N/A (client_type is not applicable for protocol :#{@protocol})"]
+      )
+    end
+
+    def normalize_client_type(value)
+      return nil if value.nil?
+      return value.to_sym if value.is_a?(Symbol) || value.is_a?(String)
+
+      raise Errors::ConfigurationError.new(
+        invalid_attribute: :client_type,
+        invalid_value: value,
+        valid_values: PROTOCOL_CLIENT_TYPES[:smart]
       )
     end
   end

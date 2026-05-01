@@ -60,7 +60,7 @@ class Client
 end
 ```
 
-Protocol implementations (`Protocols::Smart`, `Protocols::Udap`) include `Protocols::Behaviours` to declare the required interface. Adding a new protocol requires:
+`Protocols::Smart` includes `Protocols::Behaviours` to declare the required interface. Future protocol implementations (e.g. `Protocols::Udap`, once it exists) will do the same. Adding a new protocol requires:
 1. Implementing the `Behaviours` interface in a new class
 2. Adding a `when` branch to `build_protocol_client` in `Client`
 3. Adding its valid client types to `PROTOCOL_CLIENT_TYPES`

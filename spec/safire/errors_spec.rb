@@ -116,6 +116,39 @@ RSpec.describe Safire::Errors do
         expect(error.message).to match(/response is not a JSON object/)
       end
     end
+
+    context 'with default label' do
+      subject(:error) { described_class.new(endpoint: 'https://fhir.example.com/.well-known/smart-configuration') }
+
+      it 'defaults label to SMART configuration' do
+        expect(error.label).to eq('SMART configuration')
+      end
+
+      it 'uses the default label in the message' do
+        expect(error.message).to match(/SMART configuration/)
+      end
+    end
+
+    context 'with a custom label' do
+      subject(:error) do
+        described_class.new(
+          endpoint: 'https://fhir.example.com/.well-known/udap',
+          label: 'UDAP metadata'
+        )
+      end
+
+      it 'exposes the custom label' do
+        expect(error.label).to eq('UDAP metadata')
+      end
+
+      it 'uses the custom label in the message' do
+        expect(error.message).to match(/UDAP metadata/)
+      end
+
+      it 'does not include the default label in the message' do
+        expect(error.message).not_to match(/SMART configuration/)
+      end
+    end
   end
 
   describe Safire::Errors::OAuthError do

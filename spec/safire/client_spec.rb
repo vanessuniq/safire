@@ -57,8 +57,17 @@ RSpec.describe Safire::Client do
       expect(described_class.new(config).protocol).to eq(:smart)
     end
 
-    it 'defaults to client_type: :public' do
+    it 'resolves client_type to :public by default for SMART' do
       expect(described_class.new(config).client_type).to eq(:public)
+    end
+
+    it 'defaults client_type to nil for UDAP' do
+      expect(described_class.new(config, protocol: :udap).client_type).to be_nil
+    end
+
+    it 'raises ConfigurationError when an explicit client_type is passed for UDAP' do
+      expect { described_class.new(config, protocol: :udap, client_type: :public) }
+        .to raise_error(Safire::Errors::ConfigurationError, /client_type/)
     end
 
     it 'raises ConfigurationError for unknown protocol' do
@@ -111,15 +120,12 @@ RSpec.describe Safire::Client do
         .with(headers: { 'Authorization' => /^Basic / })
     end
 
-    context 'when protocol does not support client_type (e.g. :udap)' do
-      it 'logs a warning and returns without changing client_type' do
+    context 'when protocol does not support client_type (UDAP)' do
+      it 'raises ConfigurationError' do
         client = described_class.new(config, protocol: :udap)
 
-        allow(Safire.logger).to receive(:warn)
-        client.client_type = :confidential_symmetric
-
-        expect(Safire.logger).to have_received(:warn).with(/not configurable.*:udap/i)
-        expect(client.client_type).to eq(:public)
+        expect { client.client_type = :confidential_symmetric }
+          .to raise_error(Safire::Errors::ConfigurationError, /client_type/)
       end
     end
 
@@ -144,6 +150,17 @@ RSpec.describe Safire::Client do
       client.request_access_token(code: 'auth_code', code_verifier: 'verifier')
 
       expect(WebMock).to have_requested(:get, well_known_url).once
+    end
+  end
+
+  # ---------- UDAP (not yet implemented) ----------
+
+  describe 'UDAP delegation' do
+    it 'raises NotImplementedError when a delegated method is called' do
+      client = described_class.new(config, protocol: :udap)
+
+      expect { client.server_metadata }
+        .to raise_error(NotImplementedError, /UDAP protocol client is not yet implemented/)
     end
   end
 

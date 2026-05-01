@@ -49,7 +49,7 @@ PROTOCOL_CLIENT_TYPES = {
 ```
 
 - `protocol:` is validated against `VALID_PROTOCOLS`; an unknown protocol raises `ConfigurationError`
-- `client_type:` is validated against `PROTOCOL_CLIENT_TYPES[@protocol]`; if `nil` (UDAP), validation is skipped and the setter logs a warning and no-ops rather than raising
+- `client_type:` defaults to `nil`. For `:smart`, `nil` resolves to `:public` before validation. For `:udap`, `nil` is the only accepted value — passing any explicit `client_type:` at construction or via `client_type=` raises `ConfigurationError`
 - Changing `client_type=` on a SMART client updates the underlying protocol client in place — already-fetched server metadata is preserved and no re-discovery occurs
 
 ---
@@ -60,8 +60,8 @@ PROTOCOL_CLIENT_TYPES = {
 - No invalid combinations — UDAP has no client type choices at all; this is enforced at the type level, not with runtime checks
 - `client_type=` mutation is clean and natural for the "discover first, then select client type" pattern
 - Adding a new SMART client type requires only adding a symbol to `PROTOCOL_CLIENT_TYPES[:smart]`
-- Adding a new protocol requires adding a class to `PROTOCOL_CLASSES` and an entry to `PROTOCOL_CLIENT_TYPES`
+- Adding a new protocol requires adding an entry to `PROTOCOL_CLIENT_TYPES` and a branch to `build_protocol_client` (see [ADR-002]({% link adr/ADR-002-facade-and-forwardable.md %}))
 
 **Trade-offs:**
 - Two keyword args instead of one — a caller needs to know which dimension belongs to which kwarg; mitigated by clear documentation and validation errors that name the invalid parameter
-- `client_type:` defaults to `:public` even when `protocol: :udap` — the value is ignored for UDAP, but setting it is technically a no-op with a warning rather than an error; this is intentional for resilience in generic caller code
+- `client_type:` defaults to `nil` — for SMART callers who previously relied on the `:public` default, behavior is unchanged; for UDAP callers, passing an explicit value now raises rather than silently no-oping, which is stricter but prevents misconfiguration

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `Safire::Client` now raises `ConfigurationError` when `client_type:` is passed explicitly for
+  `protocol: :udap`, both at construction and via `client_type=`; previously the value was
+  ignored silently
+
 ## [0.3.0] - 2026-04-15
 
 ### Added

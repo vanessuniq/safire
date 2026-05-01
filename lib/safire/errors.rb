@@ -80,7 +80,7 @@ module Safire
       end
     end
 
-    # Raised when SMART configuration discovery fails.
+    # Raised when protocol discovery fails.
     #
     # @!attribute [r] endpoint
     #   @return [String] the discovery endpoint URL that was requested
@@ -88,20 +88,23 @@ module Safire
     #   @return [Integer, nil] HTTP status code returned by the server
     # @!attribute [r] error_description
     #   @return [String, nil] description of why discovery failed (e.g. unexpected response format)
+    # @!attribute [r] label
+    #   @return [String] protocol label used in the error message (e.g. 'SMART configuration', 'UDAP metadata')
     class DiscoveryError < Error
-      attr_reader :endpoint, :status, :error_description
+      attr_reader :endpoint, :status, :error_description, :label
 
-      def initialize(endpoint:, status: nil, error_description: nil)
+      def initialize(endpoint:, status: nil, error_description: nil, label: 'SMART configuration')
         @endpoint          = endpoint
         @status            = status
         @error_description = error_description
+        @label             = label
         super(build_message)
       end
 
       private
 
       def build_message
-        msg = "Failed to discover SMART configuration from #{@endpoint}"
+        msg = "Failed to discover #{@label} from #{@endpoint}"
         msg += " (HTTP #{@status})" if @status
         msg += ": #{@error_description}" if @error_description
         msg

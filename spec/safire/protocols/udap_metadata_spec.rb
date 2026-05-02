@@ -42,6 +42,19 @@ RSpec.describe Safire::Protocols::UdapMetadata do
       end
     end
 
+    context 'when an array-valued field has a malformed type' do
+      described_class::ARRAY_ATTRIBUTES.each do |attr|
+        it "returns false and logs a warning when #{attr} is not an array" do
+          m = described_class.new(full_metadata.merge(attr.to_s => attr.to_s))
+          result = nil
+
+          expect { result = m.valid? }.not_to raise_error
+          expect(result).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/field '#{attr}' must be an array/)
+        end
+      end
+    end
+
     context "when udap_versions_supported is not the fixed array ['1']" do
       it "returns false and logs a warning when '1' is absent" do
         m = described_class.new(full_metadata.merge('udap_versions_supported' => ['2']))
@@ -245,6 +258,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
         expect(m.dynamic_registration_profile?).to be(false)
       end
+
+      it 'does not substring-match malformed scalar metadata' do
+        m = described_class.new(full_metadata.merge('udap_profiles_supported' => 'udap_dcr'))
+
+        expect(m.dynamic_registration_profile?).to be(false)
+      end
     end
 
     describe '#jwt_client_auth_profile?' do
@@ -254,6 +273,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
       it "returns false when 'udap_authn' is absent" do
         m = described_class.new(full_metadata.merge('udap_profiles_supported' => ['udap_dcr']))
+
+        expect(m.jwt_client_auth_profile?).to be(false)
+      end
+
+      it 'does not substring-match malformed scalar metadata' do
+        m = described_class.new(full_metadata.merge('udap_profiles_supported' => 'udap_authn'))
 
         expect(m.jwt_client_auth_profile?).to be(false)
       end
@@ -269,6 +294,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
         expect(m.client_authorization_profile?).to be(false)
       end
+
+      it 'does not substring-match malformed scalar metadata' do
+        m = described_class.new(full_metadata.merge('udap_profiles_supported' => 'udap_authz'))
+
+        expect(m.client_authorization_profile?).to be(false)
+      end
     end
 
     describe '#tiered_oauth_profile?' do
@@ -280,6 +311,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
       it "returns false when 'udap_to' is absent" do
         expect(metadata.tiered_oauth_profile?).to be(false)
+      end
+
+      it 'does not substring-match malformed scalar metadata' do
+        m = described_class.new(full_metadata.merge('udap_profiles_supported' => 'udap_to'))
+
+        expect(m.tiered_oauth_profile?).to be(false)
       end
     end
   end
@@ -343,6 +380,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
         expect(m.supports_authorization_code?).to be(false)
       end
+
+      it 'does not substring-match malformed scalar metadata' do
+        m = described_class.new(full_metadata.merge('grant_types_supported' => 'authorization_code'))
+
+        expect(m.supports_authorization_code?).to be(false)
+      end
     end
 
     describe '#supports_refresh_token?' do
@@ -358,6 +401,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
       it 'returns false when grant_types_supported is nil' do
         m = described_class.new(full_metadata.except('grant_types_supported'))
+
+        expect(m.supports_refresh_token?).to be(false)
+      end
+
+      it 'does not substring-match malformed scalar metadata' do
+        m = described_class.new(full_metadata.merge('grant_types_supported' => 'refresh_token'))
 
         expect(m.supports_refresh_token?).to be(false)
       end

@@ -67,6 +67,19 @@ module Safire
       ].freeze
 
       ATTRIBUTES = (REQUIRED_ATTRIBUTES | OPTIONAL_ATTRIBUTES).freeze
+      ARRAY_ATTRIBUTES = %i[
+        udap_versions_supported
+        udap_profiles_supported
+        udap_authorization_extensions_supported
+        udap_certifications_supported
+        grant_types_supported
+        scopes_supported
+        token_endpoint_auth_methods_supported
+        token_endpoint_auth_signing_alg_values_supported
+        registration_endpoint_jwt_signing_alg_values_supported
+        udap_authorization_extensions_required
+        udap_certifications_required
+      ].freeze
 
       attr_reader(*ATTRIBUTES)
 
@@ -82,6 +95,7 @@ module Safire
       #
       # Checks performed:
       # - All required fields are present (nil? check; empty arrays are valid required values)
+      # - All array-valued fields are arrays before any profile/grant/subset checks are performed
       # - +udap_versions_supported+ must equal <tt>["1"]</tt> exactly (STU2 fixed value)
       # - +udap_profiles_supported+ includes +"udap_dcr"+ and +"udap_authn"+
       # - +token_endpoint_auth_methods_supported+ must equal <tt>["private_key_jwt"]</tt> exactly (STU2 fixed value)
@@ -98,8 +112,11 @@ module Safire
       #
       # @return [Boolean] true if all checks pass, false if any violation is found
       def valid?
+        fields_present = required_fields_present?
+        arrays_valid = array_fields_valid?
+        return false unless fields_present && arrays_valid
+
         [
-          required_fields_present?,
           version_valid?,
           required_profiles_valid?,
           auth_methods_valid?,
@@ -139,12 +156,12 @@ module Safire
 
       # @return [Boolean] true when the server supports the authorization_code grant type
       def supports_authorization_code?
-        grant_types_supported&.include?('authorization_code') || false
+        grant_type?('authorization_code')
       end
 
       # @return [Boolean] true when the server supports the refresh_token grant type
       def supports_refresh_token?
-        grant_types_supported&.include?('refresh_token') || false
+        grant_type?('refresh_token')
       end
 
       # @return [Boolean] true when the server supports Tiered OAuth (+udap_to+ profile)
@@ -156,7 +173,26 @@ module Safire
       private
 
       def profile?(name)
-        udap_profiles_supported&.include?(name)
+        array_includes?(:udap_profiles_supported, name)
+      end
+
+      def grant_type?(name)
+        array_includes?(:grant_types_supported, name)
+      end
+
+      def array_includes?(attr, value)
+        values = public_send(attr)
+        values.is_a?(Array) && values.include?(value)
+      end
+
+      def array_any?(attr)
+        values = public_send(attr)
+        values.is_a?(Array) && values.any?
+      end
+
+      def array_or_empty(attr)
+        values = public_send(attr)
+        values.is_a?(Array) ? values : []
       end
 
       def warn_noncompliance(message)
@@ -169,6 +205,15 @@ module Safire
         missing.empty?
       end
 
+      def array_fields_valid?
+        invalid = ARRAY_ATTRIBUTES.reject do |attr|
+          value = public_send(attr)
+          value.nil? || value.is_a?(Array)
+        end
+        invalid.each { |attr| warn_noncompliance("field '#{attr}' must be an array") }
+        invalid.empty?
+      end
+
       def version_valid?
         return true if udap_versions_supported == ['1']
 
@@ -179,7 +224,7 @@ module Safire
       def required_profiles_valid?
         valid = true
         %w[udap_dcr udap_authn].each do |profile|
-          next if udap_profiles_supported&.include?(profile)
+          next if profile?(profile)
 
           warn_noncompliance("'#{profile}' is missing from udap_profiles_supported (required by UDAP Security STU2)")
           valid = false
@@ -200,8 +245,7 @@ module Safire
       def non_empty_arrays_valid?
         valid = true
         %i[scopes_supported grant_types_supported].each do |attr|
-          value = public_send(attr)
-          next if value&.any?
+          next if array_any?(attr)
 
           warn_noncompliance("#{attr} must be a non-empty array (required by UDAP Security STU2)")
           valid = false
@@ -220,7 +264,7 @@ module Safire
       end
 
       def authorization_endpoint_conditionally_present?
-        return true unless grant_types_supported&.include?('authorization_code')
+        return true unless grant_type?('authorization_code')
         return true unless authorization_endpoint.nil?
 
         warn_noncompliance('authorization_endpoint is required when authorization_code grant type is supported')
@@ -228,7 +272,7 @@ module Safire
       end
 
       def extensions_required_conditionally_present?
-        return true unless udap_authorization_extensions_supported&.any?
+        return true unless array_any?(:udap_authorization_extensions_supported)
         return true unless udap_authorization_extensions_required.nil?
 
         warn_noncompliance(
@@ -239,7 +283,7 @@ module Safire
       end
 
       def certifications_required_conditionally_present?
-        return true unless udap_certifications_supported&.any?
+        return true unless array_any?(:udap_certifications_supported)
         return true unless udap_certifications_required.nil?
 
         warn_noncompliance(
@@ -249,8 +293,8 @@ module Safire
       end
 
       def authz_profile_conditionally_present?
-        return true unless grant_types_supported&.include?('client_credentials')
-        return true if udap_profiles_supported&.include?('udap_authz')
+        return true unless grant_type?('client_credentials')
+        return true if profile?('udap_authz')
 
         warn_noncompliance(
           "'udap_authz' is required in udap_profiles_supported when client_credentials grant type is supported"
@@ -259,8 +303,8 @@ module Safire
       end
 
       def refresh_token_requires_authorization_code?
-        return true unless grant_types_supported&.include?('refresh_token')
-        return true if grant_types_supported&.include?('authorization_code')
+        return true unless grant_type?('refresh_token')
+        return true if grant_type?('authorization_code')
 
         warn_noncompliance(
           "'refresh_token' grant type requires 'authorization_code' to also be in grant_types_supported"
@@ -276,10 +320,10 @@ module Safire
       end
 
       def extensions_required_subset_valid?
-        return true unless udap_authorization_extensions_required&.any?
+        return true unless array_any?(:udap_authorization_extensions_required)
 
-        supported = udap_authorization_extensions_supported || []
-        unsupported = udap_authorization_extensions_required - supported
+        unsupported = array_or_empty(:udap_authorization_extensions_required) -
+                      array_or_empty(:udap_authorization_extensions_supported)
         return true unless unsupported.any?
 
         warn_noncompliance(
@@ -290,10 +334,10 @@ module Safire
       end
 
       def certifications_required_subset_valid?
-        return true unless udap_certifications_required&.any?
+        return true unless array_any?(:udap_certifications_required)
 
-        supported = udap_certifications_supported || []
-        unsupported = udap_certifications_required - supported
+        unsupported = array_or_empty(:udap_certifications_required) -
+                      array_or_empty(:udap_certifications_supported)
         return true unless unsupported.any?
 
         warn_noncompliance(

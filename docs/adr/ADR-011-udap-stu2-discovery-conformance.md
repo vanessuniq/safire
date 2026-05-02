@@ -48,6 +48,11 @@ dedicated validator (see ADR-012).
 response. Using `blank?` would flag `[]` as absent; using `nil?` preserves the distinction
 between "field not present in the JSON response" and "field present but empty".
 
+**Array type validation is explicit:** Discovery metadata is untrusted JSON. `UdapMetadata#valid?`
+verifies every array-valued field is actually an Array before it performs profile, grant,
+non-empty, or subset checks. Public helper methods also treat malformed scalar metadata as
+unsupported instead of using Ruby string `include?` semantics.
+
 **Value-level constraints in `valid?`:**
 
 - `udap_versions_supported` must equal `["1"]` exactly (STU2 fixed value)

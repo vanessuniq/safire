@@ -45,6 +45,8 @@ module Safire
     #   @return [String, nil] URL of the server's Authorization Endpoint; conditionally required
     #     when {#grant_types_supported} includes +"authorization_code"+
     class UdapMetadata < Safire::Entity
+      include URIValidation
+
       REQUIRED_ATTRIBUTES = %i[
         udap_versions_supported
         udap_profiles_supported
@@ -67,6 +69,7 @@ module Safire
       ].freeze
 
       ATTRIBUTES = (REQUIRED_ATTRIBUTES | OPTIONAL_ATTRIBUTES).freeze
+      STRING_URL_ATTRIBUTES = %i[token_endpoint registration_endpoint].freeze
       ARRAY_ATTRIBUTES = %i[
         udap_versions_supported
         udap_profiles_supported
@@ -99,7 +102,10 @@ module Safire
       # - +udap_versions_supported+ must equal <tt>["1"]</tt> exactly (STU2 fixed value)
       # - +udap_profiles_supported+ includes +"udap_dcr"+ and +"udap_authn"+
       # - +token_endpoint_auth_methods_supported+ must equal <tt>["private_key_jwt"]</tt> exactly (STU2 fixed value)
-      # - +scopes_supported+ and +grant_types_supported+ each have at least one element
+      # - +scopes_supported+, +grant_types_supported+, and both signing algorithm arrays each have at least one element
+      # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs;
+      #   +authorization_endpoint+ is also validated when present
+      # - +signed_metadata+ is a non-empty string
       # - +authorization_endpoint+ present when +authorization_code+ is in +grant_types_supported+
       # - +udap_authz+ present in +udap_profiles_supported+ when +client_credentials+ is in +grant_types_supported+
       # - +authorization_code+ present in +grant_types_supported+ when +refresh_token+ is also present
@@ -121,6 +127,7 @@ module Safire
           required_profiles_valid?,
           auth_methods_valid?,
           non_empty_arrays_valid?,
+          string_values_valid?,
           conditional_presence_valid?,
           required_subset_valid?
         ].all?
@@ -244,13 +251,41 @@ module Safire
 
       def non_empty_arrays_valid?
         valid = true
-        %i[scopes_supported grant_types_supported].each do |attr|
+        %i[
+          scopes_supported
+          grant_types_supported
+          token_endpoint_auth_signing_alg_values_supported
+          registration_endpoint_jwt_signing_alg_values_supported
+        ].each do |attr|
           next if array_any?(attr)
 
           warn_noncompliance("#{attr} must be a non-empty array (required by UDAP Security STU2)")
           valid = false
         end
         valid
+      end
+
+      def string_values_valid?
+        [url_fields_valid?, signed_metadata_format_valid?].all?
+      end
+
+      def url_fields_valid?
+        attrs = STRING_URL_ATTRIBUTES.dup
+        attrs << :authorization_endpoint unless authorization_endpoint.nil?
+        invalid = attrs.reject { |attr| valid_https_url?(public_send(attr)) }
+        invalid.each { |attr| warn_noncompliance("#{attr} must be an absolute HTTPS URL") }
+        invalid.empty?
+      end
+
+      def signed_metadata_format_valid?
+        return true if signed_metadata.is_a?(String) && signed_metadata.present?
+
+        warn_noncompliance('signed_metadata must be a non-empty string')
+        false
+      end
+
+      def valid_https_url?(value)
+        value.is_a?(String) && classify_uri(value).nil?
       end
 
       def conditional_presence_valid?

@@ -14,7 +14,7 @@ RSpec.describe Safire::Protocols::UdapMetadata do
       'token_endpoint_auth_signing_alg_values_supported' => ['RS256'],
       'registration_endpoint' => 'https://fhir.example.com/register',
       'registration_endpoint_jwt_signing_alg_values_supported' => ['RS256'],
-      'signed_metadata' => 'eyJhbGci...',
+      'signed_metadata' => 'eyJhbGci.eyJpc3M.c2ln',
       'authorization_endpoint' => 'https://fhir.example.com/authorize',
       'udap_authorization_extensions_required' => ['hl7-b2b'],
       'udap_certifications_required' => ['https://www.example.com/udap/profile/1']
@@ -51,6 +51,19 @@ RSpec.describe Safire::Protocols::UdapMetadata do
           expect { result = m.valid? }.not_to raise_error
           expect(result).to be(false)
           expect(Safire.logger).to have_received(:warn).with(/field '#{attr}' must be an array/)
+        end
+      end
+    end
+
+    context 'when an array-valued field contains non-string elements' do
+      described_class::ARRAY_ATTRIBUTES.each do |attr|
+        it "returns false and logs a warning when #{attr} contains a non-string element" do
+          m = described_class.new(full_metadata.merge(attr.to_s => ['valid', 123]))
+          result = nil
+
+          expect { result = m.valid? }.not_to raise_error
+          expect(result).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/field '#{attr}' must be an array of strings/)
         end
       end
     end
@@ -176,7 +189,23 @@ RSpec.describe Safire::Protocols::UdapMetadata do
         m = described_class.new(full_metadata.merge('signed_metadata' => ''))
 
         expect(m.valid?).to be(false)
-        expect(Safire.logger).to have_received(:warn).with(/signed_metadata must be a non-empty string/)
+        expect(Safire.logger).to have_received(:warn).with(/signed_metadata must be a compact-JWS string/)
+      end
+    end
+
+    context 'when signed_metadata is not compact-JWS format' do
+      it 'returns false and logs a warning for a plain string with no dots' do
+        m = described_class.new(full_metadata.merge('signed_metadata' => 'not-a-jwt'))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/signed_metadata must be a compact-JWS string/)
+      end
+
+      it 'returns false and logs a warning for a two-part string' do
+        m = described_class.new(full_metadata.merge('signed_metadata' => 'header.payload'))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/signed_metadata must be a compact-JWS string/)
       end
     end
 

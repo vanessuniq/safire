@@ -98,14 +98,14 @@ module Safire
       #
       # Checks performed:
       # - All required fields are present (nil? check; empty arrays are valid required values)
-      # - All array-valued fields are arrays before any profile/grant/subset checks are performed
+      # - All array-valued fields are arrays of strings before any profile/grant/subset checks are performed
       # - +udap_versions_supported+ must equal <tt>["1"]</tt> exactly (STU2 fixed value)
       # - +udap_profiles_supported+ includes +"udap_dcr"+ and +"udap_authn"+
       # - +token_endpoint_auth_methods_supported+ must equal <tt>["private_key_jwt"]</tt> exactly (STU2 fixed value)
       # - +scopes_supported+, +grant_types_supported+, and both signing algorithm arrays each have at least one element
       # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs;
       #   +authorization_endpoint+ is also validated when present
-      # - +signed_metadata+ is a non-empty string
+      # - +signed_metadata+ is a compact-JWS string (three dot-separated segments)
       # - +authorization_endpoint+ present when +authorization_code+ is in +grant_types_supported+
       # - +udap_authz+ present in +udap_profiles_supported+ when +client_credentials+ is in +grant_types_supported+
       # - +authorization_code+ present in +grant_types_supported+ when +refresh_token+ is also present
@@ -215,9 +215,9 @@ module Safire
       def array_fields_valid?
         invalid = ARRAY_ATTRIBUTES.reject do |attr|
           value = public_send(attr)
-          value.nil? || value.is_a?(Array)
+          value.nil? || (value.is_a?(Array) && value.all?(String))
         end
-        invalid.each { |attr| warn_noncompliance("field '#{attr}' must be an array") }
+        invalid.each { |attr| warn_noncompliance("field '#{attr}' must be an array of strings") }
         invalid.empty?
       end
 
@@ -278,10 +278,15 @@ module Safire
       end
 
       def signed_metadata_format_valid?
-        return true if signed_metadata.is_a?(String) && signed_metadata.present?
+        return true if signed_metadata.is_a?(String) && compact_jws_format?(signed_metadata)
 
-        warn_noncompliance('signed_metadata must be a non-empty string')
+        warn_noncompliance('signed_metadata must be a compact-JWS string (header.payload.signature)')
         false
+      end
+
+      def compact_jws_format?(value)
+        parts = value.split('.', -1)
+        parts.length == 3 && parts.all?(&:present?)
       end
 
       def valid_https_url?(value)

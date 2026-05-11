@@ -11,19 +11,24 @@ module Safire
 
     # Classifies a URI value as +:invalid+, +:non_https+, or +nil+ (acceptable).
     #
+    # HTTPS is accepted for all hosts. Plain HTTP is accepted only for localhost
+    # and 127.0.0.1 to support development without TLS. Any other scheme
+    # (including non-HTTP schemes on localhost) returns +:non_https+.
+    #
     # @param value [String, nil] the URI string to classify
     # @return [:invalid, :non_https, nil]
     def classify_uri(value)
       uri = Addressable::URI.parse(value)
       return :invalid unless uri.scheme && uri.host
+      return if uri.scheme == 'https'
+      return if uri.scheme == 'http' && localhost_host?(uri.host)
 
-      :non_https if uri.scheme != 'https' && !localhost_host?(uri.host)
+      :non_https
     rescue Addressable::URI::InvalidURIError
       :invalid
     end
 
     # Returns +true+ when the host is a local loopback address.
-    # HTTP is permitted for localhost to support development without TLS.
     #
     # @param host [String] the URI host
     # @return [Boolean]

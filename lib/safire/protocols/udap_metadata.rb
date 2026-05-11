@@ -70,6 +70,7 @@ module Safire
 
       ATTRIBUTES = (REQUIRED_ATTRIBUTES | OPTIONAL_ATTRIBUTES).freeze
       STRING_URL_ATTRIBUTES = %i[token_endpoint registration_endpoint].freeze
+      BASE64URL_SEGMENT = /\A[A-Za-z0-9\-_]+\z/
       ARRAY_ATTRIBUTES = %i[
         udap_versions_supported
         udap_profiles_supported
@@ -105,8 +106,8 @@ module Safire
       # - +scopes_supported+, +grant_types_supported+, and both signing algorithm arrays each have at least one element
       # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs;
       #   +authorization_endpoint+ is also validated when present
-      # - +signed_metadata+ is a compact-JWS string (three dot-separated segments); JWT header
-      #   algorithm (+alg+), required claim presence, and signature are not validated here —
+      # - +signed_metadata+ is a compact-JWS string (three base64url-encoded dot-separated segments);
+      #   JWT header algorithm (+alg+), required claim presence, and signature are not validated here —
       #   these are deferred to the cryptographic validator (future PR)
       # - endpoint URL checks accept localhost HTTP to support development without TLS
       # - +authorization_endpoint+ present when +authorization_code+ is in +grant_types_supported+
@@ -158,11 +159,18 @@ module Safire
         dynamic_registration_profile? && valid_https_url?(registration_endpoint)
       end
 
-      # @return [Boolean] true when the server supports JWT client authentication (+udap_authn+ profile)
-      def supports_jwt_client_auth? = jwt_client_auth_profile?
+      # @return [Boolean] true when the server supports JWT client authentication
+      #   (advertises +udap_authn+ profile and provides a valid +token_endpoint+)
+      def supports_jwt_client_auth?
+        jwt_client_auth_profile? && valid_https_url?(token_endpoint)
+      end
 
-      # @return [Boolean] true when the server supports the UDAP client authorization profile (+udap_authz+)
-      def supports_client_authorization? = client_authorization_profile?
+      # @return [Boolean] true when the server supports the UDAP client authorization profile
+      #   (advertises +udap_authz+ profile, supports the +client_credentials+ grant, and provides
+      #   a valid +token_endpoint+)
+      def supports_client_authorization?
+        client_authorization_profile? && grant_type?('client_credentials') && valid_https_url?(token_endpoint)
+      end
 
       # @return [Boolean] true when the server supports the authorization_code grant type
       def supports_authorization_code?
@@ -293,7 +301,7 @@ module Safire
 
       def compact_jws_format?(value)
         parts = value.split('.', -1)
-        parts.length == 3 && parts.all?(&:present?)
+        parts.length == 3 && parts.all? { |p| BASE64URL_SEGMENT.match?(p) }
       end
 
       def valid_https_url?(value)
@@ -319,23 +327,24 @@ module Safire
       end
 
       def extensions_required_conditionally_present?
-        return true unless array_any?(:udap_authorization_extensions_supported)
-        return true unless udap_authorization_extensions_required.nil?
-
-        warn_noncompliance(
-          'udap_authorization_extensions_required must be present ' \
-          'when udap_authorization_extensions_supported is non-empty'
+        required_conditionally_present?(
+          :udap_authorization_extensions_required,
+          :udap_authorization_extensions_supported
         )
-        false
       end
 
       def certifications_required_conditionally_present?
-        return true unless array_any?(:udap_certifications_supported)
-        return true unless udap_certifications_required.nil?
-
-        warn_noncompliance(
-          'udap_certifications_required must be present when udap_certifications_supported is non-empty'
+        required_conditionally_present?(
+          :udap_certifications_required,
+          :udap_certifications_supported
         )
+      end
+
+      def required_conditionally_present?(required_attr, supported_attr)
+        return true unless array_any?(supported_attr)
+        return true unless public_send(required_attr).nil?
+
+        warn_noncompliance("#{required_attr} must be present when #{supported_attr} is non-empty")
         false
       end
 
@@ -367,30 +376,26 @@ module Safire
       end
 
       def extensions_required_subset_valid?
-        return true unless array_any?(:udap_authorization_extensions_required)
-
-        unsupported = array_or_empty(:udap_authorization_extensions_required) -
-                      array_or_empty(:udap_authorization_extensions_supported)
-        return true unless unsupported.any?
-
-        warn_noncompliance(
-          'udap_authorization_extensions_required contains values not in ' \
-          "udap_authorization_extensions_supported: #{unsupported.join(', ')}"
+        required_subset_valid_for?(
+          :udap_authorization_extensions_required,
+          :udap_authorization_extensions_supported
         )
-        false
       end
 
       def certifications_required_subset_valid?
-        return true unless array_any?(:udap_certifications_required)
+        required_subset_valid_for?(
+          :udap_certifications_required,
+          :udap_certifications_supported
+        )
+      end
 
-        unsupported = array_or_empty(:udap_certifications_required) -
-                      array_or_empty(:udap_certifications_supported)
+      def required_subset_valid_for?(required_attr, supported_attr)
+        return true unless array_any?(required_attr)
+
+        unsupported = array_or_empty(required_attr) - array_or_empty(supported_attr)
         return true unless unsupported.any?
 
-        warn_noncompliance(
-          'udap_certifications_required contains values not in ' \
-          "udap_certifications_supported: #{unsupported.join(', ')}"
-        )
+        warn_noncompliance("#{required_attr} contains values not in #{supported_attr}: #{unsupported.join(', ')}")
         false
       end
     end

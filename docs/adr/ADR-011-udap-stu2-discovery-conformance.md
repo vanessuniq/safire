@@ -60,12 +60,14 @@ semantics.
 - `udap_profiles_supported` must include `"udap_dcr"` and `"udap_authn"` (both required by STU2)
 - `token_endpoint_auth_methods_supported` must equal `["private_key_jwt"]` exactly (STU2 fixed value)
 - `scopes_supported`, `grant_types_supported`, and both JWT signing algorithm arrays must each have at least one element
-- `signed_metadata` must be a compact-JWS string (three dot-separated segments); JWT header
+- `signed_metadata` must be a compact-JWS string: exactly three dot-separated segments where
+  every segment contains only base64url characters (`[A-Za-z0-9\-_]`, no padding); JWT header
   algorithm (`alg`), required claim presence, and signature are not validated here — these are
   deferred to the cryptographic validator (future PR)
 - endpoint URL fields (`token_endpoint`, `registration_endpoint`, conditionally
-  `authorization_endpoint`) must be absolute HTTPS URLs; `localhost` HTTP is accepted to support
-  development and testing without TLS — this exception does not apply in production
+  `authorization_endpoint`) must be absolute HTTPS URLs; plain HTTP is accepted only for
+  `localhost` and `127.0.0.1` to support development without TLS — any other scheme on
+  those hosts (e.g. `ftp://localhost`) is rejected; this exception does not apply in production
 - `authorization_endpoint` is conditionally required when `grant_types_supported` includes
   `"authorization_code"`
 - `"udap_authz"` is conditionally required in `udap_profiles_supported` when `grant_types_supported`
@@ -84,8 +86,11 @@ semantics.
   only whether the server advertises the profile string in `udap_profiles_supported`; they do
   not check whether all required supporting fields are present.
 - *Capability checks* (`supports_dynamic_registration?`, `supports_jwt_client_auth?`, etc.)
-  combine profile advertisement with any additional preconditions (e.g.,
-  `supports_dynamic_registration?` also requires `registration_endpoint` to be present).
+  combine profile advertisement with the minimum preconditions needed to start that flow:
+  - `supports_dynamic_registration?` requires `udap_dcr` profile and a valid `registration_endpoint`
+  - `supports_jwt_client_auth?` requires `udap_authn` profile and a valid `token_endpoint`
+  - `supports_client_authorization?` requires `udap_authz` profile, `client_credentials` in
+    `grant_types_supported`, and a valid `token_endpoint`
 
 ---
 

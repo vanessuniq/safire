@@ -207,6 +207,13 @@ RSpec.describe Safire::Protocols::UdapMetadata do
         expect(m.valid?).to be(false)
         expect(Safire.logger).to have_received(:warn).with(/signed_metadata must be a compact-JWS string/)
       end
+
+      it 'returns false and logs a warning when a segment contains non-base64url characters' do
+        m = described_class.new(full_metadata.merge('signed_metadata' => 'not a.jwt.!!!'))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/signed_metadata must be a compact-JWS string/)
+      end
     end
 
     context 'when authorization_code is in grant_types_supported' do
@@ -432,7 +439,7 @@ RSpec.describe Safire::Protocols::UdapMetadata do
     end
 
     describe '#supports_jwt_client_auth?' do
-      it "returns true when 'udap_authn' is in udap_profiles_supported" do
+      it "returns true when 'udap_authn' profile and a valid token_endpoint are both present" do
         expect(metadata.supports_jwt_client_auth?).to be(true)
       end
 
@@ -441,15 +448,45 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
         expect(m.supports_jwt_client_auth?).to be(false)
       end
+
+      it 'returns false when token_endpoint is absent' do
+        m = described_class.new(full_metadata.except('token_endpoint'))
+
+        expect(m.supports_jwt_client_auth?).to be(false)
+      end
+
+      it 'returns false when token_endpoint is not a valid HTTPS URL' do
+        m = described_class.new(full_metadata.merge('token_endpoint' => 'http://remote.example.com/token'))
+
+        expect(m.supports_jwt_client_auth?).to be(false)
+      end
     end
 
     describe '#supports_client_authorization?' do
-      it "returns true when 'udap_authz' is in udap_profiles_supported" do
+      it "returns true when 'udap_authz' profile, client_credentials grant, and valid token_endpoint are all present" do
         expect(metadata.supports_client_authorization?).to be(true)
       end
 
       it "returns false when 'udap_authz' is absent" do
         m = described_class.new(full_metadata.merge('udap_profiles_supported' => %w[udap_dcr udap_authn]))
+
+        expect(m.supports_client_authorization?).to be(false)
+      end
+
+      it "returns false when 'client_credentials' is absent from grant_types_supported" do
+        m = described_class.new(full_metadata.merge('grant_types_supported' => ['authorization_code']))
+
+        expect(m.supports_client_authorization?).to be(false)
+      end
+
+      it 'returns false when token_endpoint is absent' do
+        m = described_class.new(full_metadata.except('token_endpoint'))
+
+        expect(m.supports_client_authorization?).to be(false)
+      end
+
+      it 'returns false when token_endpoint is not a valid HTTPS URL' do
+        m = described_class.new(full_metadata.merge('token_endpoint' => 'http://remote.example.com/token'))
 
         expect(m.supports_client_authorization?).to be(false)
       end
@@ -516,7 +553,7 @@ RSpec.describe Safire::Protocols::UdapMetadata do
     end
 
     describe '#supports_signed_metadata?' do
-      it 'returns true when signed_metadata is present' do
+      it 'returns true when signed_metadata is a compact-JWS string' do
         expect(metadata.supports_signed_metadata?).to be(true)
       end
 
@@ -526,8 +563,14 @@ RSpec.describe Safire::Protocols::UdapMetadata do
         expect(m.supports_signed_metadata?).to be(false)
       end
 
-      it 'returns false when signed_metadata is not compact-JWS format' do
+      it 'returns false when signed_metadata has fewer than three dot-separated segments' do
         m = described_class.new(full_metadata.merge('signed_metadata' => 'not-a-jwt'))
+
+        expect(m.supports_signed_metadata?).to be(false)
+      end
+
+      it 'returns false when a segment contains non-base64url characters' do
+        m = described_class.new(full_metadata.merge('signed_metadata' => 'not a.jwt.!!!'))
 
         expect(m.supports_signed_metadata?).to be(false)
       end

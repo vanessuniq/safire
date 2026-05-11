@@ -48,17 +48,20 @@ dedicated cryptographic validator to be introduced in a future PR.
 response. Using `blank?` would flag `[]` as absent; using `nil?` preserves the distinction
 between "field not present in the JSON response" and "field present but empty".
 
-**Array type validation is explicit:** Discovery metadata is untrusted JSON. `UdapMetadata#valid?`
-verifies every array-valued field is actually an Array before it performs profile, grant,
-non-empty, or subset checks. Public helper methods also treat malformed scalar metadata as
-unsupported instead of using Ruby string `include?` semantics.
+**Array type and element validation is explicit:** Discovery metadata is untrusted JSON.
+`UdapMetadata#valid?` verifies every array-valued field is an `Array` whose elements are all
+`String`s before performing profile, grant, non-empty, or subset checks. Public helper methods
+also treat malformed scalar metadata as unsupported instead of using Ruby string `include?`
+semantics.
 
 **Value-level constraints in `valid?`:**
 
 - `udap_versions_supported` must equal `["1"]` exactly (STU2 fixed value)
 - `udap_profiles_supported` must include `"udap_dcr"` and `"udap_authn"` (both required by STU2)
 - `token_endpoint_auth_methods_supported` must equal `["private_key_jwt"]` exactly (STU2 fixed value)
-- `scopes_supported` and `grant_types_supported` must each have at least one element
+- `scopes_supported`, `grant_types_supported`, and both JWT signing algorithm arrays must each have at least one element
+- `signed_metadata` must be a compact-JWS string (three dot-separated segments); signature
+  verification is deferred to the cryptographic validator (future PR)
 - `authorization_endpoint` is conditionally required when `grant_types_supported` includes
   `"authorization_code"`
 - `"udap_authz"` is conditionally required in `udap_profiles_supported` when `grant_types_supported`

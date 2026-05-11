@@ -423,6 +423,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
         expect(m.supports_dynamic_registration?).to be(false)
       end
+
+      it 'returns false when registration_endpoint is not a valid HTTPS URL' do
+        m = described_class.new(full_metadata.merge('registration_endpoint' => 'http://fhir.example.com/register'))
+
+        expect(m.supports_dynamic_registration?).to be(false)
+      end
     end
 
     describe '#supports_jwt_client_auth?' do
@@ -516,6 +522,12 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
       it 'returns false when signed_metadata is absent' do
         m = described_class.new(full_metadata.except('signed_metadata'))
+
+        expect(m.supports_signed_metadata?).to be(false)
+      end
+
+      it 'returns false when signed_metadata is not compact-JWS format' do
+        m = described_class.new(full_metadata.merge('signed_metadata' => 'not-a-jwt'))
 
         expect(m.supports_signed_metadata?).to be(false)
       end

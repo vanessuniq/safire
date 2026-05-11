@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `Safire::Protocols::UdapMetadata` for HL7 UDAP Security STU2 discovery metadata,
+  including structural `valid?` checks and helper methods for advertised UDAP profiles and capabilities.
+
 - `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default: `'SMART configuration'`)
   and exposes it as a readable attribute; consumers can inspect `error.label` to identify which
   protocol's discovery failed

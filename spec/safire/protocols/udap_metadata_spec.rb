@@ -124,6 +124,62 @@ RSpec.describe Safire::Protocols::UdapMetadata do
       end
     end
 
+    context 'when token_endpoint_auth_signing_alg_values_supported is empty' do
+      it 'returns false and logs a warning' do
+        m = described_class.new(full_metadata.merge('token_endpoint_auth_signing_alg_values_supported' => []))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn)
+          .with(/token_endpoint_auth_signing_alg_values_supported must be a non-empty array/)
+      end
+    end
+
+    context 'when registration_endpoint_jwt_signing_alg_values_supported is empty' do
+      it 'returns false and logs a warning' do
+        m = described_class.new(full_metadata.merge('registration_endpoint_jwt_signing_alg_values_supported' => []))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn)
+          .with(/registration_endpoint_jwt_signing_alg_values_supported must be a non-empty array/)
+      end
+    end
+
+    context 'when a required endpoint URL is not an absolute HTTPS URL' do
+      %w[token_endpoint registration_endpoint].each do |field|
+        it "returns false and logs a warning when #{field} is an HTTP URL" do
+          m = described_class.new(full_metadata.merge(field => 'http://fhir.example.com/endpoint'))
+
+          expect(m.valid?).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/#{field} must be an absolute HTTPS URL/)
+        end
+
+        it "returns false and logs a warning when #{field} is a blank string" do
+          m = described_class.new(full_metadata.merge(field => ''))
+
+          expect(m.valid?).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/#{field} must be an absolute HTTPS URL/)
+        end
+      end
+    end
+
+    context 'when authorization_endpoint is present but not an absolute HTTPS URL' do
+      it 'returns false and logs a warning' do
+        m = described_class.new(full_metadata.merge('authorization_endpoint' => 'http://fhir.example.com/auth'))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/authorization_endpoint must be an absolute HTTPS URL/)
+      end
+    end
+
+    context 'when signed_metadata is a blank string' do
+      it 'returns false and logs a warning' do
+        m = described_class.new(full_metadata.merge('signed_metadata' => ''))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/signed_metadata must be a non-empty string/)
+      end
+    end
+
     context 'when authorization_code is in grant_types_supported' do
       it 'returns false and logs a warning when authorization_endpoint is absent' do
         m = described_class.new(full_metadata.except('authorization_endpoint'))

@@ -60,8 +60,12 @@ semantics.
 - `udap_profiles_supported` must include `"udap_dcr"` and `"udap_authn"` (both required by STU2)
 - `token_endpoint_auth_methods_supported` must equal `["private_key_jwt"]` exactly (STU2 fixed value)
 - `scopes_supported`, `grant_types_supported`, and both JWT signing algorithm arrays must each have at least one element
-- `signed_metadata` must be a compact-JWS string (three dot-separated segments); signature
-  verification is deferred to the cryptographic validator (future PR)
+- `signed_metadata` must be a compact-JWS string (three dot-separated segments); JWT header
+  algorithm (`alg`), required claim presence, and signature are not validated here — these are
+  deferred to the cryptographic validator (future PR)
+- endpoint URL fields (`token_endpoint`, `registration_endpoint`, conditionally
+  `authorization_endpoint`) must be absolute HTTPS URLs; `localhost` HTTP is accepted to support
+  development and testing without TLS — this exception does not apply in production
 - `authorization_endpoint` is conditionally required when `grant_types_supported` includes
   `"authorization_code"`
 - `"udap_authz"` is conditionally required in `udap_profiles_supported` when `grant_types_supported`

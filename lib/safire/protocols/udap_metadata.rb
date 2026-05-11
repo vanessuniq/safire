@@ -105,7 +105,10 @@ module Safire
       # - +scopes_supported+, +grant_types_supported+, and both signing algorithm arrays each have at least one element
       # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs;
       #   +authorization_endpoint+ is also validated when present
-      # - +signed_metadata+ is a compact-JWS string (three dot-separated segments)
+      # - +signed_metadata+ is a compact-JWS string (three dot-separated segments); JWT header
+      #   algorithm (+alg+), required claim presence, and signature are not validated here —
+      #   these are deferred to the cryptographic validator (future PR)
+      # - endpoint URL checks accept localhost HTTP to support development without TLS
       # - +authorization_endpoint+ present when +authorization_code+ is in +grant_types_supported+
       # - +udap_authz+ present in +udap_profiles_supported+ when +client_credentials+ is in +grant_types_supported+
       # - +authorization_code+ present in +grant_types_supported+ when +refresh_token+ is also present
@@ -150,9 +153,9 @@ module Safire
       # Capability checks — combine profile advertisement with any additional preconditions.
 
       # @return [Boolean] true when the server supports UDAP Dynamic Client Registration
-      #   (advertises +udap_dcr+ profile and provides a +registration_endpoint+)
+      #   (advertises +udap_dcr+ profile and provides a valid +registration_endpoint+)
       def supports_dynamic_registration?
-        dynamic_registration_profile? && registration_endpoint.present?
+        dynamic_registration_profile? && valid_https_url?(registration_endpoint)
       end
 
       # @return [Boolean] true when the server supports JWT client authentication (+udap_authn+ profile)
@@ -174,8 +177,10 @@ module Safire
       # @return [Boolean] true when the server supports Tiered OAuth (+udap_to+ profile)
       def supports_tiered_oauth? = tiered_oauth_profile?
 
-      # @return [Boolean] true when the server provides a signed_metadata JWT
-      def supports_signed_metadata? = signed_metadata.present?
+      # @return [Boolean] true when the server provides a signed_metadata value in compact-JWS format
+      def supports_signed_metadata?
+        signed_metadata.is_a?(String) && compact_jws_format?(signed_metadata)
+      end
 
       private
 
@@ -273,7 +278,9 @@ module Safire
         attrs = STRING_URL_ATTRIBUTES.dup
         attrs << :authorization_endpoint unless authorization_endpoint.nil?
         invalid = attrs.reject { |attr| valid_https_url?(public_send(attr)) }
-        invalid.each { |attr| warn_noncompliance("#{attr} must be an absolute HTTPS URL") }
+        invalid.each do |attr|
+          warn_noncompliance("#{attr} must be an absolute HTTPS URL (localhost HTTP is accepted for development)")
+        end
         invalid.empty?
       end
 

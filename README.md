@@ -29,7 +29,7 @@ Safire is a Ruby gem implementing the [SMART App Launch 2.2.0](https://hl7.org/f
 
 ## Installation
 
-Requires Ruby ≥ 4.0.3.
+Requires Ruby ≥ 4.0.4.
 
 ```ruby
 gem 'safire'

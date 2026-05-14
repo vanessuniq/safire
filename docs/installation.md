@@ -20,7 +20,7 @@ description: "How to install the Safire Ruby gem and get started with SMART App 
 
 ## Install
 
-**Requirements:** Ruby ≥ 4.0.3. OpenSSL is bundled with Ruby — no separate install needed.
+**Requirements:** Ruby ≥ 4.0.4. OpenSSL is bundled with Ruby — no separate install needed.
 
 Add to your Gemfile:
 

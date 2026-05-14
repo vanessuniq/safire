@@ -70,9 +70,9 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 | Component | Version |
 |-----------|---------|
-| Ruby | ≥ 4.0.3 |
+| Ruby | ≥ 4.0.4 |
 | ActiveSupport | ~> 8.0 |
 | Rails (optional) | 7.x, 8.x |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 1.0 (planned) |
+| UDAP Security | 2.0.0 ( STU2 - planned) |
 | FHIR | R4, R4B |

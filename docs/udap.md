@@ -63,6 +63,7 @@ The result is cached separately from the default (no-community) request, so call
 |-----------|-------------|
 | HTTP 4xx/5xx | `Safire::Errors::DiscoveryError` with `status` populated |
 | Server returns HTTP 204 | `Safire::Errors::DiscoveryError` (server signals no UDAP workflows for that community) |
+| Connection failure, timeout, SSL error, or redirect to a non-HTTPS URL | `Safire::Errors::NetworkError` |
 | `community:` is not a valid URI string | `Safire::Errors::ConfigurationError` (raised before any HTTP call) |
 
 ---

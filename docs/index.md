@@ -20,7 +20,7 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 | [Getting Started]({{ site.baseurl }}/installation/) | Install Safire and quick start guide |
 | [Configuration]({{ site.baseurl }}/configuration/) | All configuration options and parameters |
 | [SMART]({{ site.baseurl }}/smart-on-fhir/) | App Launch (Public, Confidential Symmetric, Confidential Asymmetric) and Backend Services |
-| [UDAP]({{ site.baseurl }}/udap/) | UDAP protocol overview and planned support |
+| [UDAP]({{ site.baseurl }}/udap/) | UDAP Security discovery (implemented) and planned auth flows |
 | [Security Guide]({{ site.baseurl }}/security/) | HTTPS, credential protection, token storage, key rotation |
 | [Advanced Examples]({{ site.baseurl }}/advanced/) | Caching, multi-server, token management, complete Rails integration |
 | [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
@@ -37,9 +37,11 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 - POST-Based Authorization
 - Backend Services (client_credentials grant, JWT assertion, no user interaction or PKCE)
 
-### UDAP
+### UDAP Security (STU2)
 
-> Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details (coming soon).
+- Discovery (`/.well-known/udap`) with optional community scoping
+
+Auth flows (DCR, JWT assertion, Tiered OAuth) are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ## Demo Application
 

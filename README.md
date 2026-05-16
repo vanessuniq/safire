@@ -21,9 +21,24 @@ Safire is a Ruby gem implementing the [SMART App Launch 2.2.0](https://hl7.org/f
 - POST-Based Authorization
 - Backend Services (`client_credentials` grant, JWT assertion, no user interaction or PKCE; scope defaults to `system/*.rs`)
 
-### UDAP
+### UDAP Security (STU2)
 
-> Planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
+Server metadata discovery is implemented. Pass `protocol: :udap` to fetch `/.well-known/udap`:
+
+```ruby
+client = Safire::Client.new(
+  { base_url: 'https://fhir.example.com' },
+  protocol: :udap
+)
+
+metadata = client.server_metadata
+# => #<Safire::Protocols::UdapMetadata ...>
+
+# Community-scoped discovery
+metadata = client.server_metadata(community: 'https://udap.example.org/community1')
+```
+
+Auth flows (DCR, JWT assertion, Tiered OAuth) are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ---
 

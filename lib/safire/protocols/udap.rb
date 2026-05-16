@@ -35,8 +35,10 @@ module Safire
       #
       # @param community [String, nil] optional UDAP community URI; scopes discovery
       # @return [Safire::Protocols::UdapMetadata] parsed UDAP metadata
-      # @raise [Safire::Errors::DiscoveryError] if the request fails, the server
-      #   returns 204, or the response body is not a JSON object
+      # @raise [Safire::Errors::DiscoveryError] if the server returns an HTTP error,
+      #   a 204 response, or a body that is not a JSON object
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
+      #   or a redirect to a non-HTTPS URL
       # @raise [Safire::Errors::ConfigurationError] if +community+ is not a URI
       def server_metadata(community: nil)
         community = normalize_community(community)

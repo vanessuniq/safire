@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Safire::Client.new(..., protocol: :udap).server_metadata` now works end-to-end:
+  `Protocols::Udap` fetches and parses `/.well-known/udap`, supports the optional `community:` URI
+  parameter, caches results per community, and raises `DiscoveryError` on HTTP errors or a 204 response
+
 - Added `Safire::Protocols::UdapMetadata` for HL7 UDAP Security STU2 discovery metadata,
   including structural `valid?` checks and helper methods for advertised UDAP profiles and capabilities.
 

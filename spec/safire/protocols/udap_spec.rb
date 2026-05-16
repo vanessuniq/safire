@@ -111,6 +111,11 @@ RSpec.describe Safire::Protocols::Udap do
           .to raise_error(Safire::Errors::ConfigurationError, /community/)
       end
 
+      it 'raises ConfigurationError for a scheme-only URI with no host or path' do
+        expect { udap.server_metadata(community: 'foo:') }
+          .to raise_error(Safire::Errors::ConfigurationError, /community/)
+      end
+
       it 'raises ConfigurationError when the value is not a string' do
         expect { udap.server_metadata(community: 123) }
           .to raise_error(Safire::Errors::ConfigurationError, /community/)

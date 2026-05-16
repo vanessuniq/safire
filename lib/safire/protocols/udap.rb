@@ -83,7 +83,7 @@ module Safire
 
       def valid_uri?(value)
         uri = Addressable::URI.parse(value)
-        uri.scheme.present? && (uri.host.present? || uri.path.present? || uri.opaque.present?)
+        uri.scheme.present? && (uri.host.present? || uri.path.present?)
       rescue Addressable::URI::InvalidURIError
         false
       end

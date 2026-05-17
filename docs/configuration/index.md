@@ -29,7 +29,7 @@ flowchart TD
     A -->|"resolves config"| B
     A -->|"validates protocol + client_type"| C
     C -->|":smart (default)"| D
-    C -->|":udap (planned)"| G["Protocols::Udap\n(future)"]
+    C -->|":udap"| G["Protocols::Udap\n— discovery implemented\n— auth flows planned"]
     D -->|"lazily fetches"| E
     E -->|"HTTP"| F
 ```

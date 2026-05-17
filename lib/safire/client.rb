@@ -24,7 +24,7 @@ module Safire
   # The +protocol:+ keyword selects the authorization protocol:
   #
   # * :smart (default) — SMART App Launch 2.2.0
-  # * :udap             — UDAP Security (future; not yet implemented)
+  # * :udap             — UDAP Security STU2
   #
   # The +client_type:+ keyword controls how the SMART client authenticates at the token endpoint.
   # Defaults to +nil+, which resolves to +:public+ for SMART. For UDAP, +client_type:+ is not
@@ -41,7 +41,7 @@ module Safire
   # client_credentials grant without prior DCR when identity can be fully determined from
   # certificate attributes alone.
   #
-  # @note Future kwargs (not yet implemented):
+  # @note Future kwargs (not yet implemented for UDAP):
   #
   #   flow: [Symbol] the authorization flow for UDAP clients (protocol: :udap):
   #     :b2b          — client_credentials grant, server-to-server
@@ -194,7 +194,7 @@ module Safire
     def build_protocol_client
       case @protocol
       when :smart then Protocols::Smart.new(config, client_type:)
-      when :udap  then raise NotImplementedError, 'UDAP protocol client is not yet implemented'
+      when :udap  then Protocols::Udap.new(config)
       end
     end
 

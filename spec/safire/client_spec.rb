@@ -153,14 +153,39 @@ RSpec.describe Safire::Client do
     end
   end
 
-  # ---------- UDAP (not yet implemented) ----------
+  # ---------- UDAP delegation ----------
 
   describe 'UDAP delegation' do
-    it 'raises NotImplementedError when a delegated method is called' do
-      client = described_class.new(config, protocol: :udap)
+    let(:well_known_url) { "#{base_url}/.well-known/udap" }
+    let(:udap_metadata_body) do
+      {
+        'udap_versions_supported' => ['1'],
+        'udap_profiles_supported' => %w[udap_dcr udap_authn],
+        'udap_authorization_extensions_supported' => [],
+        'udap_certifications_supported' => [],
+        'grant_types_supported' => ['client_credentials'],
+        'scopes_supported' => ['system/*.rs'],
+        'token_endpoint' => "#{base_url}/token",
+        'token_endpoint_auth_methods_supported' => ['private_key_jwt'],
+        'token_endpoint_auth_signing_alg_values_supported' => ['RS256'],
+        'registration_endpoint' => "#{base_url}/register",
+        'registration_endpoint_jwt_signing_alg_values_supported' => ['RS256'],
+        'signed_metadata' => 'eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwcyJ9.c2ln'
+      }
+    end
+    let(:udap_client) { described_class.new(config, protocol: :udap) }
 
-      expect { client.server_metadata }
-        .to raise_error(NotImplementedError, /UDAP protocol client is not yet implemented/)
+    before do
+      stub_request(:get, well_known_url)
+        .to_return(status: 200, body: udap_metadata_body.to_json, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    it 'delegates server_metadata to Protocols::Udap and returns a UdapMetadata instance' do
+      expect(udap_client.server_metadata).to be_a(Safire::Protocols::UdapMetadata)
+    end
+
+    it 'raises NotImplementedError for unimplemented UDAP flows' do
+      expect { udap_client.authorization_url }.to raise_error(NotImplementedError)
     end
   end
 

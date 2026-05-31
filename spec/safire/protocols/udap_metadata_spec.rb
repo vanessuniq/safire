@@ -552,6 +552,24 @@ RSpec.describe Safire::Protocols::UdapMetadata do
       end
     end
 
+    describe '#signed_metadata_valid?' do
+      before { allow(Safire.logger).to receive(:warn) }
+
+      it 'returns false immediately when signed_metadata is absent' do
+        m = described_class.new(full_metadata.except('signed_metadata'))
+
+        expect(m.signed_metadata_valid?(base_url: 'https://fhir.example.com')).to be(false)
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+
+      it 'returns false when the signed_metadata JWT cannot be decoded' do
+        result = metadata.signed_metadata_valid?(base_url: 'https://fhir.example.com', verify_chain: false)
+
+        expect(result).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/signed_metadata/)
+      end
+    end
+
     describe '#supports_signed_metadata?' do
       it 'returns true when signed_metadata is a compact-JWS string' do
         expect(metadata.supports_signed_metadata?).to be(true)

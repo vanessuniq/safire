@@ -107,8 +107,7 @@ module Safire
       # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs;
       #   +authorization_endpoint+ is also validated when present
       # - +signed_metadata+ is a compact-JWS string (three base64url-encoded dot-separated segments);
-      #   JWT header algorithm (+alg+), required claim presence, and signature are not validated here —
-      #   these are deferred to the cryptographic validator (future PR)
+      #   full cryptographic validation (signature, chain, claims) requires {#signed_metadata_valid?}
       # - endpoint URL checks accept localhost HTTP to support development without TLS
       # - +authorization_endpoint+ present when +authorization_code+ is in +grant_types_supported+
       # - +udap_authz+ present in +udap_profiles_supported+ when +client_credentials+ is in +grant_types_supported+
@@ -135,6 +134,26 @@ module Safire
           conditional_presence_valid?,
           required_subset_valid?
         ].all?
+      end
+
+      # Validates the +signed_metadata+ JWT: decodes it, verifies the signature against the
+      # leaf certificate in +x5c+, optionally validates the X.509 chain, and checks all required
+      # UDAP STU2 claims (+iss+, +sub+, +exp+, +jti+, +token_endpoint+, +registration_endpoint+,
+      # and conditionally +authorization_endpoint+).
+      #
+      # This is separate from {#valid?}, which only performs structural conformance checks.
+      # Full cryptographic validation should be called after discovery when trust anchors are available.
+      #
+      # @param base_url [String] the server's base URL; must equal the +iss+ claim in the signed JWT
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] CA anchors for X.509 chain verification
+      # @param verify_chain [Boolean] set +false+ to skip chain validation (dev/test only)
+      # @return [Boolean] +true+ if all cryptographic and claim checks pass
+      def signed_metadata_valid?(base_url:, trusted_anchors: [], verify_chain: true)
+        return false unless signed_metadata.present?
+
+        UdapSignedMetadataValidator.new(signed_metadata, to_hash).valid?(
+          base_url:, trusted_anchors:, verify_chain:
+        )
       end
 
       # Profile checks — test profile advertisement only, not whether required fields are present.

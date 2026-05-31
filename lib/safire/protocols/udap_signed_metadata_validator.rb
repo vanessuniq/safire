@@ -90,7 +90,7 @@ module Safire
       end
 
       def signature_valid?(leaf_cert)
-        JWT.decode(@jwt, leaf_cert.public_key, true, algorithms: ALLOWED_ALGORITHMS)
+        JWT.decode(@jwt, leaf_cert.public_key, true, algorithms: ALLOWED_ALGORITHMS, verify_expiration: false)
         true
       rescue JWT::DecodeError => e
         log_failure("signature verification failed: #{e.message}")

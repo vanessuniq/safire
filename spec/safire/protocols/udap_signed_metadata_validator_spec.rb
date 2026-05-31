@@ -181,6 +181,19 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
           expect(Safire.logger).to have_received(:warn).with(/chain/)
         end
       end
+
+      context 'when the X.509 store raises a StoreError' do
+        before do
+          allow(OpenSSL::X509::StoreContext).to receive(:new).and_raise(OpenSSL::X509::StoreError, 'store error')
+        end
+
+        it 'returns nil and logs a chain error warning' do
+          result = validator.signed_endpoint_claims(base_url:, trusted_anchors: [cert], verify_chain: true)
+
+          expect(result).to be_nil
+          expect(Safire.logger).to have_received(:warn).with(/chain/)
+        end
+      end
     end
 
     context 'with verify_chain: false' do
@@ -192,6 +205,17 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
     end
 
     # ---------- iss / SAN validation ----------
+
+    context 'when iss claim is missing from the payload' do
+      let(:jwt) { build_udap_jwt(valid_payload.except('iss')) }
+
+      it 'returns nil and logs a warning' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/iss.*missing/)
+      end
+    end
 
     context 'when iss does not match the certificate SAN' do
       let(:jwt) { build_udap_jwt(valid_payload.merge('iss' => 'https://other.example.com')) }

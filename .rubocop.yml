@@ -32,6 +32,10 @@ Metrics/BlockLength:
     - 'spec/**/*'
     - '*.gemspec'
 
+Metrics/AbcSize:
+  Exclude:
+    - 'spec/**/*'
+
 Metrics/ParameterLists:
   CountKeywordArgs: false
 

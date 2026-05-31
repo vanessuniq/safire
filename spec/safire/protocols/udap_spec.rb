@@ -35,8 +35,21 @@ RSpec.describe Safire::Protocols::Udap do
   # ---------- server_metadata — default (no community) ----------
 
   describe '#server_metadata' do
+    let(:signed_claims) do
+      {
+        'token_endpoint' => valid_metadata['token_endpoint'],
+        'registration_endpoint' => valid_metadata['registration_endpoint']
+      }
+    end
+    let(:validator_double) do
+      instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: signed_claims)
+    end
+
     context 'without community parameter' do
-      before { stub_udap }
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
 
       it 'returns a UdapMetadata instance' do
         expect(udap.server_metadata).to be_a(Safire::Protocols::UdapMetadata)
@@ -66,6 +79,7 @@ RSpec.describe Safire::Protocols::Udap do
           .to_return(**success_return)
         stub_request(:get, well_known_url)
           .to_return(**success_return)
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
       end
 
       it 'appends the community as a query parameter' do
@@ -90,7 +104,10 @@ RSpec.describe Safire::Protocols::Udap do
     end
 
     context 'with a blank community parameter' do
-      before { stub_udap }
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
 
       it 'treats it as the default discovery request' do
         udap.server_metadata(community: '   ')
@@ -203,6 +220,66 @@ RSpec.describe Safire::Protocols::Udap do
       it 'includes the label UDAP metadata in the error message' do
         expect { udap.server_metadata }
           .to raise_error(Safire::Errors::DiscoveryError) { |e| expect(e.message).to include('UDAP metadata') }
+      end
+    end
+
+    # ---------- server_metadata — signed_metadata validation ----------
+
+    context 'when signed_metadata validation fails' do
+      let(:failing_validator) do
+        instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: nil)
+      end
+
+      before do
+        stub_udap
+        allow(Safire.logger).to receive(:warn)
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(failing_validator)
+      end
+
+      it 'raises DiscoveryError' do
+        expect { udap.server_metadata }.to raise_error(Safire::Errors::DiscoveryError)
+      end
+
+      it 'includes signed_metadata in the error description' do
+        expect { udap.server_metadata }
+          .to raise_error(Safire::Errors::DiscoveryError, /signed_metadata/)
+      end
+
+      it 'includes the community in the error when community-scoped' do
+        community = 'https://udap.example.org/community1'
+        stub_request(:get, well_known_url)
+          .with(query: { 'community' => community })
+          .to_return(status: 200, body: valid_metadata.to_json, headers: { 'Content-Type' => 'application/json' })
+
+        expect { udap.server_metadata(community: community) }
+          .to raise_error(Safire::Errors::DiscoveryError, /community/)
+      end
+    end
+
+    context 'when signed endpoint claims differ from the unsigned values' do
+      let(:signed_claims) do
+        {
+          'token_endpoint' => 'https://fhir.example.com/signed-token',
+          'registration_endpoint' => valid_metadata['registration_endpoint']
+        }
+      end
+
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
+
+      it 'returns metadata with the authoritative signed token_endpoint' do
+        expect(udap.server_metadata.token_endpoint).to eq('https://fhir.example.com/signed-token')
+      end
+
+      it 'passes the raw discovery hash as unsigned_metadata to the validator' do
+        udap.server_metadata
+
+        expect(Safire::Protocols::UdapSignedMetadataValidator).to have_received(:new).with(
+          valid_metadata['signed_metadata'],
+          hash_including('token_endpoint' => valid_metadata['token_endpoint'])
+        )
       end
     end
   end

@@ -86,10 +86,7 @@ module Safire
       end
 
       def parse_leaf_cert(x5c_value)
-        der = Base64.strict_decode64(x5c_value)
-        OpenSSL::X509::Certificate.new(der)
-      rescue ArgumentError, OpenSSL::X509::CertificateError => e
-        raise Errors::CertificateError.new(reason: "malformed x5c leaf certificate: #{e.message}")
+        parse_x5c_cert(x5c_value, 'leaf')
       end
 
       def signature_valid?(leaf_cert)
@@ -121,11 +118,13 @@ module Safire
       end
 
       def parse_intermediate_certs(ders)
-        ders.map do |der_b64|
-          OpenSSL::X509::Certificate.new(Base64.strict_decode64(der_b64))
-        end
+        ders.map { |der_b64| parse_x5c_cert(der_b64, 'intermediate') }
+      end
+
+      def parse_x5c_cert(der_b64, label)
+        OpenSSL::X509::Certificate.new(Base64.strict_decode64(der_b64))
       rescue ArgumentError, OpenSSL::X509::CertificateError => e
-        raise Errors::CertificateError.new(reason: "malformed x5c intermediate certificate: #{e.message}")
+        raise Errors::CertificateError.new(reason: "malformed x5c #{label} certificate: #{e.message}")
       end
 
       def claims_valid?(payload, base_url, leaf_cert)

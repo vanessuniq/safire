@@ -33,32 +33,58 @@ module Safire
       # cached per community — subsequent calls with the same +community+ return the
       # cached result without a second HTTP request.
       #
+      # The +signed_metadata+ JWT in the discovery response is validated per UDAP Security STU2.
+      # Signed endpoint claims (+token_endpoint+, +registration_endpoint+, and optionally
+      # +authorization_endpoint+) are merged over the unsigned values before the metadata object
+      # is constructed.
+      #
       # @param community [String, nil] optional UDAP community URI; scopes discovery
-      # @return [Safire::Protocols::UdapMetadata] parsed UDAP metadata
-      # @raise [Safire::Errors::DiscoveryError] if the server returns an HTTP error,
-      #   a 204 response, or a body that is not a JSON object
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] X.509 trust anchors for
+      #   +signed_metadata+ chain verification; required for production use
+      # @param verify_chain [Boolean] when +false+, skips X.509 chain validation (dev/test only)
+      # @return [Safire::Protocols::UdapMetadata] parsed UDAP metadata with authoritative signed endpoint claims
+      # @raise [Safire::Errors::DiscoveryError] if the server returns an HTTP error, a 204 response,
+      #   a body that is not a JSON object, or if +signed_metadata+ JWT validation fails
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
       #   or a redirect to a non-HTTPS URL
       # @raise [Safire::Errors::ConfigurationError] if +community+ is not a URI
-      def server_metadata(community: nil)
+      def server_metadata(community: nil, trusted_anchors: [], verify_chain: true)
         community = normalize_community(community)
         cache_key = community || :default
         return @metadata_cache[cache_key] if @metadata_cache.key?(cache_key)
 
-        @metadata_cache[cache_key] = fetch_metadata(community:)
+        @metadata_cache[cache_key] = fetch_metadata(community:, trusted_anchors:, verify_chain:)
       end
 
       private
 
-      def fetch_metadata(community:)
+      def fetch_metadata(community:, trusted_anchors:, verify_chain:)
         endpoint = well_known_endpoint(community:)
         response = @http_client.get(endpoint)
         check_204!(response, endpoint:, community:)
-        UdapMetadata.new(parse_discovery_body(response.body, endpoint))
+        raw = parse_discovery_body(response.body, endpoint)
+        signed_claims = validate_signed_metadata!(raw, endpoint:, community:, trusted_anchors:, verify_chain:)
+        UdapMetadata.new(raw.merge(signed_claims))
       rescue Faraday::Error => e
         status = e.response&.dig(:status)
         Safire.logger.error("UDAP discovery failed for `#{endpoint}`: HTTP #{status}")
         raise Errors::DiscoveryError.new(endpoint: endpoint, status:, label: 'UDAP metadata')
+      end
+
+      def validate_signed_metadata!(raw, endpoint:, community:, trusted_anchors:, verify_chain:)
+        validator = UdapSignedMetadataValidator.new(raw['signed_metadata'], raw)
+        claims = validator.signed_endpoint_claims(base_url: @base_url, trusted_anchors:, verify_chain:)
+        return claims if claims
+
+        raise Errors::DiscoveryError.new(
+          endpoint: endpoint,
+          error_description: community_scoped('signed_metadata validation failed', community),
+          label: 'UDAP metadata'
+        )
+      end
+
+      def community_scoped(description, community)
+        community ? "#{description} for community #{community}" : description
       end
 
       def normalize_community(community)
@@ -100,12 +126,10 @@ module Safire
       def check_204!(response, endpoint:, community:)
         return unless response.status == 204
 
-        description = 'no UDAP workflows supported'
-        description += " for community #{community}" if community
         raise Errors::DiscoveryError.new(
           endpoint: endpoint,
           status: 204,
-          error_description: description,
+          error_description: community_scoped('no UDAP workflows supported', community),
           label: 'UDAP metadata'
         )
       end

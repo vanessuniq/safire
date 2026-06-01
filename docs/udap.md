@@ -32,30 +32,46 @@ UDAP is a separate protocol from SMART. In Safire, select it via `protocol: :uda
 
 ## Discovery
 
-UDAP server metadata discovery fetches `/.well-known/udap` and parses the response into a `UdapMetadata` object. Results are cached per community within a client instance, so repeated calls for the same community make at most one HTTP request.
+UDAP server metadata discovery fetches `/.well-known/udap`, validates the `signed_metadata` JWT, and merges the authoritative signed endpoint claims into a `UdapMetadata` object. Results are cached per community and trust policy within a client instance, so repeated calls for the same community with the same trust configuration make at most one HTTP request.
+
+### Trust anchors
+
+Per UDAP Security STU2, `signed_metadata` JWT signature and X.509 chain verification are performed on every discovery call. Provide your trust anchors as `OpenSSL::X509::Certificate` objects — typically the CA certificate used to issue the server's UDAP certificate:
 
 ```ruby
+ca_cert = OpenSSL::X509::Certificate.new(File.read('udap_ca.pem'))
+
 client = Safire::Client.new(
   { base_url: 'https://fhir.example.com' },
   protocol: :udap
 )
 
-metadata = client.server_metadata
+metadata = client.server_metadata(trusted_anchors: [ca_cert])
 puts metadata.token_endpoint
 puts metadata.udap_versions_supported.inspect
 puts metadata.udap_profiles_supported.inspect
 ```
+
+{: .note }
+> **Development and testing**: Pass `verify_chain: false` to skip X.509 chain validation when working with self-signed certificates or local servers that do not have a CA-issued UDAP certificate. Never use `verify_chain: false` in production.
+>
+> ```ruby
+> metadata = client.server_metadata(verify_chain: false)
+> ```
 
 ### Community-scoped discovery
 
 Many UDAP servers host multiple trust communities at the same base URL, each scoped by a community URI. Pass `community:` to target a specific community:
 
 ```ruby
-metadata = client.server_metadata(community: 'https://udap.example.org/community1')
+metadata = client.server_metadata(
+  community:       'https://udap.example.org/community1',
+  trusted_anchors: [ca_cert]
+)
 puts metadata.token_endpoint
 ```
 
-The result is cached separately from the default (no-community) request, so calling `server_metadata` and `server_metadata(community: ...)` on the same client instance each makes at most one HTTP request.
+Results are cached separately per community and trust policy, so calling `server_metadata` with different community or `trusted_anchors` arguments each makes at most one HTTP request for that combination.
 
 ### Error handling
 
@@ -63,6 +79,8 @@ The result is cached separately from the default (no-community) request, so call
 |-----------|-------------|
 | HTTP 4xx/5xx | `Safire::Errors::DiscoveryError` with `status` populated |
 | Server returns HTTP 204 | `Safire::Errors::DiscoveryError` (server signals no UDAP workflows for that community) |
+| `signed_metadata` JWT validation fails | `Safire::Errors::DiscoveryError` (invalid signature, chain, or missing required claims) |
+| Malformed DER certificate in `x5c` header | `Safire::Errors::CertificateError` |
 | Connection failure, timeout, SSL error, or redirect to a non-HTTPS URL | `Safire::Errors::NetworkError` |
 | `community:` is not a valid URI string | `Safire::Errors::ConfigurationError` (raised before any HTTP call) |
 

@@ -133,6 +133,7 @@ module Safire
           iss_san_valid?(payload['iss'], leaf_cert),
           iss_base_url_valid?(payload['iss'], base_url),
           sub_equals_iss?(payload['sub'], payload['iss']),
+          iat_present?(payload['iat']),
           exp_valid?(payload['exp'], payload['iat']),
           jti_present?(payload['jti']),
           endpoint_claims_present?(payload)
@@ -191,6 +192,13 @@ module Safire
         end
 
         true
+      end
+
+      def iat_present?(iat)
+        return true if iat.is_a?(Integer)
+
+        log_failure('iat claim is missing or not an integer')
+        false
       end
 
       def jti_present?(jti)

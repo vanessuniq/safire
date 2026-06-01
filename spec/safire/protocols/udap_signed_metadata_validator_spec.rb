@@ -263,6 +263,19 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
       end
     end
 
+    # ---------- iat validation ----------
+
+    context 'when iat is missing from the payload' do
+      let(:jwt) { build_udap_jwt(valid_payload.except('iat')) }
+
+      it 'returns nil and logs a warning' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/iat/)
+      end
+    end
+
     # ---------- exp validation ----------
 
     context 'when exp is missing' do

@@ -50,7 +50,7 @@ module Safire
       # @raise [Safire::Errors::ConfigurationError] if +community+ is not a URI
       def server_metadata(community: nil, trusted_anchors: [], verify_chain: true)
         community = normalize_community(community)
-        cache_key = community || :default
+        cache_key = build_cache_key(community, trusted_anchors, verify_chain)
         return @metadata_cache[cache_key] if @metadata_cache.key?(cache_key)
 
         @metadata_cache[cache_key] = fetch_metadata(community:, trusted_anchors:, verify_chain:)
@@ -85,6 +85,10 @@ module Safire
 
       def community_scoped(description, community)
         community ? "#{description} for community #{community}" : description
+      end
+
+      def build_cache_key(community, trusted_anchors, verify_chain)
+        [community || :default, verify_chain, trusted_anchors.map(&:to_der).sort]
       end
 
       def normalize_community(community)

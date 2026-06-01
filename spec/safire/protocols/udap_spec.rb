@@ -117,6 +117,22 @@ RSpec.describe Safire::Protocols::Udap do
       end
     end
 
+    # ---------- trust policy cache isolation ----------
+
+    context 'when called with different trust policies for the same community' do
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
+
+      it 'does not serve a lenient-policy cached result to a stricter call' do
+        udap.server_metadata(verify_chain: false)
+        udap.server_metadata(verify_chain: true)
+
+        expect(a_request(:get, well_known_url)).to have_been_made.twice
+      end
+    end
+
     context 'with an invalid community parameter' do
       it 'raises ConfigurationError when the value is not a URI' do
         expect { udap.server_metadata(community: 'not a uri') }

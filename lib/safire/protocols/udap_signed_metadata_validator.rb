@@ -175,8 +175,8 @@ module Safire
       end
 
       def exp_valid?(exp, iat)
-        if exp.nil?
-          log_failure('exp claim is missing')
+        unless exp.is_a?(Integer)
+          log_failure('exp claim is missing or not an integer')
           return false
         end
 
@@ -185,6 +185,8 @@ module Safire
           log_failure("JWT has expired (exp=#{exp})")
           return false
         end
+
+        return false if iat.present? && !iat.is_a?(Integer)
 
         if iat && exp > iat + MAX_VALIDITY_SECONDS
           log_failure('exp exceeds maximum validity of 1 year from iat')

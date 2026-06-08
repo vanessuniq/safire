@@ -59,6 +59,14 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
     JWT.encode(payload, key, alg, header)
   end
 
+  def build_malformed_claim_jwt(payload, key: private_key, cert: self.cert)
+    header = { 'alg' => 'RS256', 'x5c' => [Base64.strict_encode64(cert.to_der)] }
+    signing_input = [header, payload].map { |part| Base64.urlsafe_encode64(part.to_json, padding: false) }.join('.')
+    signature = key.sign(OpenSSL::Digest.new('SHA256'), signing_input)
+
+    "#{signing_input}.#{Base64.urlsafe_encode64(signature, padding: false)}"
+  end
+
   # ---------- #signed_endpoint_claims ----------
 
   describe '#signed_endpoint_claims' do
@@ -276,6 +284,17 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
       end
     end
 
+    context 'when iat is not an integer' do
+      let(:jwt) { build_malformed_claim_jwt(valid_payload.merge('iat' => 'now')) }
+
+      it 'returns nil and logs a warning without raising' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/iat.*integer/)
+      end
+    end
+
     # ---------- exp validation ----------
 
     context 'when exp is missing' do
@@ -286,6 +305,17 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
 
         expect(result).to be_nil
         expect(Safire.logger).to have_received(:warn).with(/exp/)
+      end
+    end
+
+    context 'when exp is not an integer' do
+      let(:jwt) { build_malformed_claim_jwt(valid_payload.merge('exp' => 'tomorrow')) }
+
+      it 'returns nil and logs a warning without raising' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/exp.*integer/)
       end
     end
 

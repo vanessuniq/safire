@@ -24,7 +24,7 @@ description: "UDAP Security STU2 server metadata discovery in Safire, with commu
 
 ## Overview
 
-UDAP (Unified Data Access Profiles) is a security framework for healthcare data exchange defined by the [UDAP Security Implementation Guide](https://hl7.org/fhir/us/udap-security/). It extends standard OAuth 2.0 with X.509 certificate-based identity, dynamic client registration, and trust community models, designed primarily for backend system-to-system integration and cross-organizational data access.
+UDAP (Unified Data Access Profiles) is a security framework for healthcare data exchange defined by the [UDAP Security STU2 / v2.0.0 Implementation Guide](https://hl7.org/fhir/us/udap-security/STU2/index.html). It extends standard OAuth 2.0 with X.509 certificate-based identity, dynamic client registration, and trust community models, designed primarily for backend system-to-system integration and cross-organizational data access.
 
 UDAP is a separate protocol from SMART. In Safire, select it via `protocol: :udap` rather than a `client_type:`.
 
@@ -97,7 +97,8 @@ Results are cached separately per community and trust policy, so calling `server
 
 ### Trust Framework
 
-- **Certificate Validation** — verify server and client certificates against trust anchors
+- **Client certificate trust management** — apply trust anchors and community policy to future
+  UDAP client authentication and registration flows
 - **Trust Community Support** — integration with UDAP trust communities (e.g. Carequality, CommonWell)
 
 ---
@@ -123,8 +124,8 @@ Results are cached separately per community and trust policy, so calling `server
 
 ### Resources
 
-- [UDAP Security IG](https://hl7.org/fhir/us/udap-security/) — HL7 Implementation Guide
+- [UDAP Security STU2 / v2.0.0 IG](https://hl7.org/fhir/us/udap-security/STU2/index.html) — HL7 Implementation Guide
 - [UDAP JWT Client Auth](https://www.udap.org/udap-jwt-client-auth.html) — JWT assertion specification
 - [UDAP Dynamic Client Registration](https://www.udap.org/udap-dynamic-client-registration.html) — DCR specification
 - [RFC 9126 — Pushed Authorization Requests](https://datatracker.ietf.org/doc/html/rfc9126)
-- [UDAP Tiered OAuth](https://hl7.org/fhir/us/udap-security/b2b.html) — Delegated authorization
+- [UDAP Tiered OAuth](https://hl7.org/fhir/us/udap-security/STU2/b2b.html) — Delegated authorization

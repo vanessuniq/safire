@@ -3,7 +3,7 @@ layout: default
 title: Home
 nav_order: 1
 permalink: /
-description: "Safire is a Ruby gem implementing SMART App Launch 2.2.0 and UDAP Security protocols for healthcare client applications, with full support for OAuth 2.0 authorization against HL7 FHIR servers."
+description: "Safire is a Ruby gem implementing SMART App Launch 2.2.0 and UDAP Security STU2 for healthcare client applications."
 ---
 
 # Safire Documentation
@@ -11,7 +11,7 @@ description: "Safire is a Ruby gem implementing SMART App Launch 2.2.0 and UDAP 
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 
-A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app-launch/)** and **[UDAP](https://hl7.org/fhir/us/udap-security/)** protocols for clients.
+A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app-launch/)** flows and **[UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html)** server metadata discovery for clients.
 
 ## Quick Navigation
 

@@ -67,7 +67,7 @@ Selects the authorization protocol. Defaults to `:smart`.
 | `:smart` | Implemented | SMART App Launch 2.2.0 |
 | `:udap` | Partial | UDAP Security STU2 — `server_metadata` (with optional `community:`) is implemented; auth flows raise `NotImplementedError` |
 
-For UDAP, `client_type:` is not applicable. Passing any explicit value raises `ConfigurationError`. UDAP clients always authenticate via a JWT signed by their private key.
+For UDAP, `client_type:` is not applicable. Passing any explicit value raises `ConfigurationError`. Future UDAP authentication flows will use signed JWT assertions rather than SMART client types.
 
 ### Client Type
 

@@ -3,7 +3,7 @@ layout: default
 title: Installation
 nav_order: 2
 permalink: /installation/
-description: "How to install the Safire Ruby gem and get started with SMART App Launch and UDAP authorization in your healthcare application."
+description: "How to install the Safire Ruby gem and get started with SMART App Launch and UDAP in your healthcare application."
 ---
 
 # Installation

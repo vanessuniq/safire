@@ -22,7 +22,8 @@ Validation involves:
 
 1. Decoding the JOSE header and verifying `alg == RS256` and `x5c` is present.
 2. Verifying the JWT signature against the leaf certificate in `x5c[0]`.
-3. Optionally validating the X.509 chain using `x5c[1..]` and caller-supplied trust anchors.
+3. Validating the X.509 chain using `x5c[1..]`, caller-supplied trust anchors, and explicit
+   revocation policy/material.
 4. Checking required claims: `iss`, `sub`, `exp`, `iat`, `jti`, `token_endpoint`,
    `registration_endpoint`, and conditionally `authorization_endpoint`.
 
@@ -43,11 +44,17 @@ than raising. This surfaces every applicable warning in a single call. The only 
 malformed DER certificate in `x5c`, which raises `Safire::Errors::CertificateError` because the
 input cannot be interpreted at all, making further validation impossible.
 
-### Chain verification on by default; `verify_chain: false` for dev/test only
+### Chain and revocation verification on by default; `verify_chain: false` for dev/test only
 
-`verify_chain: true` is the secure production default. Skipping chain verification is an explicit
-opt-in intended for development and testing against servers whose certificates are not rooted in a
-trusted CA. The parameter threads from `Udap#server_metadata` through to `UdapSignedMetadataValidator`.
+`verify_chain: true` is the secure production default. Skipping chain and revocation verification
+is an explicit opt-in intended for development and testing against servers whose certificates are
+not rooted in a trusted CA. The parameter threads from `Udap#server_metadata` through to
+`UdapSignedMetadataValidator`.
+
+When `verify_chain: true`, validation fails closed unless the caller supplies either `crls:` or a
+custom `revocation_checker:`. CRLs are applied to the OpenSSL certificate store with CRL checking
+enabled. A custom checker must return literal `true`; any other value or exception is treated as a
+revocation validation failure.
 
 ### Signed endpoint claims merged before constructing `UdapMetadata`
 
@@ -66,9 +73,10 @@ anchor set). Instances returned by `Udap#server_metadata` are already pre-valida
 
 ## Consequences
 
-- Production use requires providing `trusted_anchors:` to `server_metadata`. With
-  `verify_chain: true`, Safire validates against the caller-supplied anchors; it does not fall
-  back to the operating system trust store.
+- Production use requires providing `trusted_anchors:` plus an explicit revocation policy
+  (`crls:` or `revocation_checker:`) to `server_metadata`. With `verify_chain: true`, Safire
+  validates against caller-supplied material; it does not fall back to the operating system trust
+  store or perform implicit online revocation checks.
 - `CertificateError` is reserved for unrecoverable DER parse failures. All other validation
   decisions use the warn-and-return-nil pattern.
 - `UdapMetadata#valid?` remains a structural check only; it does not invoke the JWT validator.

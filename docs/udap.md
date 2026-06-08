@@ -34,26 +34,30 @@ UDAP is a separate protocol from SMART. In Safire, select it via `protocol: :uda
 
 UDAP server metadata discovery fetches `/.well-known/udap`, validates the `signed_metadata` JWT, and merges the authoritative signed endpoint claims into a `UdapMetadata` object. Results are cached per community and trust policy within a client instance, so repeated calls for the same community with the same trust configuration make at most one HTTP request.
 
-### Trust anchors
+### Trust anchors and revocation
 
-Per UDAP Security STU2, `signed_metadata` JWT signature and X.509 chain verification are performed on every discovery call. Provide your trust anchors as `OpenSSL::X509::Certificate` objects — typically the CA certificate used to issue the server's UDAP certificate:
+Per UDAP Security STU2, `signed_metadata` JWT signature, X.509 chain verification, and certificate revocation status checking are performed on every production discovery call. Provide your trust anchors as `OpenSSL::X509::Certificate` objects and either CRLs as `OpenSSL::X509::CRL` objects or a custom `revocation_checker:`:
 
 ```ruby
 ca_cert = OpenSSL::X509::Certificate.new(File.read('udap_ca.pem'))
+ca_crl  = OpenSSL::X509::CRL.new(File.read('udap_ca.crl'))
 
 client = Safire::Client.new(
   { base_url: 'https://fhir.example.com' },
   protocol: :udap
 )
 
-metadata = client.server_metadata(trusted_anchors: [ca_cert])
+metadata = client.server_metadata(
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
 puts metadata.token_endpoint
 puts metadata.udap_versions_supported.inspect
 puts metadata.udap_profiles_supported.inspect
 ```
 
 {: .note }
-> **Development and testing**: Pass `verify_chain: false` to skip X.509 chain validation when working with self-signed certificates or local servers that do not have a CA-issued UDAP certificate. Never use `verify_chain: false` in production.
+> **Development and testing**: Pass `verify_chain: false` to skip X.509 chain and revocation validation when working with self-signed certificates or local servers that do not have a CA-issued UDAP certificate. Never use `verify_chain: false` in production.
 >
 > ```ruby
 > metadata = client.server_metadata(verify_chain: false)
@@ -66,12 +70,13 @@ Many UDAP servers host multiple trust communities at the same base URL, each sco
 ```ruby
 metadata = client.server_metadata(
   community:       'https://udap.example.org/community1',
-  trusted_anchors: [ca_cert]
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
 )
 puts metadata.token_endpoint
 ```
 
-Results are cached separately per community and trust policy, so calling `server_metadata` with different community or `trusted_anchors` arguments each makes at most one HTTP request for that combination.
+Results are cached separately per community and trust policy, so calling `server_metadata` with different community, `trusted_anchors`, `crls`, or `revocation_checker` arguments each makes at most one HTTP request for that combination.
 
 ### Error handling
 
@@ -79,7 +84,7 @@ Results are cached separately per community and trust policy, so calling `server
 |-----------|-------------|
 | HTTP 4xx/5xx | `Safire::Errors::DiscoveryError` with `status` populated |
 | Server returns HTTP 204 | `Safire::Errors::DiscoveryError` (server signals no UDAP workflows for that community) |
-| `signed_metadata` JWT validation fails | `Safire::Errors::DiscoveryError` (invalid signature, chain, or missing required claims) |
+| `signed_metadata` JWT validation fails | `Safire::Errors::DiscoveryError` (invalid signature, chain, revocation status, endpoint claim, or missing required claim) |
 | Malformed DER certificate in `x5c` header | `Safire::Errors::CertificateError` |
 | Connection failure, timeout, SSL error, or redirect to a non-HTTPS URL | `Safire::Errors::NetworkError` |
 | `community:` is not a valid URI string | `Safire::Errors::ConfigurationError` (raised before any HTTP call) |

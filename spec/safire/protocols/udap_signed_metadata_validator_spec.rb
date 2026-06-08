@@ -59,6 +59,24 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
     JWT.encode(payload, key, alg, header)
   end
 
+  def build_crl(issuer_cert, issuer_key, revoked_serials: [])
+    crl = OpenSSL::X509::CRL.new
+    crl.version = 1
+    crl.issuer = issuer_cert.subject
+    crl.last_update = Time.now - 60
+    crl.next_update = Time.now + 86_400
+
+    revoked_serials.each do |serial|
+      revoked = OpenSSL::X509::Revoked.new
+      revoked.serial = serial
+      revoked.time = Time.now - 30
+      crl.add_revoked(revoked)
+    end
+
+    crl.sign(issuer_key, OpenSSL::Digest.new('SHA256'))
+    crl
+  end
+
   def build_malformed_claim_jwt(payload, key: private_key, cert: self.cert, header: nil)
     header ||= { 'alg' => 'RS256', 'x5c' => [Base64.strict_encode64(cert.to_der)] }
     signing_input = [header, payload].map { |part| Base64.urlsafe_encode64(part.to_json, padding: false) }.join('.')
@@ -202,22 +220,98 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
     # ---------- chain verification ----------
 
     context 'with verify_chain: true' do
-      context 'when the cert is provided as a trusted anchor' do
+      context 'when the cert is provided as a trusted anchor with revocation material' do
         it 'returns the signed endpoint claims' do
-          result = validator.signed_endpoint_claims(base_url:, trusted_anchors: [cert], verify_chain: true)
+          result = validator.signed_endpoint_claims(
+            base_url:,
+            trusted_anchors: [cert],
+            crls: [build_crl(cert, private_key)],
+            verify_chain: true
+          )
 
           expect(result).to include('token_endpoint', 'registration_endpoint')
         end
       end
 
+      context 'when no revocation policy is configured' do
+        it 'returns nil and logs a revocation warning' do
+          result = validator.signed_endpoint_claims(base_url:, trusted_anchors: [cert], verify_chain: true)
+
+          expect(result).to be_nil
+          expect(Safire.logger).to have_received(:warn).with(/revocation/)
+        end
+      end
+
+      context 'when a CRL revokes the leaf certificate' do
+        it 'returns nil and logs a chain warning' do
+          result = validator.signed_endpoint_claims(
+            base_url:,
+            trusted_anchors: [cert],
+            crls: [build_crl(cert, private_key, revoked_serials: [cert.serial])],
+            verify_chain: true
+          )
+
+          expect(result).to be_nil
+          expect(Safire.logger).to have_received(:warn).with(/chain|revoked/i)
+        end
+      end
+
+      context 'when a custom revocation checker approves the certificate' do
+        it 'returns the signed endpoint claims' do
+          checker = lambda do |leaf_cert:, intermediates:, trusted_anchors:|
+            expect(leaf_cert).to eq(cert)
+            expect(intermediates).to eq([])
+            expect(trusted_anchors).to eq([cert])
+            true
+          end
+
+          result = validator.signed_endpoint_claims(
+            base_url:,
+            trusted_anchors: [cert],
+            revocation_checker: checker,
+            verify_chain: true
+          )
+
+          expect(result).to include('token_endpoint', 'registration_endpoint')
+        end
+      end
+
+      context 'when a custom revocation checker rejects the certificate' do
+        it 'returns nil and logs a revocation warning' do
+          checker = ->(**_kwargs) { false }
+
+          result = validator.signed_endpoint_claims(
+            base_url:,
+            trusted_anchors: [cert],
+            revocation_checker: checker,
+            verify_chain: true
+          )
+
+          expect(result).to be_nil
+          expect(Safire.logger).to have_received(:warn).with(/revocation/)
+        end
+      end
+
       context 'when no trusted anchors are provided for a self-signed cert' do
         it 'returns nil' do
-          expect(validator.signed_endpoint_claims(base_url:, trusted_anchors: [], verify_chain: true))
+          expect(
+            validator.signed_endpoint_claims(
+              base_url:,
+              trusted_anchors: [],
+              crls: [build_crl(cert, private_key)],
+              verify_chain: true
+            )
+          )
             .to be_nil
         end
 
         it 'logs a warning about chain failure' do
-          validator.signed_endpoint_claims(base_url:, trusted_anchors: [], verify_chain: true)
+          validator.signed_endpoint_claims(
+            base_url:,
+            trusted_anchors: [],
+            crls: [build_crl(cert, private_key)],
+            verify_chain: true
+          )
 
           expect(Safire.logger).to have_received(:warn).with(/chain/)
         end
@@ -229,7 +323,12 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
         end
 
         it 'returns nil and logs a chain error warning' do
-          result = validator.signed_endpoint_claims(base_url:, trusted_anchors: [cert], verify_chain: true)
+          result = validator.signed_endpoint_claims(
+            base_url:,
+            trusted_anchors: [cert],
+            crls: [build_crl(cert, private_key)],
+            verify_chain: true
+          )
 
           expect(result).to be_nil
           expect(Safire.logger).to have_received(:warn).with(/chain/)
@@ -442,6 +541,17 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
       let(:jwt) do
         build_udap_jwt(valid_payload.merge('authorization_endpoint' => 'http://remote.example.com/authorize'))
       end
+
+      it 'returns nil and logs a warning' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/authorization_endpoint.*HTTPS URL/)
+      end
+    end
+
+    context 'when authorization_endpoint is present but blank' do
+      let(:jwt) { build_udap_jwt(valid_payload.merge('authorization_endpoint' => '   ')) }
 
       it 'returns nil and logs a warning' do
         result = validator.signed_endpoint_claims(base_url:, verify_chain: false)

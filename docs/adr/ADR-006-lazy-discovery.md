@@ -73,23 +73,39 @@ end
 **UDAP** memoises a Hash keyed by community URI string or `:default`, because the same server can host multiple communities at separate `?community=<uri>` scopes:
 
 ```ruby
-def server_metadata(community: nil)
+def server_metadata(community: nil, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
   community = normalize_community(community)
-  cache_key = community || :default
+  cache_key = build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
   return @metadata_cache[cache_key] if @metadata_cache.key?(cache_key)
 
-  @metadata_cache[cache_key] = fetch_metadata(community:)
+  @metadata_cache[cache_key] = fetch_metadata(
+    community:,
+    trusted_anchors:,
+    crls:,
+    revocation_checker:,
+    verify_chain:
+  )
 end
 
-def fetch_metadata(community:)
+def fetch_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
   endpoint = well_known_endpoint(community:)
   response = @http_client.get(endpoint)
   check_204!(response, endpoint:, community:)
-  UdapMetadata.new(parse_discovery_body(response.body, endpoint))
+  raw = parse_discovery_body(response.body, endpoint)
+  signed_claims = validate_signed_metadata!(
+    raw,
+    endpoint:,
+    community:,
+    trusted_anchors:,
+    crls:,
+    revocation_checker:,
+    verify_chain:
+  )
+  UdapMetadata.new(raw.merge(signed_claims))
 end
 ```
 
-`server_metadata(community:)` is a UDAP-specific parameter. Calling it on a SMART client raises `ArgumentError` from Ruby's own keyword argument checking — this is intentional and correct, since community scoping is a UDAP concept.
+`server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)` uses UDAP-specific parameters. Calling any of these on a SMART client raises `ArgumentError` from Ruby's own keyword argument checking — this is intentional and correct, since community scoping and UDAP certificate trust policy are UDAP concepts.
 
 A 204 response means the server has no UDAP workflows for that community. `Protocols::Udap` raises `DiscoveryError` before the body is parsed, with a descriptive message that identifies the community when one was requested.
 

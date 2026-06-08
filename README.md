@@ -31,12 +31,15 @@ client = Safire::Client.new(
   protocol: :udap
 )
 
-metadata = client.server_metadata
+metadata = client.server_metadata(verify_chain: false) # development/test only
 # => #<Safire::Protocols::UdapMetadata ...>
 
 # Community-scoped discovery
-metadata = client.server_metadata(community: 'https://udap.example.org/community1')
+metadata = client.server_metadata(community: 'https://udap.example.org/community1', verify_chain: false)
 ```
+
+Production UDAP discovery requires trust anchors plus an explicit certificate revocation policy
+(`crls:` or `revocation_checker:`). Use `verify_chain: false` only for development or tests.
 
 Auth flows (DCR, JWT assertion, Tiered OAuth) are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 

@@ -131,6 +131,33 @@ RSpec.describe Safire::Protocols::Udap do
 
         expect(a_request(:get, well_known_url)).to have_been_made.twice
       end
+
+      it 'passes trust anchors, CRLs, and revocation checker to the validator' do
+        anchor = instance_double(OpenSSL::X509::Certificate, to_der: 'anchor')
+        crl = instance_double(OpenSSL::X509::CRL, to_der: 'crl')
+        checker = ->(**_kwargs) { true }
+
+        udap.server_metadata(trusted_anchors: [anchor], crls: [crl], revocation_checker: checker)
+
+        expect(validator_double).to have_received(:signed_endpoint_claims).with(
+          base_url: base_url,
+          trusted_anchors: [anchor],
+          crls: [crl],
+          revocation_checker: checker,
+          verify_chain: true
+        )
+      end
+
+      it 'does not share cached metadata across different CRL sets' do
+        anchor = instance_double(OpenSSL::X509::Certificate, to_der: 'anchor')
+        crl1 = instance_double(OpenSSL::X509::CRL, to_der: 'crl-1')
+        crl2 = instance_double(OpenSSL::X509::CRL, to_der: 'crl-2')
+
+        udap.server_metadata(trusted_anchors: [anchor], crls: [crl1])
+        udap.server_metadata(trusted_anchors: [anchor], crls: [crl2])
+
+        expect(a_request(:get, well_known_url)).to have_been_made.twice
+      end
     end
 
     context 'with an invalid community parameter' do

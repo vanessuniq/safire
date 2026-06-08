@@ -146,13 +146,15 @@ module Safire
       #
       # @param base_url [String] the server's base URL; must equal the +iss+ claim in the signed JWT
       # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] CA anchors for X.509 chain verification
+      # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for production chain validation
+      # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
       # @param verify_chain [Boolean] set +false+ to skip chain validation (dev/test only)
       # @return [Boolean] +true+ if all cryptographic and claim checks pass
-      def signed_metadata_valid?(base_url:, trusted_anchors: [], verify_chain: true)
+      def signed_metadata_valid?(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
         return false unless signed_metadata.present?
 
         UdapSignedMetadataValidator.new(signed_metadata, to_hash).valid?(
-          base_url:, trusted_anchors:, verify_chain:
+          base_url:, trusted_anchors:, crls:, revocation_checker:, verify_chain:
         )
       end
 

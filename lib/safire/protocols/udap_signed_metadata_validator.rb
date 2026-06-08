@@ -36,16 +36,20 @@ module Safire
       #
       # @param base_url [String] the server's base URL; must equal the +iss+ claim
       # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] trust anchors for chain verification
+      # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for fail-closed chain validation
+      # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
       # @param verify_chain [Boolean] when +false+, skips X.509 chain validation (dev/test only)
       # @return [Hash, nil] signed endpoint claims to merge, or +nil+ if validation fails
       # @raise [Safire::Errors::CertificateError] if an +x5c+ certificate cannot be parsed
-      def signed_endpoint_claims(base_url:, trusted_anchors: [], verify_chain: true)
+      def signed_endpoint_claims(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
         decoded = decode_and_validate_jwt
         return unless decoded
 
         payload, header = decoded
         leaf_cert = parse_leaf_cert(header['x5c'].first)
-        return unless signature_and_chain_valid?(header, leaf_cert, trusted_anchors, verify_chain)
+        trust_policy = { trusted_anchors:, crls:, revocation_checker:, verify_chain: }
+        return unless signature_and_chain_valid?(header, leaf_cert, trust_policy)
+
         return unless claims_valid?(payload, base_url, leaf_cert)
 
         extract_endpoint_claims(payload)
@@ -55,10 +59,12 @@ module Safire
       #
       # @param base_url [String] the server's base URL
       # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] trust anchors for chain verification
+      # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for fail-closed chain validation
+      # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
       # @param verify_chain [Boolean] when +false+, skips X.509 chain validation
       # @return [Boolean]
-      def valid?(base_url:, trusted_anchors: [], verify_chain: true)
-        signed_endpoint_claims(base_url:, trusted_anchors:, verify_chain:).present?
+      def valid?(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
+        signed_endpoint_claims(base_url:, trusted_anchors:, crls:, revocation_checker:, verify_chain:).present?
       end
 
       private
@@ -121,9 +127,9 @@ module Safire
         parse_x5c_cert(x5c_value, 'leaf')
       end
 
-      def signature_and_chain_valid?(header, leaf_cert, trusted_anchors, verify_chain)
+      def signature_and_chain_valid?(header, leaf_cert, trust_policy)
         signature_valid?(leaf_cert) &&
-          cert_trusted?(header['x5c'].drop(1), leaf_cert, trusted_anchors, verify_chain)
+          cert_trusted?(header['x5c'].drop(1), leaf_cert, trust_policy)
       end
 
       def signature_valid?(leaf_cert)
@@ -134,23 +140,58 @@ module Safire
         false
       end
 
-      def cert_trusted?(intermediate_ders, leaf_cert, trusted_anchors, verify_chain)
-        return true unless verify_chain
+      def cert_trusted?(intermediate_ders, leaf_cert, trust_policy)
+        return true unless trust_policy.fetch(:verify_chain)
 
-        chain_valid?(intermediate_ders, leaf_cert, trusted_anchors)
+        chain_valid?(intermediate_ders, leaf_cert, trust_policy)
       end
 
-      def chain_valid?(intermediate_ders, leaf_cert, trusted_anchors)
+      def chain_valid?(intermediate_ders, leaf_cert, trust_policy)
         intermediates = parse_intermediate_certs(intermediate_ders)
-        store = OpenSSL::X509::Store.new
-        trusted_anchors.each { |anchor| store.add_cert(anchor) }
-        ctx = OpenSSL::X509::StoreContext.new(store, leaf_cert, intermediates)
-        return true if ctx.verify
+        trusted_anchors = trust_policy.fetch(:trusted_anchors)
+        revocation_checker = trust_policy.fetch(:revocation_checker)
+        crls = trust_policy.fetch(:crls)
+        return false unless revocation_policy_configured?(crls, revocation_checker)
+
+        ctx = build_store_context(leaf_cert, intermediates, trusted_anchors, crls)
+        return revocation_checker_valid?(revocation_checker, leaf_cert, intermediates, trusted_anchors) if ctx.verify
 
         log_failure("certificate chain validation failed: #{ctx.error_string}")
         false
       rescue OpenSSL::X509::StoreError => e
         log_failure("certificate chain error: #{e.message}")
+        false
+      end
+
+      def build_store_context(leaf_cert, intermediates, trusted_anchors, crls)
+        store = OpenSSL::X509::Store.new
+        trusted_anchors.each { |anchor| store.add_cert(anchor) }
+        configure_crls(store, crls)
+        OpenSSL::X509::StoreContext.new(store, leaf_cert, intermediates)
+      end
+
+      def revocation_policy_configured?(crls, revocation_checker)
+        return true if crls.any? || revocation_checker
+
+        log_failure('certificate revocation checking is required when verify_chain is true')
+        false
+      end
+
+      def configure_crls(store, crls)
+        return if crls.empty?
+
+        crls.each { |crl| store.add_crl(crl) }
+        store.flags = OpenSSL::X509::V_FLAG_CRL_CHECK | OpenSSL::X509::V_FLAG_CRL_CHECK_ALL
+      end
+
+      def revocation_checker_valid?(revocation_checker, leaf_cert, intermediates, trusted_anchors)
+        return true unless revocation_checker
+        return true if revocation_checker.call(leaf_cert:, intermediates:, trusted_anchors:) == true
+
+        log_failure('certificate revocation check failed')
+        false
+      rescue StandardError => e
+        log_failure("certificate revocation check failed: #{e.message}")
         false
       end
 
@@ -270,7 +311,7 @@ module Safire
       def endpoint_claims_valid?(payload)
         valid = true
         ENDPOINT_CLAIMS.each do |claim|
-          next if payload[claim].blank?
+          next unless payload.key?(claim)
           next if valid_endpoint_url?(payload[claim])
 
           log_failure("'#{claim}' must be an absolute HTTPS URL (localhost HTTP is accepted for development)")

@@ -41,6 +41,8 @@ module Safire
       # @param community [String, nil] optional UDAP community URI; scopes discovery
       # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] X.509 trust anchors for
       #   +signed_metadata+ chain verification; required for production use
+      # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for production chain validation
+      # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
       # @param verify_chain [Boolean] when +false+, skips X.509 chain validation (dev/test only)
       # @return [Safire::Protocols::UdapMetadata] parsed UDAP metadata with authoritative signed endpoint claims
       # @raise [Safire::Errors::DiscoveryError] if the server returns an HTTP error, a 204 response,
@@ -48,22 +50,36 @@ module Safire
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
       #   or a redirect to a non-HTTPS URL
       # @raise [Safire::Errors::ConfigurationError] if +community+ is not a URI
-      def server_metadata(community: nil, trusted_anchors: [], verify_chain: true)
+      def server_metadata(community: nil, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
         community = normalize_community(community)
-        cache_key = build_cache_key(community, trusted_anchors, verify_chain)
+        cache_key = build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
         return @metadata_cache[cache_key] if @metadata_cache.key?(cache_key)
 
-        @metadata_cache[cache_key] = fetch_metadata(community:, trusted_anchors:, verify_chain:)
+        @metadata_cache[cache_key] = fetch_metadata(
+          community:,
+          trusted_anchors:,
+          crls:,
+          revocation_checker:,
+          verify_chain:
+        )
       end
 
       private
 
-      def fetch_metadata(community:, trusted_anchors:, verify_chain:)
+      def fetch_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
         endpoint = well_known_endpoint(community:)
         response = @http_client.get(endpoint)
         check_204!(response, endpoint:, community:)
         raw = parse_discovery_body(response.body, endpoint)
-        signed_claims = validate_signed_metadata!(raw, endpoint:, community:, trusted_anchors:, verify_chain:)
+        signed_claims = validate_signed_metadata!(
+          raw,
+          endpoint:,
+          community:,
+          trusted_anchors:,
+          crls:,
+          revocation_checker:,
+          verify_chain:
+        )
         UdapMetadata.new(raw.merge(signed_claims))
       rescue Faraday::Error => e
         status = e.response&.dig(:status)
@@ -71,9 +87,23 @@ module Safire
         raise Errors::DiscoveryError.new(endpoint: endpoint, status:, label: 'UDAP metadata')
       end
 
-      def validate_signed_metadata!(raw, endpoint:, community:, trusted_anchors:, verify_chain:)
+      def validate_signed_metadata!(
+        raw,
+        endpoint:,
+        community:,
+        trusted_anchors:,
+        crls:,
+        revocation_checker:,
+        verify_chain:
+      )
         validator = UdapSignedMetadataValidator.new(raw['signed_metadata'], raw)
-        claims = validator.signed_endpoint_claims(base_url: normalized_base_url, trusted_anchors:, verify_chain:)
+        claims = validator.signed_endpoint_claims(
+          base_url: normalized_base_url,
+          trusted_anchors:,
+          crls:,
+          revocation_checker:,
+          verify_chain:
+        )
         return claims if claims
 
         raise Errors::DiscoveryError.new(
@@ -87,8 +117,14 @@ module Safire
         community ? "#{description} for community #{community}" : description
       end
 
-      def build_cache_key(community, trusted_anchors, verify_chain)
-        [community || :default, verify_chain, trusted_anchors.map(&:to_der).sort]
+      def build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
+        [
+          community || :default,
+          verify_chain,
+          trusted_anchors.map(&:to_der).sort,
+          crls.map(&:to_der).sort,
+          revocation_checker&.object_id
+        ]
       end
 
       def normalized_base_url

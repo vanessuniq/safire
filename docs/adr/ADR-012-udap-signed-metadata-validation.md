@@ -66,8 +66,9 @@ anchor set). Instances returned by `Udap#server_metadata` are already pre-valida
 
 ## Consequences
 
-- Production use requires providing `trusted_anchors:` to `server_metadata`. Without them, chain
-  validation will fail for any certificate not self-signed by a CA in the system store.
+- Production use requires providing `trusted_anchors:` to `server_metadata`. With
+  `verify_chain: true`, Safire validates against the caller-supplied anchors; it does not fall
+  back to the operating system trust store.
 - `CertificateError` is reserved for unrecoverable DER parse failures. All other validation
   decisions use the warn-and-return-nil pattern.
 - `UdapMetadata#valid?` remains a structural check only; it does not invoke the JWT validator.

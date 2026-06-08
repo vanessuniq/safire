@@ -32,7 +32,7 @@ UDAP is a separate protocol from SMART. In Safire, select it via `protocol: :uda
 
 ## Discovery
 
-UDAP server metadata discovery fetches `/.well-known/udap`, validates the `signed_metadata` JWT, and merges the authoritative signed endpoint claims into a `UdapMetadata` object. Results are cached per community and trust policy within a client instance, so repeated calls for the same community with the same trust configuration make at most one HTTP request.
+UDAP server metadata discovery fetches `/.well-known/udap`, validates the `signed_metadata` JWT, and merges the authoritative signed endpoint claims into a `UdapMetadata` object. Results are cached per community and trust policy within a client instance. Cache hits revalidate the cached `signed_metadata` before returning; if the JWT, certificate chain, or revocation policy no longer validates, Safire discards the cached entry and refetches discovery metadata.
 
 ### Trust anchors and revocation
 
@@ -76,7 +76,7 @@ metadata = client.server_metadata(
 puts metadata.token_endpoint
 ```
 
-Results are cached separately per community and trust policy, so calling `server_metadata` with different community, `trusted_anchors`, `crls`, or `revocation_checker` arguments each makes at most one HTTP request for that combination.
+Results are cached separately per community and trust policy. Calling `server_metadata` with different community, `trusted_anchors`, `crls`, or `revocation_checker` arguments uses a separate cache entry, and each cached entry is revalidated before reuse.
 
 ### Error handling
 

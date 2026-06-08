@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   authoritative signed endpoint claims into the returned `UdapMetadata`. Raises
   `Safire::Errors::DiscoveryError` if validation fails. Accepts `trusted_anchors:` and
   `crls:` or `revocation_checker:` for production chain and revocation validation, plus
-  `verify_chain:` (`verify_chain: false` for dev/test only).
+  `verify_chain:` (`verify_chain: false` for dev/test only). Cached UDAP metadata is
+  revalidated before reuse and refetched if its signed JWT, certificate chain, or revocation
+  policy no longer validates.
 
 - `UdapMetadata#signed_metadata_valid?` for explicit cryptographic re-validation of the
   `signed_metadata` JWT against a specific set of trust anchors and revocation policy.

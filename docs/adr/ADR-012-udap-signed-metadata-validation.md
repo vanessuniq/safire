@@ -63,6 +63,14 @@ claims over the unsigned JSON values before constructing the `UdapMetadata` inst
 never receive a `UdapMetadata` object with unverified endpoint URLs. If validation fails,
 `Safire::Errors::DiscoveryError` is raised.
 
+### Cached metadata is revalidated before reuse
+
+`Protocols::Udap` caches parsed metadata per community and trust policy, but cache hits are not
+blind returns. Before returning cached metadata, Safire revalidates the original `signed_metadata`
+JWT against the current trust policy. If the JWT has expired, the certificate chain no longer
+validates, or the configured revocation policy rejects it, the cache entry is discarded and
+discovery is fetched again.
+
 ### `UdapMetadata#signed_metadata_valid?` for re-validation
 
 `UdapMetadata` exposes `signed_metadata_valid?(base_url:, ...)` as a convenience for callers who

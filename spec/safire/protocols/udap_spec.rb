@@ -63,6 +63,32 @@ RSpec.describe Safire::Protocols::Udap do
         2.times { udap.server_metadata }
         expect(a_request(:get, well_known_url)).to have_been_made.once
       end
+
+      it 'revalidates cached signed_metadata before returning cached metadata' do
+        2.times { udap.server_metadata }
+
+        expect(validator_double).to have_received(:signed_endpoint_claims).twice
+      end
+
+      it 'refetches metadata when cached signed_metadata no longer validates' do
+        stale_validator = instance_double(
+          Safire::Protocols::UdapSignedMetadataValidator,
+          signed_endpoint_claims: nil
+        )
+        fresh_validator = instance_double(
+          Safire::Protocols::UdapSignedMetadataValidator,
+          signed_endpoint_claims: signed_claims
+        )
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(
+          validator_double,
+          stale_validator,
+          fresh_validator
+        )
+
+        2.times { udap.server_metadata }
+
+        expect(a_request(:get, well_known_url)).to have_been_made.twice
+      end
     end
 
     # ---------- server_metadata — community-scoped ----------

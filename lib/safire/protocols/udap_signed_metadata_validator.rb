@@ -5,7 +5,7 @@ require 'base64'
 module Safire
   module Protocols
     # Validates the +signed_metadata+ JWT included in a UDAP server discovery response
-    # per {https://hl7.org/fhir/us/udap-security/discovery.html#signed-metadata-elements
+    # per {https://hl7.org/fhir/us/udap-security/STU2/discovery.html#signed-metadata-elements
     # UDAP Security STU2 §Signed Metadata Elements}.
     #
     # This is an internal class used by {Safire::Protocols::Udap} and
@@ -13,15 +13,18 @@ module Safire
     #
     # @api private
     class UdapSignedMetadataValidator
+      include URIValidation
+
       ALLOWED_ALGORITHMS    = %w[RS256].freeze
       MAX_VALIDITY_SECONDS  = 365 * 24 * 3600
       REQUIRED_ENDPOINT_CLAIMS = %w[token_endpoint registration_endpoint].freeze
+      ENDPOINT_CLAIMS = (REQUIRED_ENDPOINT_CLAIMS + %w[authorization_endpoint]).freeze
 
       # @param signed_metadata_jwt [String] the compact-JWS value from the discovery response
       # @param unsigned_metadata [Hash] the raw (unsigned) discovery response body
       def initialize(signed_metadata_jwt, unsigned_metadata)
         @jwt      = signed_metadata_jwt
-        @unsigned = unsigned_metadata
+        @unsigned = unsigned_metadata.respond_to?(:to_h) ? unsigned_metadata.to_h.stringify_keys : {}
       end
 
       # Validates the signed metadata JWT and returns the signed endpoint claims to merge
@@ -37,16 +40,12 @@ module Safire
       # @return [Hash, nil] signed endpoint claims to merge, or +nil+ if validation fails
       # @raise [Safire::Errors::CertificateError] if an +x5c+ certificate cannot be parsed
       def signed_endpoint_claims(base_url:, trusted_anchors: [], verify_chain: true)
-        decoded = decode_jwt
+        decoded = decode_and_validate_jwt
         return unless decoded
 
         payload, header = decoded
-        return unless alg_valid?(header)
-        return unless x5c_present?(header)
-
         leaf_cert = parse_leaf_cert(header['x5c'].first)
-        return unless signature_valid?(leaf_cert)
-        return unless cert_trusted?(header['x5c'].drop(1), leaf_cert, trusted_anchors, verify_chain)
+        return unless signature_and_chain_valid?(header, leaf_cert, trusted_anchors, verify_chain)
         return unless claims_valid?(payload, base_url, leaf_cert)
 
         extract_endpoint_claims(payload)
@@ -65,10 +64,43 @@ module Safire
       private
 
       def decode_jwt
+        unless @jwt.is_a?(String)
+          log_failure('signed_metadata must be a compact-JWS string')
+          return nil
+        end
+
         JWT.decode(@jwt, nil, false)
       rescue JWT::DecodeError => e
         log_failure("could not decode signed_metadata JWT: #{e.message}")
         nil
+      end
+
+      def decode_and_validate_jwt
+        decoded = decode_jwt
+        return unless decoded
+
+        payload, header = decoded
+        return unless decoded_shapes_valid?(payload, header)
+        return unless alg_valid?(header)
+        return unless x5c_present?(header)
+
+        decoded
+      end
+
+      def decoded_shapes_valid?(payload, header)
+        valid = true
+
+        unless header.is_a?(Hash)
+          log_failure('JWT header must be a JSON object')
+          valid = false
+        end
+
+        unless payload.is_a?(Hash)
+          log_failure('JWT payload must be a JSON object')
+          valid = false
+        end
+
+        valid
       end
 
       def alg_valid?(header)
@@ -79,14 +111,19 @@ module Safire
       end
 
       def x5c_present?(header)
-        return true if header['x5c'].is_a?(Array) && header['x5c'].any?
+        return true if header['x5c'].is_a?(Array) && header['x5c'].any? && header['x5c'].all?(String)
 
-        log_failure('x5c header is required and must be a non-empty array of base64-encoded certificates')
+        log_failure('x5c header is required and must be a non-empty array of base64-encoded certificate strings')
         false
       end
 
       def parse_leaf_cert(x5c_value)
         parse_x5c_cert(x5c_value, 'leaf')
+      end
+
+      def signature_and_chain_valid?(header, leaf_cert, trusted_anchors, verify_chain)
+        signature_valid?(leaf_cert) &&
+          cert_trusted?(header['x5c'].drop(1), leaf_cert, trusted_anchors, verify_chain)
       end
 
       def signature_valid?(leaf_cert)
@@ -136,7 +173,8 @@ module Safire
           iat_present?(payload['iat']),
           exp_valid?(payload['exp'], payload['iat']),
           jti_present?(payload['jti']),
-          endpoint_claims_present?(payload)
+          endpoint_claims_present?(payload),
+          endpoint_claims_valid?(payload)
         ].all?
       end
 
@@ -161,6 +199,7 @@ module Safire
       end
 
       def iss_base_url_valid?(iss, base_url)
+        base_url = normalize_base_url(base_url)
         return true if iss == base_url
 
         log_failure("iss '#{iss}' does not match the server base URL '#{base_url}'")
@@ -228,8 +267,28 @@ module Safire
         valid
       end
 
+      def endpoint_claims_valid?(payload)
+        valid = true
+        ENDPOINT_CLAIMS.each do |claim|
+          next if payload[claim].blank?
+          next if valid_endpoint_url?(payload[claim])
+
+          log_failure("'#{claim}' must be an absolute HTTPS URL (localhost HTTP is accepted for development)")
+          valid = false
+        end
+        valid
+      end
+
       def extract_endpoint_claims(payload)
         payload.slice('token_endpoint', 'registration_endpoint', 'authorization_endpoint').compact
+      end
+
+      def valid_endpoint_url?(value)
+        value.is_a?(String) && classify_uri(value).nil?
+      end
+
+      def normalize_base_url(base_url)
+        base_url.to_s.chomp('/')
       end
 
       def log_failure(message)

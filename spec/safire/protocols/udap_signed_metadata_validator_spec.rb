@@ -59,8 +59,8 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
     JWT.encode(payload, key, alg, header)
   end
 
-  def build_malformed_claim_jwt(payload, key: private_key, cert: self.cert)
-    header = { 'alg' => 'RS256', 'x5c' => [Base64.strict_encode64(cert.to_der)] }
+  def build_malformed_claim_jwt(payload, key: private_key, cert: self.cert, header: nil)
+    header ||= { 'alg' => 'RS256', 'x5c' => [Base64.strict_encode64(cert.to_der)] }
     signing_input = [header, payload].map { |part| Base64.urlsafe_encode64(part.to_json, padding: false) }.join('.')
     signature = key.sign(OpenSSL::Digest.new('SHA256'), signing_input)
 
@@ -119,6 +119,28 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
       end
     end
 
+    context 'when the decoded header is not a JSON object' do
+      let(:jwt) { build_malformed_claim_jwt(valid_payload, header: 'not an object') }
+
+      it 'returns nil and logs a warning without raising' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/header.*object/)
+      end
+    end
+
+    context 'when the decoded payload is not a JSON object' do
+      let(:jwt) { build_malformed_claim_jwt('not an object') }
+
+      it 'returns nil and logs a warning without raising' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/payload.*object/)
+      end
+    end
+
     # ---------- x5c validation ----------
 
     context 'when x5c header is absent' do
@@ -132,6 +154,17 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
         validator.signed_endpoint_claims(base_url:)
 
         expect(Safire.logger).to have_received(:warn).with(/x5c/)
+      end
+    end
+
+    context 'when x5c header contains a non-string value' do
+      let(:jwt) { build_malformed_claim_jwt(valid_payload, header: { 'alg' => 'RS256', 'x5c' => [nil] }) }
+
+      it 'returns nil and logs a warning without raising' do
+        result = validator.signed_endpoint_claims(base_url:)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/x5c.*certificate strings/)
       end
     end
 
@@ -253,6 +286,11 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
 
         expect(Safire.logger).to have_received(:warn)
       end
+
+      it 'normalizes a trailing slash on the configured base URL' do
+        expect(validator.signed_endpoint_claims(base_url: "#{base_url}/", verify_chain: false))
+          .to include('token_endpoint', 'registration_endpoint')
+      end
     end
 
     # ---------- sub == iss ----------
@@ -367,6 +405,28 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
       end
     end
 
+    context 'when token_endpoint is not an absolute URL' do
+      let(:jwt) { build_udap_jwt(valid_payload.merge('token_endpoint' => 'not a url')) }
+
+      it 'returns nil and logs a warning' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/token_endpoint.*HTTPS URL/)
+      end
+    end
+
+    context 'when registration_endpoint is not HTTPS' do
+      let(:jwt) { build_udap_jwt(valid_payload.merge('registration_endpoint' => 'http://remote.example.com/register')) }
+
+      it 'returns nil and logs a warning' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/registration_endpoint.*HTTPS URL/)
+      end
+    end
+
     context 'when registration_endpoint is missing from the signed payload' do
       let(:jwt) { build_udap_jwt(valid_payload.except('registration_endpoint')) }
 
@@ -375,6 +435,19 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
 
         expect(result).to be_nil
         expect(Safire.logger).to have_received(:warn).with(/registration_endpoint/)
+      end
+    end
+
+    context 'when authorization_endpoint is present but not HTTPS' do
+      let(:jwt) do
+        build_udap_jwt(valid_payload.merge('authorization_endpoint' => 'http://remote.example.com/authorize'))
+      end
+
+      it 'returns nil and logs a warning' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/authorization_endpoint.*HTTPS URL/)
       end
     end
 
@@ -411,6 +484,17 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
         validator.signed_endpoint_claims(base_url:)
 
         expect(Safire.logger).to have_received(:warn).with(/decode|invalid|malformed/i)
+      end
+    end
+
+    context 'when signed_metadata is not a string' do
+      let(:jwt) { 123 }
+
+      it 'returns nil and logs a warning without raising' do
+        result = validator.signed_endpoint_claims(base_url:)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/compact-JWS string/)
       end
     end
   end

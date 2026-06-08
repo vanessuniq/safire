@@ -73,7 +73,7 @@ module Safire
 
       def validate_signed_metadata!(raw, endpoint:, community:, trusted_anchors:, verify_chain:)
         validator = UdapSignedMetadataValidator.new(raw['signed_metadata'], raw)
-        claims = validator.signed_endpoint_claims(base_url: @base_url, trusted_anchors:, verify_chain:)
+        claims = validator.signed_endpoint_claims(base_url: normalized_base_url, trusted_anchors:, verify_chain:)
         return claims if claims
 
         raise Errors::DiscoveryError.new(
@@ -89,6 +89,10 @@ module Safire
 
       def build_cache_key(community, trusted_anchors, verify_chain)
         [community || :default, verify_chain, trusted_anchors.map(&:to_der).sort]
+      end
+
+      def normalized_base_url
+        @base_url.to_s.chomp('/')
       end
 
       def normalize_community(community)
@@ -119,7 +123,7 @@ module Safire
       end
 
       def well_known_endpoint(community:)
-        base = "#{@base_url.to_s.chomp('/')}#{WELL_KNOWN_PATH}"
+        base = "#{normalized_base_url}#{WELL_KNOWN_PATH}"
         return base unless community
 
         uri = Addressable::URI.parse(base)

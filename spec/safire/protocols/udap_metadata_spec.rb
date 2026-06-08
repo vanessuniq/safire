@@ -23,6 +23,26 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
   let(:metadata) { described_class.new(full_metadata) }
 
+  def build_udap_cert(key, uri_san:)
+    c = OpenSSL::X509::Certificate.new
+    c.version    = 2
+    c.serial     = 1
+    c.subject    = OpenSSL::X509::Name.parse('/CN=Test UDAP Server')
+    c.issuer     = c.subject
+    c.public_key = key
+    c.not_before = Time.now - 60
+    c.not_after  = Time.now + 86_400
+    ef = OpenSSL::X509::ExtensionFactory.new(c, c)
+    c.add_extension(ef.create_extension('subjectAltName', "URI:#{uri_san}", false))
+    c.sign(key, OpenSSL::Digest.new('SHA256'))
+    c
+  end
+
+  def build_udap_jwt(payload, key:, cert:)
+    header = { 'x5c' => [Base64.strict_encode64(cert.to_der)] }
+    JWT.encode(payload, key, 'RS256', header)
+  end
+
   describe '#valid?' do
     before { allow(Safire.logger).to receive(:warn) }
 
@@ -567,6 +587,28 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
         expect(result).to be(false)
         expect(Safire.logger).to have_received(:warn).with(/signed_metadata/)
+      end
+
+      it 'enforces the conditional authorization_endpoint claim through symbol-keyed metadata' do
+        key = OpenSSL::PKey::RSA.generate(2048)
+        cert = build_udap_cert(key, uri_san: 'https://fhir.example.com')
+        jwt = build_udap_jwt(
+          {
+            'iss' => 'https://fhir.example.com',
+            'sub' => 'https://fhir.example.com',
+            'iat' => Time.now.to_i,
+            'exp' => Time.now.to_i + 3600,
+            'jti' => 'unique-nonce-abc123',
+            'token_endpoint' => full_metadata['token_endpoint'],
+            'registration_endpoint' => full_metadata['registration_endpoint']
+          },
+          key: key,
+          cert: cert
+        )
+        m = described_class.new(full_metadata.merge('signed_metadata' => jwt))
+
+        expect(m.signed_metadata_valid?(base_url: 'https://fhir.example.com', verify_chain: false)).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/authorization_endpoint/)
       end
     end
 

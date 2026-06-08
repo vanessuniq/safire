@@ -52,7 +52,7 @@ client = Safire::Client.new(config)
 
 ## Protocol and Client Type
 
-`protocol:` and `client_type:` are keyword arguments to `Safire::Client.new`. They are independent of each other.
+`protocol:` and `client_type:` are keyword arguments to `Safire::Client.new`. `protocol:` selects the protocol implementation; `client_type:` selects the SMART authentication style and is not used for UDAP.
 
 ```ruby
 client = Safire::Client.new(config, protocol: :smart, client_type: :confidential_symmetric)
@@ -65,9 +65,42 @@ Selects the authorization protocol. Defaults to `:smart`.
 | Value | Status | Description |
 |-------|--------|-------------|
 | `:smart` | Implemented | SMART App Launch 2.2.0 |
-| `:udap` | Partial | UDAP Security STU2 — `server_metadata` (with optional `community:`) is implemented; auth flows raise `NotImplementedError` |
+| `:udap` | Partial | UDAP Security STU2 discovery — `server_metadata` validates `signed_metadata`, supports optional `community:`, and accepts trust policy keywords (`trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:`); auth flows raise `NotImplementedError` |
 
-For UDAP, `client_type:` is not applicable. Passing any explicit value raises `ConfigurationError`. Future UDAP authentication flows will use signed JWT assertions rather than SMART client types.
+For UDAP, `client_type:` is not applicable. Passing any explicit value, either at initialization or through `client.client_type=`, raises `Safire::Errors::ConfigurationError`. Future UDAP authentication flows will use signed JWT assertions rather than SMART client types.
+
+```ruby
+client = Safire::Client.new(
+  { base_url: 'https://fhir.example.com' },
+  protocol: :udap
+)
+
+metadata = client.server_metadata(verify_chain: false) # development/test only
+```
+
+Production UDAP discovery must validate `signed_metadata` with trust anchors and an explicit revocation policy:
+
+```ruby
+ca_cert = OpenSSL::X509::Certificate.new(File.read('udap_ca.pem'))
+ca_crl  = OpenSSL::X509::CRL.new(File.read('udap_ca.crl'))
+
+metadata = client.server_metadata(
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+```
+
+Pass `community:` when the server participates in a specific UDAP trust community:
+
+```ruby
+metadata = client.server_metadata(
+  community:       'https://udap.example.org/community1',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+```
+
+See [UDAP]({{ site.baseurl }}/udap/) for validation helpers, 404/204 discovery behavior, and the `verify_chain: false` development caveat.
 
 ### Client Type
 
@@ -119,7 +152,7 @@ For a decision guide on which workflow to use, see [SMART App Launch — Choosin
 All URI parameters are validated at initialization. Safire raises `Safire::Errors::ConfigurationError` for any violation:
 
 - URIs must be well-formed (scheme + host required)
-- URIs must use `https` — required by SMART App Launch 2.2.0
+- URIs must use `https` — required for SMART App Launch and UDAP discovery
 - **Exception:** `http` is permitted for `localhost` and `127.0.0.1` (local development only)
 
 The following attributes are validated:
@@ -134,6 +167,8 @@ The following attributes are validated:
 | `jwks_uri` | When provided |
 
 If you need to bypass discovery and provide endpoints directly, set `authorization_endpoint` and `token_endpoint` in your config. Safire will use them as-is instead of fetching `/.well-known/smart-configuration`.
+
+UDAP discovery always uses the FHIR `base_url` and the `/.well-known/udap` endpoint. UDAP endpoint values are taken from discovered, signed metadata rather than from SMART endpoint overrides.
 
 ---
 
@@ -160,5 +195,6 @@ config.inspect
 ## Next Steps
 
 - [Logging]({{ site.baseurl }}/configuration/logging/) — configure Safire's logger and HTTP request logging
+- [UDAP Discovery]({{ site.baseurl }}/udap/) — discover and validate UDAP Security STU2 server metadata
 - [Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) — obtain a `client_id` at runtime using RFC 7591
 - [SMART App Launch Workflows]({{ site.baseurl }}/smart-on-fhir/) — step-by-step authorization flow guides

@@ -37,12 +37,23 @@ RSpec.describe 'UDAP Discovery Flow', type: :integration do
   let(:config) { Safire::ClientConfig.new(base_url: base_url) }
   let(:client) { Safire::Client.new(config, protocol: :udap) }
 
+  let(:signed_claims) do
+    {
+      'token_endpoint' => "#{base_url}/token",
+      'registration_endpoint' => "#{base_url}/register"
+    }
+  end
+  let(:validator_double) do
+    instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: signed_claims)
+  end
+
   # ---------- Basic Discovery ----------
 
   context 'when discovery succeeds' do
     before do
       stub_request(:get, well_known_url)
         .to_return(status: 200, body: udap_metadata_body.to_json, headers: { 'Content-Type' => 'application/json' })
+      allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
     end
 
     it 'returns a UdapMetadata instance' do
@@ -72,6 +83,7 @@ RSpec.describe 'UDAP Discovery Flow', type: :integration do
       stub_request(:get, well_known_url)
         .with(query: { 'community' => community })
         .to_return(status: 200, body: udap_metadata_body.to_json, headers: { 'Content-Type' => 'application/json' })
+      allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
     end
 
     it 'passes the community as a query parameter' do

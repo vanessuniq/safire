@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Safire::Protocols::UdapSignedMetadataValidator` validates the `signed_metadata` JWT per UDAP
+  Security STU2: RS256 algorithm, `x5c` leaf certificate, JWT signature, X.509 chain and
+  revocation validation, and all required claims (`iss`, `sub`, `exp`, `jti`, `token_endpoint`,
+  `registration_endpoint`, conditionally `authorization_endpoint`). Signed endpoint claims are
+  returned for merging over unsigned discovery values.
+
+- `Udap#server_metadata` now validates `signed_metadata` on every fetch and merges the
+  authoritative signed endpoint claims into the returned `UdapMetadata`. Raises
+  `Safire::Errors::DiscoveryError` if validation fails. Accepts `trusted_anchors:` and
+  `crls:` or `revocation_checker:` for production chain and revocation validation, plus
+  `verify_chain:` (`verify_chain: false` for dev/test only). Cached UDAP metadata is
+  revalidated before reuse and refetched if its signed JWT, certificate chain, or revocation
+  policy no longer validates.
+
+- `UdapMetadata#signed_metadata_valid?` for explicit cryptographic re-validation of the
+  `signed_metadata` JWT against a specific set of trust anchors and revocation policy.
+
 - `Safire::Client.new(..., protocol: :udap).server_metadata` now works end-to-end:
   `Protocols::Udap` fetches and parses `/.well-known/udap`, supports the optional `community:` URI
   parameter, caches results per community, and raises `DiscoveryError` on HTTP errors or a 204 response

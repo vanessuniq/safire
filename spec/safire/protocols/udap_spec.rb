@@ -35,8 +35,21 @@ RSpec.describe Safire::Protocols::Udap do
   # ---------- server_metadata — default (no community) ----------
 
   describe '#server_metadata' do
+    let(:signed_claims) do
+      {
+        'token_endpoint' => valid_metadata['token_endpoint'],
+        'registration_endpoint' => valid_metadata['registration_endpoint']
+      }
+    end
+    let(:validator_double) do
+      instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: signed_claims)
+    end
+
     context 'without community parameter' do
-      before { stub_udap }
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
 
       it 'returns a UdapMetadata instance' do
         expect(udap.server_metadata).to be_a(Safire::Protocols::UdapMetadata)
@@ -49,6 +62,32 @@ RSpec.describe Safire::Protocols::Udap do
       it 'caches the result and makes only one HTTP request' do
         2.times { udap.server_metadata }
         expect(a_request(:get, well_known_url)).to have_been_made.once
+      end
+
+      it 'revalidates cached signed_metadata before returning cached metadata' do
+        2.times { udap.server_metadata }
+
+        expect(validator_double).to have_received(:signed_endpoint_claims).twice
+      end
+
+      it 'refetches metadata when cached signed_metadata no longer validates' do
+        stale_validator = instance_double(
+          Safire::Protocols::UdapSignedMetadataValidator,
+          signed_endpoint_claims: nil
+        )
+        fresh_validator = instance_double(
+          Safire::Protocols::UdapSignedMetadataValidator,
+          signed_endpoint_claims: signed_claims
+        )
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(
+          validator_double,
+          stale_validator,
+          fresh_validator
+        )
+
+        2.times { udap.server_metadata }
+
+        expect(a_request(:get, well_known_url)).to have_been_made.twice
       end
     end
 
@@ -66,6 +105,7 @@ RSpec.describe Safire::Protocols::Udap do
           .to_return(**success_return)
         stub_request(:get, well_known_url)
           .to_return(**success_return)
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
       end
 
       it 'appends the community as a query parameter' do
@@ -90,13 +130,59 @@ RSpec.describe Safire::Protocols::Udap do
     end
 
     context 'with a blank community parameter' do
-      before { stub_udap }
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
 
       it 'treats it as the default discovery request' do
         udap.server_metadata(community: '   ')
         udap.server_metadata
 
         expect(a_request(:get, well_known_url)).to have_been_made.once
+      end
+    end
+
+    # ---------- trust policy cache isolation ----------
+
+    context 'when called with different trust policies for the same community' do
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
+
+      it 'does not serve a lenient-policy cached result to a stricter call' do
+        udap.server_metadata(verify_chain: false)
+        udap.server_metadata(verify_chain: true)
+
+        expect(a_request(:get, well_known_url)).to have_been_made.twice
+      end
+
+      it 'passes trust anchors, CRLs, and revocation checker to the validator' do
+        anchor = instance_double(OpenSSL::X509::Certificate, to_der: 'anchor')
+        crl = instance_double(OpenSSL::X509::CRL, to_der: 'crl')
+        checker = ->(**_kwargs) { true }
+
+        udap.server_metadata(trusted_anchors: [anchor], crls: [crl], revocation_checker: checker)
+
+        expect(validator_double).to have_received(:signed_endpoint_claims).with(
+          base_url: base_url,
+          trusted_anchors: [anchor],
+          crls: [crl],
+          revocation_checker: checker,
+          verify_chain: true
+        )
+      end
+
+      it 'does not share cached metadata across different CRL sets' do
+        anchor = instance_double(OpenSSL::X509::Certificate, to_der: 'anchor')
+        crl1 = instance_double(OpenSSL::X509::CRL, to_der: 'crl-1')
+        crl2 = instance_double(OpenSSL::X509::CRL, to_der: 'crl-2')
+
+        udap.server_metadata(trusted_anchors: [anchor], crls: [crl1])
+        udap.server_metadata(trusted_anchors: [anchor], crls: [crl2])
+
+        expect(a_request(:get, well_known_url)).to have_been_made.twice
       end
     end
 
@@ -203,6 +289,66 @@ RSpec.describe Safire::Protocols::Udap do
       it 'includes the label UDAP metadata in the error message' do
         expect { udap.server_metadata }
           .to raise_error(Safire::Errors::DiscoveryError) { |e| expect(e.message).to include('UDAP metadata') }
+      end
+    end
+
+    # ---------- server_metadata — signed_metadata validation ----------
+
+    context 'when signed_metadata validation fails' do
+      let(:failing_validator) do
+        instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: nil)
+      end
+
+      before do
+        stub_udap
+        allow(Safire.logger).to receive(:warn)
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(failing_validator)
+      end
+
+      it 'raises DiscoveryError' do
+        expect { udap.server_metadata }.to raise_error(Safire::Errors::DiscoveryError)
+      end
+
+      it 'includes signed_metadata in the error description' do
+        expect { udap.server_metadata }
+          .to raise_error(Safire::Errors::DiscoveryError, /signed_metadata/)
+      end
+
+      it 'includes the community in the error when community-scoped' do
+        community = 'https://udap.example.org/community1'
+        stub_request(:get, well_known_url)
+          .with(query: { 'community' => community })
+          .to_return(status: 200, body: valid_metadata.to_json, headers: { 'Content-Type' => 'application/json' })
+
+        expect { udap.server_metadata(community: community) }
+          .to raise_error(Safire::Errors::DiscoveryError, /community/)
+      end
+    end
+
+    context 'when signed endpoint claims differ from the unsigned values' do
+      let(:signed_claims) do
+        {
+          'token_endpoint' => 'https://fhir.example.com/signed-token',
+          'registration_endpoint' => valid_metadata['registration_endpoint']
+        }
+      end
+
+      before do
+        stub_udap
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+      end
+
+      it 'returns metadata with the authoritative signed token_endpoint' do
+        expect(udap.server_metadata.token_endpoint).to eq('https://fhir.example.com/signed-token')
+      end
+
+      it 'passes the raw discovery hash as unsigned_metadata to the validator' do
+        udap.server_metadata
+
+        expect(Safire::Protocols::UdapSignedMetadataValidator).to have_received(:new).with(
+          valid_metadata['signed_metadata'],
+          hash_including('token_endpoint' => valid_metadata['token_endpoint'])
+        )
       end
     end
   end

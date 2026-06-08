@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a Ruby gem implementing the [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) specification and the [UDAP Security](https://hl7.org/fhir/us/udap-security/) protocol for healthcare client applications. It handles OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
+Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) server metadata discovery. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
 
 ---
 
@@ -31,12 +31,15 @@ client = Safire::Client.new(
   protocol: :udap
 )
 
-metadata = client.server_metadata
+metadata = client.server_metadata(verify_chain: false) # development/test only
 # => #<Safire::Protocols::UdapMetadata ...>
 
 # Community-scoped discovery
-metadata = client.server_metadata(community: 'https://udap.example.org/community1')
+metadata = client.server_metadata(community: 'https://udap.example.org/community1', verify_chain: false)
 ```
+
+Production UDAP discovery requires trust anchors plus an explicit certificate revocation policy
+(`crls:` or `revocation_checker:`). Use `verify_chain: false` only for development or tests.
 
 Auth flows (DCR, JWT assertion, Tiered OAuth) are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 

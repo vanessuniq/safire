@@ -31,34 +31,116 @@ module Safire
       # When a +community+ URI is provided, the request is scoped to that community
       # by appending +?community=<encoded-uri>+ to the endpoint URL. Results are
       # cached per community — subsequent calls with the same +community+ return the
-      # cached result without a second HTTP request.
+      # cached result without a second HTTP request, as long as its +signed_metadata+
+      # still validates against the current trust policy.
+      #
+      # The +signed_metadata+ JWT in the discovery response is validated per UDAP Security STU2.
+      # Signed endpoint claims (+token_endpoint+, +registration_endpoint+, and optionally
+      # +authorization_endpoint+) are merged over the unsigned values before the metadata object
+      # is constructed.
       #
       # @param community [String, nil] optional UDAP community URI; scopes discovery
-      # @return [Safire::Protocols::UdapMetadata] parsed UDAP metadata
-      # @raise [Safire::Errors::DiscoveryError] if the server returns an HTTP error,
-      #   a 204 response, or a body that is not a JSON object
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] X.509 trust anchors for
+      #   +signed_metadata+ chain verification; required for production use
+      # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for production chain validation
+      # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
+      # @param verify_chain [Boolean] when +false+, skips X.509 chain validation (dev/test only)
+      # @return [Safire::Protocols::UdapMetadata] parsed UDAP metadata with authoritative signed endpoint claims
+      # @raise [Safire::Errors::DiscoveryError] if the server returns an HTTP error, a 204 response,
+      #   a body that is not a JSON object, or if +signed_metadata+ JWT validation fails
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
       #   or a redirect to a non-HTTPS URL
       # @raise [Safire::Errors::ConfigurationError] if +community+ is not a URI
-      def server_metadata(community: nil)
+      def server_metadata(community: nil, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
         community = normalize_community(community)
-        cache_key = community || :default
-        return @metadata_cache[cache_key] if @metadata_cache.key?(cache_key)
+        trust_policy = {
+          trusted_anchors:,
+          crls:,
+          revocation_checker:,
+          verify_chain:
+        }
+        cache_key = build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
+        cached_entry = @metadata_cache[cache_key]
+        return cached_entry.fetch(:metadata) if cached_entry && cached_entry_valid?(cached_entry, trust_policy)
 
-        @metadata_cache[cache_key] = fetch_metadata(community:)
+        @metadata_cache.delete(cache_key)
+
+        entry = fetch_metadata(
+          community:,
+          trust_policy:
+        )
+        @metadata_cache[cache_key] = entry
+        entry.fetch(:metadata)
       end
 
       private
 
-      def fetch_metadata(community:)
+      def fetch_metadata(community:, trust_policy:)
         endpoint = well_known_endpoint(community:)
         response = @http_client.get(endpoint)
         check_204!(response, endpoint:, community:)
-        UdapMetadata.new(parse_discovery_body(response.body, endpoint))
+        raw = parse_discovery_body(response.body, endpoint)
+        signed_claims = validate_signed_metadata!(
+          raw,
+          endpoint:,
+          community:,
+          trust_policy:
+        )
+        build_cache_entry(raw, signed_claims)
       rescue Faraday::Error => e
         status = e.response&.dig(:status)
         Safire.logger.error("UDAP discovery failed for `#{endpoint}`: HTTP #{status}")
         raise Errors::DiscoveryError.new(endpoint: endpoint, status:, label: 'UDAP metadata')
+      end
+
+      def validate_signed_metadata!(
+        raw,
+        endpoint:,
+        community:,
+        trust_policy:
+      )
+        validator = UdapSignedMetadataValidator.new(raw['signed_metadata'], raw)
+        claims = validator.signed_endpoint_claims(
+          base_url: normalized_base_url,
+          **trust_policy
+        )
+        return claims if claims
+
+        raise Errors::DiscoveryError.new(
+          endpoint: endpoint,
+          error_description: community_scoped('signed_metadata validation failed', community),
+          label: 'UDAP metadata'
+        )
+      end
+
+      def build_cache_entry(raw, signed_claims)
+        {
+          metadata: UdapMetadata.new(raw.merge(signed_claims)),
+          raw:
+        }
+      end
+
+      def cached_entry_valid?(entry, trust_policy)
+        validator = UdapSignedMetadataValidator.new(entry.fetch(:raw)['signed_metadata'], entry.fetch(:raw))
+        validator.signed_endpoint_claims(base_url: normalized_base_url, **trust_policy).present?
+      end
+
+      def community_scoped(description, community)
+        community ? "#{description} for community #{community}" : description
+      end
+
+      def build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
+        [
+          community || :default,
+          verify_chain,
+          trusted_anchors.map(&:to_der).sort,
+          crls.map(&:to_der).sort,
+          revocation_checker
+        ]
+      end
+
+      def normalized_base_url
+        @base_url.to_s.chomp('/')
       end
 
       def normalize_community(community)
@@ -89,7 +171,7 @@ module Safire
       end
 
       def well_known_endpoint(community:)
-        base = "#{@base_url.to_s.chomp('/')}#{WELL_KNOWN_PATH}"
+        base = "#{normalized_base_url}#{WELL_KNOWN_PATH}"
         return base unless community
 
         uri = Addressable::URI.parse(base)
@@ -100,12 +182,10 @@ module Safire
       def check_204!(response, endpoint:, community:)
         return unless response.status == 204
 
-        description = 'no UDAP workflows supported'
-        description += " for community #{community}" if community
         raise Errors::DiscoveryError.new(
           endpoint: endpoint,
           status: 204,
-          error_description: description,
+          error_description: community_scoped('no UDAP workflows supported', community),
           label: 'UDAP metadata'
         )
       end

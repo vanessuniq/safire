@@ -22,3 +22,5 @@ Architecture Decision Records (ADRs) document significant design decisions made 
 | [ADR-008]({% link adr/ADR-008-warn-return-false-for-compliance-validation.md %}) | Warn and return false for compliance validation — raise only for configuration errors | Accepted |
 | [ADR-009]({% link adr/ADR-009-oauth-error-hierarchy.md %}) | `OAuthError` base class and `ReceivesFields` mixin for protocol error hierarchy | Accepted |
 | [ADR-010]({% link adr/ADR-010-optional-client-id-dcr-temp-client.md %}) | `client_id` optional at initialization — deferred validation for the DCR temp-client pattern | Accepted |
+| [ADR-011]({% link adr/ADR-011-udap-stu2-discovery-conformance.md %}) | `UdapMetadata` entity — structural validation separate from cryptographic validation | Accepted |
+| [ADR-012]({% link adr/ADR-012-udap-signed-metadata-validation.md %}) | `signed_metadata` JWT validation — design and chain verification defaults | Accepted |

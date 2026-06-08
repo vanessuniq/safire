@@ -41,7 +41,7 @@ for `valid?`.
 **Signed metadata:** STU2 uses `signed_metadata` (not the deprecated `signed_endpoints` from
 earlier drafts). `signed_metadata` is treated as a required field by `UdapMetadata#valid?` and
 as an opaque string. Cryptographic validation of the JWT is intentionally deferred to a
-dedicated cryptographic validator to be introduced in a future PR.
+dedicated cryptographic validator; see [ADR-012](ADR-012-udap-signed-metadata-validation.md).
 
 **Presence check uses `nil?`, not `blank?`:** Several required array fields — for example,
 `udap_authorization_extensions_supported` — may legitimately be empty arrays in a conformant
@@ -63,7 +63,7 @@ semantics.
 - `signed_metadata` must be a compact-JWS string: exactly three dot-separated segments where
   every segment contains only base64url characters (`[A-Za-z0-9\-_]`, no padding); JWT header
   algorithm (`alg`), required claim presence, and signature are not validated here — these are
-  deferred to the cryptographic validator (future PR)
+  deferred to the cryptographic validator
 - endpoint URL fields (`token_endpoint`, `registration_endpoint`, conditionally
   `authorization_endpoint`) must be absolute HTTPS URLs; plain HTTP is accepted only for
   `localhost` and `127.0.0.1` to support development without TLS — any other scheme on
@@ -101,12 +101,11 @@ semantics.
 - Structural conformance is independently testable without any certificate infrastructure
 - `valid?` follows the same warn-and-return-false contract as `SmartMetadata#valid?`, giving
   callers a consistent API across protocols
-- `signed_metadata` cryptographic validation can be added (or skipped in dev/test) without
-  touching the entity
+- `signed_metadata` cryptographic validation stays separate from the entity; see
+  [ADR-012](ADR-012-udap-signed-metadata-validation.md)
 
 **Trade-offs:**
 
 - A structurally valid `UdapMetadata` object is not automatically cryptographically validated;
   callers that require full STU2 conformance must also perform cryptographic validation of the
-  `signed_metadata` JWT after structural validation passes; a dedicated validator will be
-  introduced in a future PR
+  `signed_metadata` JWT after structural validation passes

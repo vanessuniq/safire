@@ -174,10 +174,17 @@ RSpec.describe Safire::Client do
       }
     end
     let(:udap_client) { described_class.new(config, protocol: :udap) }
+    let(:signed_claims) do
+      { 'token_endpoint' => "#{base_url}/token", 'registration_endpoint' => "#{base_url}/register" }
+    end
+    let(:validator_double) do
+      instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: signed_claims)
+    end
 
     before do
       stub_request(:get, well_known_url)
         .to_return(status: 200, body: udap_metadata_body.to_json, headers: { 'Content-Type' => 'application/json' })
+      allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
     end
 
     it 'delegates server_metadata to Protocols::Udap and returns a UdapMetadata instance' do

@@ -70,26 +70,54 @@ end
 
 `Safire::Client` memoises the protocol client itself (`@protocol_client ||= ...`), so changing `client_type=` reuses the existing `Protocols::Smart` instance — and thus its already-fetched `@server_metadata` — rather than constructing a new one. This is the mechanism that prevents double-discovery on `client_type=` changes.
 
-**UDAP** memoises a Hash keyed by community URI string or `:default`, because the same server can host multiple communities at separate `?community=<uri>` scopes:
+**UDAP** memoises a Hash keyed by community URI string or `:default`, plus the caller's trust
+policy. The same server can host multiple communities at separate `?community=<uri>` scopes, and
+the same community can be evaluated under different trust anchors, CRLs, or revocation checkers.
+Cache hits revalidate the cached `signed_metadata` before reuse; if validation fails, the cached
+entry is discarded and discovery is fetched again.
 
 ```ruby
-def server_metadata(community: nil)
+def server_metadata(community: nil, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
   community = normalize_community(community)
-  cache_key = community || :default
-  return @metadata_cache[cache_key] if @metadata_cache.key?(cache_key)
+  trust_policy = {
+    trusted_anchors:,
+    crls:,
+    revocation_checker:,
+    verify_chain:
+  }
+  cache_key = build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
+  cached_entry = @metadata_cache[cache_key]
+  return cached_entry.fetch(:metadata) if cached_entry && cached_entry_valid?(cached_entry, trust_policy)
 
-  @metadata_cache[cache_key] = fetch_metadata(community:)
+  @metadata_cache.delete(cache_key)
+
+  entry = fetch_metadata(
+    community:,
+    trust_policy:
+  )
+  @metadata_cache[cache_key] = entry
+  entry.fetch(:metadata)
 end
 
-def fetch_metadata(community:)
+def fetch_metadata(community:, trust_policy:)
   endpoint = well_known_endpoint(community:)
   response = @http_client.get(endpoint)
   check_204!(response, endpoint:, community:)
-  UdapMetadata.new(parse_discovery_body(response.body, endpoint))
+  raw = parse_discovery_body(response.body, endpoint)
+  signed_claims = validate_signed_metadata!(
+    raw,
+    endpoint:,
+    community:,
+    trust_policy:
+  )
+  {
+    metadata: UdapMetadata.new(raw.merge(signed_claims)),
+    raw:
+  }
 end
 ```
 
-`server_metadata(community:)` is a UDAP-specific parameter. Calling it on a SMART client raises `ArgumentError` from Ruby's own keyword argument checking — this is intentional and correct, since community scoping is a UDAP concept.
+`server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)` uses UDAP-specific parameters. Calling any of these on a SMART client raises `ArgumentError` from Ruby's own keyword argument checking — this is intentional and correct, since community scoping and UDAP certificate trust policy are UDAP concepts.
 
 A 204 response means the server has no UDAP workflows for that community. `Protocols::Udap` raises `DiscoveryError` before the body is parsed, with a descriptive message that identifies the community when one was requested.
 
@@ -102,7 +130,7 @@ A 204 response means the server has no UDAP workflows for that community. `Proto
 - Configuration errors are raised before any HTTP call
 - Callers control when discovery happens — supports application-level caching patterns (see [Advanced Examples]({{ site.baseurl }}/advanced/#metadata-caching))
 - `client_type=` mutation preserves cached SMART metadata — no re-discovery
-- UDAP community-keyed cache allows a single client instance to serve multiple communities without redundant HTTP calls
+- UDAP community-and-trust-policy cache allows a single client instance to serve multiple communities without serving stale signed metadata
 
 **Trade-offs:**
 - Discovery errors surface at first use (e.g. `authorization_url`), not at construction — callers must handle `Errors::DiscoveryError` in their flow logic rather than at the `new` call site

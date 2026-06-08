@@ -24,7 +24,7 @@ description: "UDAP Security STU2 server metadata discovery in Safire, with commu
 
 ## Overview
 
-UDAP (Unified Data Access Profiles) is a security framework for healthcare data exchange defined by the [UDAP Security Implementation Guide](https://hl7.org/fhir/us/udap-security/). It extends standard OAuth 2.0 with X.509 certificate-based identity, dynamic client registration, and trust community models, designed primarily for backend system-to-system integration and cross-organizational data access.
+UDAP (Unified Data Access Profiles) is a security framework for healthcare data exchange defined by the [UDAP Security STU2 / v2.0.0 Implementation Guide](https://hl7.org/fhir/us/udap-security/STU2/index.html). It extends standard OAuth 2.0 with X.509 certificate-based identity, dynamic client registration, and trust community models, designed primarily for backend system-to-system integration and cross-organizational data access.
 
 UDAP is a separate protocol from SMART. In Safire, select it via `protocol: :udap` rather than a `client_type:`.
 
@@ -32,30 +32,51 @@ UDAP is a separate protocol from SMART. In Safire, select it via `protocol: :uda
 
 ## Discovery
 
-UDAP server metadata discovery fetches `/.well-known/udap` and parses the response into a `UdapMetadata` object. Results are cached per community within a client instance, so repeated calls for the same community make at most one HTTP request.
+UDAP server metadata discovery fetches `/.well-known/udap`, validates the `signed_metadata` JWT, and merges the authoritative signed endpoint claims into a `UdapMetadata` object. Results are cached per community and trust policy within a client instance. Cache hits revalidate the cached `signed_metadata` before returning; if the JWT, certificate chain, or revocation policy no longer validates, Safire discards the cached entry and refetches discovery metadata.
+
+### Trust anchors and revocation
+
+Per UDAP Security STU2, `signed_metadata` JWT signature, X.509 chain verification, and certificate revocation status checking are performed on every production discovery call. Provide your trust anchors as `OpenSSL::X509::Certificate` objects and either CRLs as `OpenSSL::X509::CRL` objects or a custom `revocation_checker:`:
 
 ```ruby
+ca_cert = OpenSSL::X509::Certificate.new(File.read('udap_ca.pem'))
+ca_crl  = OpenSSL::X509::CRL.new(File.read('udap_ca.crl'))
+
 client = Safire::Client.new(
   { base_url: 'https://fhir.example.com' },
   protocol: :udap
 )
 
-metadata = client.server_metadata
+metadata = client.server_metadata(
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
 puts metadata.token_endpoint
 puts metadata.udap_versions_supported.inspect
 puts metadata.udap_profiles_supported.inspect
 ```
+
+{: .note }
+> **Development and testing**: Pass `verify_chain: false` to skip X.509 chain and revocation validation when working with self-signed certificates or local servers that do not have a CA-issued UDAP certificate. Never use `verify_chain: false` in production.
+>
+> ```ruby
+> metadata = client.server_metadata(verify_chain: false)
+> ```
 
 ### Community-scoped discovery
 
 Many UDAP servers host multiple trust communities at the same base URL, each scoped by a community URI. Pass `community:` to target a specific community:
 
 ```ruby
-metadata = client.server_metadata(community: 'https://udap.example.org/community1')
+metadata = client.server_metadata(
+  community:       'https://udap.example.org/community1',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
 puts metadata.token_endpoint
 ```
 
-The result is cached separately from the default (no-community) request, so calling `server_metadata` and `server_metadata(community: ...)` on the same client instance each makes at most one HTTP request.
+Results are cached separately per community and trust policy. Calling `server_metadata` with different community, `trusted_anchors`, `crls`, or `revocation_checker` arguments uses a separate cache entry, and each cached entry is revalidated before reuse.
 
 ### Error handling
 
@@ -63,6 +84,8 @@ The result is cached separately from the default (no-community) request, so call
 |-----------|-------------|
 | HTTP 4xx/5xx | `Safire::Errors::DiscoveryError` with `status` populated |
 | Server returns HTTP 204 | `Safire::Errors::DiscoveryError` (server signals no UDAP workflows for that community) |
+| `signed_metadata` JWT validation fails | `Safire::Errors::DiscoveryError` (invalid signature, chain, revocation status, endpoint claim, or missing required claim) |
+| Malformed DER certificate in `x5c` header | `Safire::Errors::CertificateError` |
 | Connection failure, timeout, SSL error, or redirect to a non-HTTPS URL | `Safire::Errors::NetworkError` |
 | `community:` is not a valid URI string | `Safire::Errors::ConfigurationError` (raised before any HTTP call) |
 
@@ -79,7 +102,8 @@ The result is cached separately from the default (no-community) request, so call
 
 ### Trust Framework
 
-- **Certificate Validation** — verify server and client certificates against trust anchors
+- **Client certificate trust management** — apply trust anchors and community policy to future
+  UDAP client authentication and registration flows
 - **Trust Community Support** — integration with UDAP trust communities (e.g. Carequality, CommonWell)
 
 ---
@@ -105,8 +129,8 @@ The result is cached separately from the default (no-community) request, so call
 
 ### Resources
 
-- [UDAP Security IG](https://hl7.org/fhir/us/udap-security/) — HL7 Implementation Guide
+- [UDAP Security STU2 / v2.0.0 IG](https://hl7.org/fhir/us/udap-security/STU2/index.html) — HL7 Implementation Guide
 - [UDAP JWT Client Auth](https://www.udap.org/udap-jwt-client-auth.html) — JWT assertion specification
 - [UDAP Dynamic Client Registration](https://www.udap.org/udap-dynamic-client-registration.html) — DCR specification
 - [RFC 9126 — Pushed Authorization Requests](https://datatracker.ietf.org/doc/html/rfc9126)
-- [UDAP Tiered OAuth](https://hl7.org/fhir/us/udap-security/b2b.html) — Delegated authorization
+- [UDAP Tiered OAuth](https://hl7.org/fhir/us/udap-security/STU2/b2b.html) — Delegated authorization

@@ -9,20 +9,32 @@ require 'uri'
 class FhirServer
   DATA_FILE = File.join(__dir__, '..', 'data', 'servers.yml')
 
-  ATTRIBUTES = %i[id name base_url client_id client_secret scopes].freeze
+  SUPPORTED_PROTOCOLS = %w[smart udap].freeze
+  PROTOCOL_LABELS = {
+    'smart' => 'SMART App Launch',
+    'udap' => 'UDAP Security'
+  }.freeze
 
-  attr_accessor(*ATTRIBUTES)
-  attr_reader :errors
+  ATTRIBUTES = %i[id name base_url client_id client_secret scopes protocols].freeze
+
+  attr_accessor(*(ATTRIBUTES - %i[protocols]))
+  attr_reader :errors, :protocols
 
   def initialize(attrs = {})
     ATTRIBUTES.each { |attr| send(:"#{attr}=", extract_attr(attrs, attr)) }
+    self.protocols = protocol_values_from(attrs)
     @scopes ||= []
     @errors = []
+  end
+
+  def protocols=(value)
+    @protocols = normalize_protocol_values(value)
   end
 
   def valid?
     @errors = []
     validate_presence
+    validate_protocols
     validate_url_format
     validate_url_uniqueness
     @errors.empty?
@@ -49,6 +61,18 @@ class FhirServer
 
   def confidential?
     !client_secret.to_s.empty?
+  end
+
+  def supports_smart?
+    protocols.include?('smart')
+  end
+
+  def supports_udap?
+    protocols.include?('udap')
+  end
+
+  def protocols_display
+    protocols.map { |protocol| PROTOCOL_LABELS.fetch(protocol, protocol) }.join(', ')
   end
 
   def scopes_display
@@ -123,10 +147,31 @@ class FhirServer
     attrs[key] || attrs[key.to_s]
   end
 
+  def normalize_protocol_values(values)
+    Array(values).map(&:to_s).map(&:strip).reject(&:empty?).uniq
+  end
+
+  def protocol_values_from(attrs)
+    attrs[:protocols] ||
+      attrs['protocols'] ||
+      attrs[:protocol] ||
+      attrs['protocol'] ||
+      ['smart']
+  end
+
   def validate_presence
     @errors << 'Name is required' if blank?(name)
     @errors << 'Base URL is required' if blank?(base_url)
-    @errors << 'Client ID is required' if blank?(client_id)
+    @errors << 'Client ID is required for SMART App Launch' if supports_smart? && blank?(client_id)
+  end
+
+  def validate_protocols
+    @errors << 'At least one protocol is required' if protocols.empty?
+    @errors << "Protocols must be one or more of: #{SUPPORTED_PROTOCOLS.join(', ')}" if unsupported_protocols.any?
+  end
+
+  def unsupported_protocols
+    protocols - SUPPORTED_PROTOCOLS
   end
 
   def validate_url_format

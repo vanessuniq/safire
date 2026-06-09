@@ -1,12 +1,13 @@
 # Safire Demo Application
 
-A Sinatra-based web application that demonstrates the features of the Safire gem for SMART authorization.
+A Sinatra-based web application that demonstrates the Safire gem for SMART authorization and UDAP discovery.
 
 ## Features
 
 - **Dynamic Client Registration**: Register this application with a SMART server at runtime using RFC 7591 to obtain a `client_id` automatically
-- **Server Management**: Add, edit, and remove FHIR server configurations with support for public and confidential clients
+- **Server Management**: Add, edit, and remove FHIR server configurations with protocol-aware SMART and UDAP sections
 - **SMART Discovery**: View server capabilities from `/.well-known/smart-configuration` including supported scopes, capabilities, and endpoints
+- **UDAP Discovery**: Fetch `/.well-known/udap`, validate `signed_metadata`, inspect STU2 fields, and run community-scoped discovery
 - **Authorization Flows**: Test multiple launch types:
   - Provider Standalone Launch
   - Patient Standalone Launch
@@ -52,6 +53,9 @@ Copy `.env.example` to `.env` and configure:
 | `SESSION_SECRET` | No | Session encryption key (auto-generated if not set) |
 | `ASYMMETRIC_PRIVATE_KEY_PEM` | No | Private key in PEM format for asymmetric auth |
 | `ASYMMETRIC_KID` | No | Key ID matching your registered JWKS |
+| `UDAP_TRUST_ANCHORS_PEM` | No | PEM-encoded UDAP signing certificate trust anchors |
+| `UDAP_CRLS_PEM` | No | PEM-encoded CRLs for UDAP signing certificate revocation checks |
+| `UDAP_VERIFY_CHAIN` | No | Optional override for UDAP signed metadata chain validation (`true` or `false`) |
 
 ### Setting Up Asymmetric Authentication
 
@@ -85,9 +89,27 @@ Asymmetric authentication uses JWT assertions signed with a private key. This is
 
 4. **Test**: The "Confidential Asymmetric" option will appear in the authorization form when the server supports it.
 
+### Setting Up UDAP signed_metadata Validation
+
+The UDAP Discovery screen always verifies the `signed_metadata` JWT signature and claims. Without configured trust material, it sets `verify_chain: false` and displays a visible warning because X.509 chain and revocation checks are skipped.
+
+For production-style testing, configure both trust anchors and CRLs:
+
+```bash
+UDAP_TRUST_ANCHORS_PEM="-----BEGIN CERTIFICATE-----
+...trusted anchor certificate...
+-----END CERTIFICATE-----"
+
+UDAP_CRLS_PEM="-----BEGIN X509 CRL-----
+...certificate revocation list...
+-----END X509 CRL-----"
+```
+
+When both values are present, the demo enables chain and revocation validation by default. Set `UDAP_VERIFY_CHAIN=false` only for local development or test scenarios.
+
 ### Adding a FHIR Server
 
-The home page offers two paths depending on whether you already have a `client_id`.
+The home page offers dynamic SMART registration or manual server setup.
 
 **Register Dynamically (RFC 7591)** — if the server advertises a `registration_endpoint`:
 
@@ -96,13 +118,14 @@ The home page offers two paths depending on whether you already have a `client_i
 3. Choose grant types, authentication method, and optional scope
 4. Click "Register Client" — the app POSTs your metadata to the server, receives a `client_id`, and saves the server entry automatically
 
-**Add Server Manually** — if you already have a `client_id`:
+**Add Server Manually** — for SMART credentials, UDAP discovery, or both:
 
 1. Click "Add Server" on the home page
 2. Enter the server details:
    - **Name**: Display name for the server
    - **Base URL**: FHIR server base URL
-   - **Client ID**: OAuth client ID registered with the server
+   - **Protocols**: SMART App Launch, UDAP Security, or both
+   - **Client ID**: OAuth client ID registered with the server for SMART workflows
    - **Client Secret**: (Optional) For confidential symmetric clients only
    - **Scopes**: Space or comma-separated list of OAuth scopes
 
@@ -141,7 +164,7 @@ To test EHR launch with the SMART sandbox:
 
 ### Backend Services Token Request
 
-If the server advertises `client_credentials` grant support, the "Backend Services" card appears on the server detail page:
+If a SMART server advertises `client_credentials` grant support, the "Backend Services" card appears in the SMART section of the server detail page:
 
 1. Navigate to a server detail page
 2. Click "Request Backend Token"
@@ -150,6 +173,18 @@ If the server advertises `client_credentials` grant support, the "Backend Servic
 5. View the access token, expiry, granted scopes, and SMART compliance check result
 
 Requires `ASYMMETRIC_PRIVATE_KEY_PEM` and `ASYMMETRIC_KID` to be configured (same key pair used for confidential asymmetric App Launch).
+
+### UDAP Discovery
+
+Navigate to a UDAP-enabled server detail page and use the UDAP Security section to fetch `/.well-known/udap`.
+
+The page displays:
+
+- Structural `valid?` status and `signed_metadata_valid?` status
+- Every UDAP Security STU2 metadata field Safire exposes
+- Profile-only helpers such as `dynamic_registration_profile?`
+- Capability helpers such as `supports_dynamic_registration?`
+- An optional `community` query parameter for community-scoped discovery
 
 ### Token Refresh
 
@@ -178,10 +213,13 @@ examples/sinatra_app/
 ├── data/
 │   └── servers.yml     # Server configurations (YAML storage)
 ├── models/
-│   └── fhir_server.rb  # Server model with YAML persistence
+│   ├── fhir_server.rb                # Server model with YAML persistence
+│   └── udap_discovery_presenter.rb   # UDAP demo presentation and trust policy
 ├── public/
-│   └── css/
-│       └── style.css   # Application styles
+│   ├── css/
+│   │   └── style.css   # Application styles
+│   └── js/
+│       └── app.js      # Small progressive UI behaviors
 └── views/              # ERB templates
     ├── layout.erb
     ├── index.erb
@@ -195,6 +233,7 @@ examples/sinatra_app/
         ├── authorize.erb
         ├── tokens.erb
         ├── refresh.erb
+        ├── udap_discovery.erb
         └── backend_token.erb
 ```
 
@@ -207,6 +246,8 @@ examples/sinatra_app/
 | `POST /register` | Submits the registration request and saves the new server entry |
 | `/launch` | EHR/Portal launch endpoint |
 | `/callback` | OAuth2 callback handler |
+| `GET /demo/:id/discovery` | SMART discovery result page |
+| `GET /demo/:id/udap-discovery` | UDAP discovery result page |
 | `GET /demo/:id/backend-token` | Backend Services token request form |
 | `POST /demo/:id/backend-token` | Submits the backend services token request |
 | `POST /reset-session` | Clears all OAuth and token session data |

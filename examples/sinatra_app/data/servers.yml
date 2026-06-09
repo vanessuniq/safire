@@ -10,3 +10,14 @@
   - fhirUser
   - launch/patient
   - patient/*.read
+  protocols:
+  - smart
+b82614f4-9050-4358-bb39-224916e6d623:
+  id: b82614f4-9050-4358-bb39-224916e6d623
+  name: FAST Identity Matching
+  base_url: https://identity-matching.fast.hl7.org/fhir
+  client_id: ''
+  client_secret: 
+  scopes: []
+  protocols:
+  - udap

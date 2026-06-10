@@ -91,7 +91,10 @@ Asymmetric authentication uses JWT assertions signed with a private key. This is
 
 ### Setting Up UDAP signed_metadata Validation
 
-The UDAP Discovery screen always verifies the `signed_metadata` JWT signature and claims. Without configured trust material, it sets `verify_chain: false` and displays a visible warning because X.509 chain and revocation checks are skipped.
+The UDAP Discovery screen always verifies the `signed_metadata` JWT signature and claims. When
+complete trust material is unavailable, or when `UDAP_VERIFY_CHAIN=false` is configured, it sets
+`verify_chain: false` and displays a visible warning because X.509 chain and revocation checks are
+skipped.
 
 For production-style testing, configure both trust anchors and CRLs:
 

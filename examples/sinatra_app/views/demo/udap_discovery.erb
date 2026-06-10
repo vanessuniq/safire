@@ -8,8 +8,8 @@
 
   <% if @udap_presenter.trust_warning? %>
     <div class="warning-box">
-      The <code>signed_metadata</code> JWT was validated without X.509 chain and revocation checks because UDAP
-      trust anchors and CRLs are not configured for this demo environment.
+      The <code>signed_metadata</code> JWT was validated without X.509 chain and revocation checks
+      <%= h(@udap_presenter.trust_warning_reason) %>.
     </div>
   <% end %>
 

@@ -67,6 +67,15 @@ class UdapDiscoveryPresenter
     trust_policy.development_mode?
   end
 
+  def trust_warning_reason
+    case trust_policy.chain_verification_disabled_reason
+    when :explicit_override
+      'because UDAP_VERIFY_CHAIN explicitly disables them for this demo environment'
+    else
+      'because complete UDAP trust anchors and CRLs are not configured for this demo environment'
+    end
+  end
+
   def structural_status
     metadata_valid ? 'Conformant' : 'Non-conformant'
   end
@@ -110,10 +119,20 @@ class UdapDiscoveryPresenter
       !verify_chain?
     end
 
+    def chain_verification_disabled_reason
+      return nil if verify_chain?
+
+      explicit_verify_chain == false ? :explicit_override : :missing_trust_material
+    end
+
     def verify_chain?
       explicit = explicit_verify_chain
       return explicit unless explicit.nil?
 
+      trust_material_configured?
+    end
+
+    def trust_material_configured?
       trusted_anchors.any? && crls.any?
     end
 
@@ -134,12 +153,14 @@ class UdapDiscoveryPresenter
     end
 
     def explicit_verify_chain
+      return @explicit_verify_chain if defined?(@explicit_verify_chain)
+
       value = env.fetch('UDAP_VERIFY_CHAIN', nil).to_s.strip
-      return if value.empty?
+      return @explicit_verify_chain = nil if value.empty?
 
       normalized_value = value.downcase
-      return true if TRUTHY_VALUES.include?(normalized_value)
-      return false if FALSEY_VALUES.include?(normalized_value)
+      return @explicit_verify_chain = true if TRUTHY_VALUES.include?(normalized_value)
+      return @explicit_verify_chain = false if FALSEY_VALUES.include?(normalized_value)
 
       raise Safire::Errors::ConfigurationError.new(
         invalid_attribute: :UDAP_VERIFY_CHAIN,

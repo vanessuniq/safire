@@ -94,6 +94,29 @@ RSpec.describe UdapDiscoveryPresenter do
 
       expect(presenter).to be_trust_warning
     end
+
+    it 'explains missing trust material when chain verification is disabled by default' do
+      presenter = described_class.new(
+        metadata,
+        metadata_valid: true,
+        signed_metadata_valid: true,
+        trust_policy: described_class::TrustPolicy.new({})
+      )
+
+      expect(presenter.trust_warning_reason).to include('complete UDAP trust anchors and CRLs are not configured')
+    end
+
+    it 'explains explicit override when chain verification is disabled by configuration' do
+      policy = described_class::TrustPolicy.new('UDAP_VERIFY_CHAIN' => 'false')
+      presenter = described_class.new(
+        metadata,
+        metadata_valid: true,
+        signed_metadata_valid: true,
+        trust_policy: policy
+      )
+
+      expect(presenter.trust_warning_reason).to include('UDAP_VERIFY_CHAIN explicitly disables')
+    end
   end
 
   describe 'status display helpers' do
@@ -167,6 +190,7 @@ RSpec.describe UdapDiscoveryPresenter do
         verify_chain: false
       )
       expect(policy).to be_development_mode
+      expect(policy.chain_verification_disabled_reason).to eq(:missing_trust_material)
     end
 
     it 'enables chain verification when trust anchors and CRLs are configured' do
@@ -179,6 +203,7 @@ RSpec.describe UdapDiscoveryPresenter do
       expect(policy.server_metadata_kwargs[:crls]).to contain_exactly(be_a(OpenSSL::X509::CRL))
       expect(policy.server_metadata_kwargs[:verify_chain]).to be(true)
       expect(policy).not_to be_development_mode
+      expect(policy.chain_verification_disabled_reason).to be_nil
     end
 
     it 'honors an explicit verify_chain=false override' do
@@ -189,6 +214,7 @@ RSpec.describe UdapDiscoveryPresenter do
       )
 
       expect(policy.server_metadata_kwargs[:verify_chain]).to be(false)
+      expect(policy.chain_verification_disabled_reason).to eq(:explicit_override)
     end
 
     it 'honors explicit true and false boolean values' do

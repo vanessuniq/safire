@@ -12,6 +12,10 @@ RSpec.describe FhirServer do
     }
   end
 
+  before do
+    allow(described_class).to receive(:load_all).and_return({})
+  end
+
   describe '#protocols' do
     it 'defaults existing records to SMART' do
       server = described_class.new(base_attrs.except(:protocols))

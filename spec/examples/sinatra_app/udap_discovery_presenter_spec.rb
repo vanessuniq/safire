@@ -26,6 +26,15 @@ RSpec.describe UdapDiscoveryPresenter do
   end
   let(:metadata) { Safire::Protocols::UdapMetadata.new(metadata_hash) }
 
+  def build_presenter(metadata_valid: true, signed_metadata_valid: true, verify_chain: false)
+    described_class.new(
+      metadata,
+      metadata_valid: metadata_valid,
+      signed_metadata_valid: signed_metadata_valid,
+      trust_policy: instance_double(described_class::TrustPolicy, verify_chain?: verify_chain)
+    )
+  end
+
   describe '#metadata_fields' do
     it 'returns every STU2 UDAP metadata field in entity order' do
       presenter = described_class.new(
@@ -84,6 +93,40 @@ RSpec.describe UdapDiscoveryPresenter do
       )
 
       expect(presenter).to be_trust_warning
+    end
+  end
+
+  describe 'status display helpers' do
+    it 'summarizes structural metadata validation status' do
+      conformant = build_presenter
+      non_conformant = build_presenter(metadata_valid: false)
+
+      expect(conformant.structural_status).to eq('Conformant')
+      expect(non_conformant.structural_status).to eq('Non-conformant')
+    end
+
+    it 'summarizes signed metadata validation status by trust mode' do
+      chain_verified = build_presenter(verify_chain: true)
+      dev_verified = build_presenter
+      failed = build_presenter(signed_metadata_valid: false, verify_chain: true)
+
+      expect(chain_verified.signed_metadata_status).to eq('Validated with chain and revocation checks')
+      expect(dev_verified.signed_metadata_status).to eq('Validated without chain verification')
+      expect(failed.signed_metadata_status).to eq('Validation failed')
+    end
+
+    it 'formats boolean status text and badge classes' do
+      presenter = described_class.new(
+        metadata,
+        metadata_valid: true,
+        signed_metadata_valid: true,
+        trust_policy: described_class::TrustPolicy.new({})
+      )
+
+      expect(presenter.status_text(true)).to eq('Yes')
+      expect(presenter.status_text(false)).to eq('No')
+      expect(presenter.badge_class(true)).to eq('badge-added')
+      expect(presenter.badge_class(false)).to eq('badge-info')
     end
   end
 
@@ -148,11 +191,35 @@ RSpec.describe UdapDiscoveryPresenter do
       expect(policy.server_metadata_kwargs[:verify_chain]).to be(false)
     end
 
+    it 'honors explicit true and false boolean values' do
+      expect(described_class.new('UDAP_VERIFY_CHAIN' => 'yes').server_metadata_kwargs[:verify_chain]).to be(true)
+      expect(described_class.new('UDAP_VERIFY_CHAIN' => '0').server_metadata_kwargs[:verify_chain]).to be(false)
+    end
+
+    it 'raises ConfigurationError for invalid verify_chain values' do
+      policy = described_class.new('UDAP_VERIFY_CHAIN' => 'treu')
+
+      expect { policy.server_metadata_kwargs }
+        .to raise_error(Safire::Errors::ConfigurationError, /UDAP_VERIFY_CHAIN/)
+    end
+
     it 'raises CertificateError for malformed trust anchor PEM' do
-      policy = described_class.new('UDAP_TRUST_ANCHORS_PEM' => 'not pem')
+      malformed_cert = <<~PEM
+        -----BEGIN CERTIFICATE-----
+        not a certificate
+        -----END CERTIFICATE-----
+      PEM
+      policy = described_class.new('UDAP_TRUST_ANCHORS_PEM' => malformed_cert)
 
       expect { policy.server_metadata_kwargs }
         .to raise_error(Safire::Errors::CertificateError, /UDAP_TRUST_ANCHORS_PEM/)
+    end
+
+    it 'raises CertificateError for malformed CRL PEM' do
+      policy = described_class.new('UDAP_CRLS_PEM' => 'not pem')
+
+      expect { policy.server_metadata_kwargs }
+        .to raise_error(Safire::Errors::CertificateError, /UDAP_CRLS_PEM/)
     end
   end
 end

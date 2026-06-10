@@ -76,6 +76,7 @@ GEM
     minitest (6.0.6)
       drb (~> 2.0)
       prism (~> 1.5)
+    mustermann (3.1.1)
     net-http (0.9.1)
       uri (>= 0.11.1)
     parallel (1.28.0)
@@ -98,6 +99,14 @@ GEM
       stringio
     public_suffix (7.0.5)
     racc (1.8.1)
+    rack (3.2.6)
+    rack-protection (4.2.1)
+      base64 (>= 0.1.0)
+      logger (>= 1.6.0)
+      rack (>= 3.0.0, < 4)
+    rack-session (2.1.2)
+      base64 (>= 0.1.0)
+      rack (>= 3.0.0)
     rainbow (3.1.1)
     rdoc (6.14.2)
       erb
@@ -147,8 +156,16 @@ GEM
       simplecov (~> 0.19)
     simplecov-html (0.13.2)
     simplecov_json_formatter (0.1.4)
+    sinatra (4.2.1)
+      logger (>= 1.6.0)
+      mustermann (~> 3.0)
+      rack (>= 3.0.0, < 4)
+      rack-protection (= 4.2.1)
+      rack-session (>= 2.0.0, < 3)
+      tilt (~> 2.0)
     stringio (3.1.9)
     thor (1.4.0)
+    tilt (2.7.0)
     timecop (0.9.11)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
@@ -178,6 +195,7 @@ DEPENDENCIES
   safire!
   simplecov
   simplecov-cobertura
+  sinatra (~> 4.0)
   timecop (~> 0.9)
   webmock (~> 3.18)
   yard (~> 0.9)

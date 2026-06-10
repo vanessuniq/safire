@@ -55,7 +55,7 @@ Copy `.env.example` to `.env` and configure:
 | `ASYMMETRIC_KID` | No | Key ID matching your registered JWKS |
 | `UDAP_TRUST_ANCHORS_PEM` | No | PEM-encoded UDAP signing certificate trust anchors |
 | `UDAP_CRLS_PEM` | No | PEM-encoded CRLs for UDAP signing certificate revocation checks |
-| `UDAP_VERIFY_CHAIN` | No | Optional override for UDAP signed metadata chain validation (`true` or `false`) |
+| `UDAP_VERIFY_CHAIN` | No | Optional override for UDAP signed metadata chain validation (`1/true/yes/on` or `0/false/no/off`; unknown values raise a configuration error) |
 
 ### Setting Up Asymmetric Authentication
 
@@ -105,7 +105,7 @@ UDAP_CRLS_PEM="-----BEGIN X509 CRL-----
 -----END X509 CRL-----"
 ```
 
-When both values are present, the demo enables chain and revocation validation by default. Set `UDAP_VERIFY_CHAIN=false` only for local development or test scenarios.
+When both values are present, the demo enables chain and revocation validation by default. Set `UDAP_VERIFY_CHAIN=false` only for local development or test scenarios. Unknown `UDAP_VERIFY_CHAIN` values raise a configuration error instead of silently disabling validation.
 
 ### Adding a FHIR Server
 

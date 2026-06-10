@@ -91,6 +91,8 @@ class UdapDiscoveryPresenter
     CERTIFICATE_PATTERN = /-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/m
     CRL_PATTERN = /-----BEGIN X509 CRL-----.*?-----END X509 CRL-----/m
     TRUTHY_VALUES = %w[1 true yes on].freeze
+    FALSEY_VALUES = %w[0 false no off].freeze
+    BOOLEAN_VALUES = (TRUTHY_VALUES + FALSEY_VALUES).freeze
 
     def initialize(env = ENV)
       @env = env
@@ -135,7 +137,15 @@ class UdapDiscoveryPresenter
       value = env.fetch('UDAP_VERIFY_CHAIN', nil).to_s.strip
       return if value.empty?
 
-      TRUTHY_VALUES.include?(value.downcase)
+      normalized_value = value.downcase
+      return true if TRUTHY_VALUES.include?(normalized_value)
+      return false if FALSEY_VALUES.include?(normalized_value)
+
+      raise Safire::Errors::ConfigurationError.new(
+        invalid_attribute: :UDAP_VERIFY_CHAIN,
+        invalid_value: value,
+        valid_values: BOOLEAN_VALUES
+      )
     end
 
     def parse_pem_collection(env_key, pattern, parser)

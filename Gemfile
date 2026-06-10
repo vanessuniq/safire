@@ -23,5 +23,6 @@ group :test do
   gem 'dotenv', '~> 3.0'
   gem 'simplecov', require: false
   gem 'simplecov-cobertura', require: false
+  gem 'sinatra', '~> 4.0'
   gem 'webmock', '~> 3.18'
 end

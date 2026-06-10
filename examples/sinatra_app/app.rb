@@ -3,7 +3,6 @@
 require 'pry-byebug' if ENV['RACK_ENV'] == 'development'
 require 'dotenv/load'
 require 'sinatra/base'
-require 'sinatra/reloader'
 require 'securerandom'
 require 'openssl'
 require 'json'
@@ -23,6 +22,8 @@ class SafireDemo < Sinatra::Base
   end
 
   configure :development do
+    require 'sinatra/reloader'
+
     register Sinatra::Reloader
     also_reload File.join(__dir__, 'models', '*.rb')
   end
@@ -212,12 +213,28 @@ class SafireDemo < Sinatra::Base
   # Demo Routes
   # ============================================
 
+  SMART_DEMO_FILTER_PATHS = %w[
+    /demo/:server_id/discovery
+    /demo/:server_id/authorize
+    /demo/:server_id/backend-token
+    /demo/:server_id/refresh
+  ].freeze
+
   # Before filter for demo routes that need server and metadata
   before '/demo/:server_id/*' do
     @server = FhirServer.find(params[:server_id])
     halt 404, 'Server not found' unless @server
+  end
 
-    load_smart_demo_context unless udap_discovery_request?
+  SMART_DEMO_FILTER_PATHS.each do |path|
+    before path do
+      require_smart_protocol!
+      load_smart_demo_context
+    end
+  end
+
+  before '/demo/:server_id/udap-discovery' do
+    require_udap_protocol!
   end
 
   # SMART Discovery
@@ -348,6 +365,7 @@ class SafireDemo < Sinatra::Base
       redirect '/'
       return
     end
+    require_smart_protocol!
 
     begin
       client = build_safire_client(@server, client_type: client_type)
@@ -580,8 +598,19 @@ class SafireDemo < Sinatra::Base
     redirect "/servers/#{@server.id}"
   end
 
-  def udap_discovery_request?
-    request.path_info.end_with?('/udap-discovery')
+  def require_smart_protocol!
+    require_protocol!(@server.supports_smart?, 'SMART App Launch')
+  end
+
+  def require_udap_protocol!
+    require_protocol!(@server.supports_udap?, 'UDAP Security')
+  end
+
+  def require_protocol!(supported, label)
+    return if supported
+
+    set_flash(:error, "#{@server.name} is not configured for #{label}.")
+    redirect "/servers/#{@server.id}"
   end
 
   def discover_udap_metadata(server, community:, trust_policy:)

@@ -39,12 +39,11 @@ class UdapDiscoveryPresenter
     signed_metadata: 'Signed Metadata'
   }.freeze
 
-  attr_reader :community, :metadata, :metadata_valid, :signed_metadata_valid, :trust_policy
+  attr_reader :community, :metadata, :metadata_valid, :trust_policy
 
-  def initialize(metadata, metadata_valid:, signed_metadata_valid:, trust_policy:, community: nil)
+  def initialize(metadata, metadata_valid:, trust_policy:, community: nil)
     @metadata = metadata
     @metadata_valid = metadata_valid
-    @signed_metadata_valid = signed_metadata_valid
     @trust_policy = trust_policy
     @community = community
   end
@@ -81,10 +80,9 @@ class UdapDiscoveryPresenter
   end
 
   def signed_metadata_status
-    return 'Validated with chain and revocation checks' if signed_metadata_valid && trust_policy.verify_chain?
-    return 'Validated without chain verification' if signed_metadata_valid
+    return 'Validated with chain and revocation checks' if trust_policy.verify_chain?
 
-    'Validation failed'
+    'Validated without chain verification'
   end
 
   def status_text(value)

@@ -183,7 +183,7 @@ Navigate to a UDAP-enabled server detail page and use the UDAP Security section 
 
 The page displays:
 
-- Structural `valid?` status and `signed_metadata_valid?` status
+- Structural `valid?` status and signed metadata validation status
 - Every UDAP Security STU2 metadata field Safire exposes
 - Profile-only helpers such as `dynamic_registration_profile?`
 - Capability helpers such as `supports_dynamic_registration?`

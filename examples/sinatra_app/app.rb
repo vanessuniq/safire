@@ -248,14 +248,9 @@ class SafireDemo < Sinatra::Base
     @udap_trust_policy = UdapDiscoveryPresenter::TrustPolicy.new
     @udap_metadata = discover_udap_metadata(@server, community: @community, trust_policy: @udap_trust_policy)
     @udap_metadata_valid = @udap_metadata.valid?
-    @udap_signed_metadata_valid = @udap_metadata.signed_metadata_valid?(
-      base_url: @server.base_url.to_s.chomp('/'),
-      **@udap_trust_policy.server_metadata_kwargs
-    )
     @udap_presenter = UdapDiscoveryPresenter.new(
       @udap_metadata,
       metadata_valid: @udap_metadata_valid,
-      signed_metadata_valid: @udap_signed_metadata_valid,
       trust_policy: @udap_trust_policy,
       community: @community
     )

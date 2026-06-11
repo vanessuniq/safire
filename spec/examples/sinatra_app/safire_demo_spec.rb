@@ -163,7 +163,6 @@ RSpec.describe SafireDemo do
       allow(client).to receive(:server_metadata)
         .with(community: nil, **udap_trust_policy.server_metadata_kwargs)
         .and_return(udap_metadata)
-      allow(udap_metadata).to receive(:signed_metadata_valid?).and_return(true)
 
       response = response_for(:get, '/demo/udap-only/udap-discovery')
 

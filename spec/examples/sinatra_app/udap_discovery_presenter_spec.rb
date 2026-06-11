@@ -26,11 +26,10 @@ RSpec.describe UdapDiscoveryPresenter do
   end
   let(:metadata) { Safire::Protocols::UdapMetadata.new(metadata_hash) }
 
-  def build_presenter(metadata_valid: true, signed_metadata_valid: true, verify_chain: false)
+  def build_presenter(metadata_valid: true, verify_chain: false)
     described_class.new(
       metadata,
       metadata_valid: metadata_valid,
-      signed_metadata_valid: signed_metadata_valid,
       trust_policy: instance_double(described_class::TrustPolicy, verify_chain?: verify_chain)
     )
   end
@@ -40,7 +39,6 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        signed_metadata_valid: true,
         trust_policy: described_class::TrustPolicy.new({})
       )
 
@@ -53,7 +51,6 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        signed_metadata_valid: true,
         trust_policy: described_class::TrustPolicy.new({})
       )
 
@@ -70,7 +67,6 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        signed_metadata_valid: true,
         trust_policy: described_class::TrustPolicy.new({})
       )
 
@@ -88,7 +84,6 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        signed_metadata_valid: true,
         trust_policy: described_class::TrustPolicy.new({})
       )
 
@@ -99,7 +94,6 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        signed_metadata_valid: true,
         trust_policy: described_class::TrustPolicy.new({})
       )
 
@@ -111,7 +105,6 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        signed_metadata_valid: true,
         trust_policy: policy
       )
 
@@ -131,18 +124,15 @@ RSpec.describe UdapDiscoveryPresenter do
     it 'summarizes signed metadata validation status by trust mode' do
       chain_verified = build_presenter(verify_chain: true)
       dev_verified = build_presenter
-      failed = build_presenter(signed_metadata_valid: false, verify_chain: true)
 
       expect(chain_verified.signed_metadata_status).to eq('Validated with chain and revocation checks')
       expect(dev_verified.signed_metadata_status).to eq('Validated without chain verification')
-      expect(failed.signed_metadata_status).to eq('Validation failed')
     end
 
     it 'formats boolean status text and badge classes' do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        signed_metadata_valid: true,
         trust_policy: described_class::TrustPolicy.new({})
       )
 

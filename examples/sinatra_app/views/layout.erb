@@ -19,8 +19,8 @@
 
   <main>
     <% if @flash[:message] %>
-      <div class="flash flash-<%= @flash[:type] %>">
-        <%= @flash[:message] %>
+      <div class="flash flash-<%= h(@flash[:type]) %>">
+        <%= h(@flash[:message]) %>
       </div>
     <% end %>
 

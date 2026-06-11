@@ -10,6 +10,14 @@ RSpec.describe SafireDemo do
   let(:request) { Rack::MockRequest.new(described_class) }
   let(:smart_server) { build_server('smart-only', protocols: ['smart']) }
   let(:udap_server) { build_server('udap-only', protocols: ['udap'], client_id: nil) }
+  let(:malicious_udap_server) do
+    build_server(
+      'evil-udap',
+      protocols: ['udap'],
+      client_id: nil,
+      name: '<script>alert("xss")</script>'
+    )
+  end
   let(:smart_metadata) { Safire::Protocols::SmartMetadata.new(smart_metadata_hash) }
   let(:smart_metadata_hash) do
     {
@@ -40,10 +48,10 @@ RSpec.describe SafireDemo do
     }
   end
 
-  def build_server(id, protocols:, client_id: 'client-123')
+  def build_server(id, protocols:, client_id: 'client-123', name: nil)
     FhirServer.new(
       id: id,
-      name: id.tr('-', ' ').split.map(&:capitalize).join(' '),
+      name: name || id.tr('-', ' ').split.map(&:capitalize).join(' '),
       base_url: "https://#{id}.example.com/fhir",
       client_id: client_id,
       scopes: %w[openid profile],
@@ -59,6 +67,7 @@ RSpec.describe SafireDemo do
     described_class.metadata_cache.clear
     allow(FhirServer).to receive(:find).with('smart-only').and_return(smart_server)
     allow(FhirServer).to receive(:find).with('udap-only').and_return(udap_server)
+    allow(FhirServer).to receive(:find).with('evil-udap').and_return(malicious_udap_server)
     allow(FhirServer).to receive(:find_by_base_url).with(udap_server.base_url).and_return(udap_server)
     allow(UdapDiscoveryPresenter::TrustPolicy).to receive(:new).and_return(udap_trust_policy)
   end
@@ -93,6 +102,17 @@ RSpec.describe SafireDemo do
       expect(response.status).to be_between(300, 399)
       expect(response.location).to end_with('/servers/udap-only')
     end
+
+    it 'escapes server names rendered through flash messages' do
+      redirect_response = response_for(:get, '/demo/evil-udap/discovery')
+
+      response = request.get('/servers/evil-udap', 'HTTP_COOKIE' => redirect_response['Set-Cookie'])
+
+      expect(response.status).to eq(200)
+      expect(response.body).not_to include(malicious_udap_server.name)
+      expect(response.body).to include('&lt;script&gt;alert')
+      expect(response.body).to include('is not configured for SMART App Launch')
+    end
   end
 
   describe 'SMART discovery' do
@@ -105,6 +125,32 @@ RSpec.describe SafireDemo do
       expect(response.status).to eq(200)
       expect(response.body).to include('SMART Discovery')
       expect(response.body).to include("#{smart_server.base_url}/authorize")
+    end
+
+    it 'redirects when SMART discovery fails before a demo route renders' do
+      client = instance_double(Safire::Client)
+      allow(Safire::Client).to receive(:new).and_return(client)
+      allow(client).to receive(:server_metadata).and_raise(
+        Safire::Errors::DiscoveryError.new(endpoint: "#{smart_server.base_url}/.well-known/smart-configuration")
+      )
+
+      response = response_for(:get, '/demo/smart-only/discovery')
+
+      expect(response.status).to be_between(300, 399)
+      expect(response.location).to end_with('/servers/smart-only')
+    end
+  end
+
+  describe 'SMART authorization' do
+    it 'renders the authorization form for a SMART server' do
+      client = instance_double(Safire::Client, server_metadata: smart_metadata)
+      allow(Safire::Client).to receive(:new).and_return(client)
+
+      response = response_for(:get, '/demo/smart-only/authorize')
+
+      expect(response.status).to eq(200)
+      expect(response.body).to include('Authorization Flow')
+      expect(response.body).to include('Provider Standalone Launch')
     end
   end
 

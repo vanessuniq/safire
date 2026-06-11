@@ -58,6 +58,6 @@
 
 <div class="form-group">
   <label>Callback URL</label>
-  <input type="text" value="<%= redirect_uri %>" readonly class="readonly-input">
+  <input type="text" value="<%= h(redirect_uri) %>" readonly class="readonly-input">
   <small>Use this URL when registering your client with the FHIR server</small>
 </div>

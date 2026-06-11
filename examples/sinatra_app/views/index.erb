@@ -27,7 +27,7 @@
       </p>
       <p class="form-hint">
         Callback URL to register with your server:<br>
-        <code><%= redirect_uri %></code>
+        <code><%= h(redirect_uri) %></code>
       </p>
       <a href="/servers/new" class="btn btn-secondary">Add Server</a>
     </div>
@@ -50,7 +50,9 @@
             <p class="server-url"><%= h(server.base_url) %></p>
             <p class="server-meta">
               <% server.protocols.each do |protocol| %>
-                <span class="badge badge-protocol"><%= h(FhirServer::PROTOCOL_LABELS.fetch(protocol, protocol)) %></span>
+                <span class="badge badge-protocol badge-protocol-<%= h(protocol) %>">
+                  <%= h(FhirServer::PROTOCOL_LABELS.fetch(protocol, protocol)) %>
+                </span>
               <% end %>
               <% if server.confidential? %>
                 <span class="badge badge-info">Confidential Client</span>

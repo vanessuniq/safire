@@ -1,5 +1,8 @@
-<div class="page-header">
-  <h1><%= h(@server.name) %></h1>
+<div class="page-header server-header">
+  <div>
+    <h1><%= h(@server.name) %></h1>
+  </div>
+
   <div class="page-actions">
     <a href="/servers/<%= @server.id %>/edit" class="btn btn-secondary">Edit</a>
     <form action="/servers/<%= @server.id %>" method="post" class="inline-form"
@@ -10,67 +13,165 @@
   </div>
 </div>
 
-<section class="server-details">
-  <h2>Server Configuration</h2>
-  <dl class="details-list">
-    <dt>Base URL</dt>
-    <dd><code><%= h(@server.base_url) %></code></dd>
-
-    <dt>Client ID</dt>
-    <dd><code><%= h(@server.client_id) %></code></dd>
-
-    <dt>Client Secret</dt>
-    <dd><%= @server.confidential? ? '••••••••••••' : '<em>Not configured (public client)</em>' %></dd>
-
-    <dt>Scopes</dt>
-    <dd><%= @server.scopes.empty? ? '<em>None configured</em>' : h(@server.scopes_display) %></dd>
-
-    <dt>Callback URL</dt>
-    <dd><code><%= redirect_uri %></code></dd>
-  </dl>
-</section>
-
-<section class="demo-actions">
-  <h2>Demo Actions</h2>
-  <p>Select an action to demonstrate Safire's SMART App Launch capabilities:</p>
-
-  <div class="action-cards">
-    <div class="action-card">
-      <h3>SMART Discovery</h3>
-      <p>Fetch the server's SMART configuration from <code>/.well-known/smart-configuration</code></p>
-      <a href="/demo/<%= @server.id %>/discovery" class="btn btn-primary">Run Discovery</a>
+<section class="server-workbench" data-protocol-workbench>
+  <div class="workbench-summary">
+    <div class="summary-main">
+      <span class="eyebrow">Configured Protocols</span>
+      <div class="summary-title-row">
+        <div class="protocol-badges">
+          <% @server.protocols.each do |protocol| %>
+            <span class="protocol-pill protocol-pill-<%= h(protocol) %>">
+              <%= h(FhirServer::PROTOCOL_LABELS.fetch(protocol, protocol)) %>
+            </span>
+          <% end %>
+          <% if @server.supports_smart? %>
+            <span class="client-mode-pill">
+              <%= @server.confidential? ? 'Confidential client' : 'Public client' %>
+            </span>
+          <% end %>
+        </div>
+      </div>
+      <code class="summary-url"><%= h(@server.base_url) %></code>
     </div>
+  </div>
 
-    <div class="action-card">
-      <h3>Authorization Flow</h3>
-      <p>Start a SMART authorization flow to obtain access tokens.</p>
-      <a href="/demo/<%= @server.id %>/authorize" class="btn btn-primary">Start Authorization</a>
-    </div>
-
-    <div class="action-card">
-      <h3>Token Refresh</h3>
-      <p>Test token refresh using a previously obtained refresh token.</p>
-      <% if session[:refresh_token] && session[:token_server_id] == @server.id %>
-        <a href="/demo/<%= @server.id %>/refresh" class="btn btn-primary">Refresh Token</a>
-      <% elsif session[:access_token] && session[:token_server_id] == @server.id && session[:refresh_token].blank?%>
-        <p class="disabled-note"><em>Server did not issue a refresh token during authorization. It may not support refresh tokens.</em></p>
-      <% else %>
-        <p class="disabled-note"><em>Complete authorization flow first to enable token refresh.</em></p>
+  <% if @server.protocols.length > 1 %>
+    <div class="protocol-tabs" role="tablist" aria-label="Protocol filters">
+      <button type="button" class="protocol-tab active" data-protocol-tab="all">All</button>
+      <% if @server.supports_smart? %>
+        <button type="button" class="protocol-tab" data-protocol-tab="smart">SMART</button>
+      <% end %>
+      <% if @server.supports_udap? %>
+        <button type="button" class="protocol-tab" data-protocol-tab="udap">UDAP</button>
       <% end %>
     </div>
+  <% end %>
 
-    <% if @metadata&.supports_backend_services? %>
-      <div class="action-card">
-        <h3>Backend Services</h3>
-        <p>Request an access token via the <code>client_credentials</code> grant — no user interaction or redirect required.</p>
-        <% if asymmetric_credentials_configured? %>
-          <a href="/demo/<%= @server.id %>/backend-token" class="btn btn-primary">Request Backend Token</a>
-        <% else %>
-          <p class="disabled-note"><em>Set <code>ASYMMETRIC_PRIVATE_KEY_PEM</code> and <code>ASYMMETRIC_KID</code> to enable.</em></p>
-        <% end %>
-      </div>
+  <div class="workflow-panels">
+    <% if @server.supports_smart? %>
+      <section class="workflow-section" data-protocol-panel="smart">
+        <div class="workflow-heading">
+          <div>
+            <span class="eyebrow">SMART App Launch</span>
+            <h2>Authorization Workflows</h2>
+          </div>
+          <% if @metadata %>
+            <span class="badge badge-info">Discovery available</span>
+          <% else %>
+            <span class="badge badge-info">Discovery pending</span>
+          <% end %>
+        </div>
+
+        <div class="action-cards workflow-grid">
+          <article class="action-card">
+            <span class="action-kicker">Configuration</span>
+            <h3>Discovery</h3>
+            <p><code>/.well-known/smart-configuration</code></p>
+            <a href="/demo/<%= @server.id %>/discovery" class="btn btn-primary">Open SMART Discovery</a>
+          </article>
+
+          <article class="action-card">
+            <span class="action-kicker">Launch</span>
+            <h3>Authorization</h3>
+            <p>Authorization code flow with the selected client type.</p>
+            <a href="/demo/<%= @server.id %>/authorize" class="btn btn-primary">Start Authorization</a>
+          </article>
+
+          <article class="action-card">
+            <span class="action-kicker">Tokens</span>
+            <h3>Refresh</h3>
+            <% if session[:refresh_token] && session[:token_server_id] == @server.id %>
+              <p>Refresh token available for this server.</p>
+              <a href="/demo/<%= @server.id %>/refresh" class="btn btn-primary">Refresh Token</a>
+            <% elsif session[:access_token] && session[:token_server_id] == @server.id && session[:refresh_token].blank? %>
+              <p class="disabled-note"><em>No refresh token was issued during authorization.</em></p>
+            <% else %>
+              <p class="disabled-note"><em>Complete authorization before refreshing tokens.</em></p>
+            <% end %>
+          </article>
+
+          <% if @metadata&.supports_backend_services? %>
+            <article class="action-card">
+              <span class="action-kicker">System Access</span>
+              <h3>Backend Services</h3>
+              <p><code>client_credentials</code> grant for system-to-system access.</p>
+              <% if asymmetric_credentials_configured? %>
+                <a href="/demo/<%= @server.id %>/backend-token" class="btn btn-primary">Request Backend Token</a>
+              <% else %>
+                <p class="disabled-note"><em>Configure asymmetric credentials to enable backend tokens.</em></p>
+              <% end %>
+            </article>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @server.supports_udap? %>
+      <section class="workflow-section" data-protocol-panel="udap">
+        <div class="workflow-heading">
+          <div>
+            <span class="eyebrow">UDAP Security STU2</span>
+            <h2>Discovery and Trust</h2>
+          </div>
+          <span class="badge badge-info">Signed metadata</span>
+        </div>
+
+        <div class="action-cards workflow-grid">
+          <article class="action-card action-card-wide">
+            <span class="action-kicker">Metadata</span>
+            <h3>UDAP Discovery</h3>
+            <form action="/demo/<%= @server.id %>/udap-discovery" method="get" class="compact-action-form">
+              <label for="community">Community URI</label>
+              <input
+                type="url"
+                id="community"
+                name="community"
+                class="form-input"
+                placeholder="https://community.example.org/udap">
+              <button type="submit" class="btn btn-primary">Run UDAP Discovery</button>
+            </form>
+          </article>
+        </div>
+      </section>
     <% end %>
   </div>
+
+  <details class="connection-details">
+    <summary>Connection details</summary>
+    <dl class="profile-list">
+      <div class="profile-row">
+        <dt>FHIR Base URL</dt>
+        <dd><code><%= h(@server.base_url) %></code></dd>
+      </div>
+
+      <% if @server.supports_smart? %>
+        <div class="profile-row">
+          <dt>Client ID</dt>
+          <dd><code><%= h(@server.client_id) %></code></dd>
+        </div>
+
+        <div class="profile-row">
+          <dt>Callback URL</dt>
+          <dd><code><%= h(redirect_uri) %></code></dd>
+        </div>
+
+        <div class="profile-row">
+          <dt>Scopes</dt>
+          <dd>
+            <% if @server.scopes.empty? %>
+              <em>None configured</em>
+            <% else %>
+              <div class="inline-badges">
+                <% @server.scopes.each do |scope| %>
+                  <span class="badge badge-scope"><%= h(scope) %></span>
+                <% end %>
+              </div>
+            <% end %>
+          </dd>
+        </div>
+      <% end %>
+    </dl>
+  </details>
 </section>
 
 <div class="back-link">

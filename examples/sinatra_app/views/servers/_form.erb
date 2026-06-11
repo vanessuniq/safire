@@ -12,27 +12,52 @@
 </div>
 
 <div class="form-group">
-  <label for="client_id">Client ID *</label>
-  <input type="text" id="client_id" name="client_id" value="<%= h(@server.client_id) %>" required
-         placeholder="Your registered client ID">
+  <label>Protocols *</label>
+  <div class="checkbox-group protocol-selector" data-protocol-selector>
+    <label class="checkbox-option">
+      <input type="checkbox" name="protocols[]" value="smart" <%= 'checked' if @server.supports_smart? %>>
+      <span>
+        <span class="radio-label">SMART App Launch</span>
+        <span class="radio-description">Authorization, token, refresh, DCR, and backend service demos.</span>
+      </span>
+    </label>
+
+    <label class="checkbox-option">
+      <input type="checkbox" name="protocols[]" value="udap" <%= 'checked' if @server.supports_udap? %>>
+      <span>
+        <span class="radio-label">UDAP Security</span>
+        <span class="radio-description">UDAP Security STU2 discovery and signed metadata validation.</span>
+      </span>
+    </label>
+  </div>
 </div>
 
-<div class="form-group">
-  <label for="client_secret">Client Secret</label>
-  <input type="password" id="client_secret" name="client_secret" value="<%= h(@server.client_secret) %>"
-         placeholder="Leave blank for public clients">
-  <small>Required only for confidential symmetric clients</small>
-</div>
+<div class="form-section smart-config-fields" data-smart-fields>
+  <h3>SMART Client Registration</h3>
 
-<div class="form-group">
-  <label for="scopes">Scopes</label>
-  <input type="text" id="scopes" name="scopes" value="<%= h(@server.scopes_display) %>"
-         placeholder="e.g., openid profile launch/patient patient/*.read">
-  <small>Space or comma separated list of OAuth scopes</small>
+  <div class="form-group">
+    <label for="client_id">Client ID</label>
+    <input type="text" id="client_id" name="client_id" value="<%= h(@server.client_id) %>"
+           placeholder="Your registered client ID" data-smart-required>
+  </div>
+
+  <div class="form-group">
+    <label for="client_secret">Client Secret</label>
+    <input type="password" id="client_secret" name="client_secret" value="<%= h(@server.client_secret) %>"
+           placeholder="Leave blank for public clients">
+    <small>Required only for confidential symmetric clients</small>
+  </div>
+
+  <div class="form-group">
+    <label for="scopes">Scopes</label>
+    <input type="text" id="scopes" name="scopes" value="<%= h(@server.scopes_display) %>"
+           placeholder="e.g., openid profile launch/patient patient/*.read">
+    <small>Space or comma separated list of OAuth scopes</small>
+  </div>
 </div>
 
 <div class="form-group">
   <label>Callback URL</label>
-  <input type="text" value="<%= redirect_uri %>" readonly class="readonly-input">
+  <input type="text" value="<%= h(redirect_uri) %>" readonly class="readonly-input">
   <small>Use this URL when registering your client with the FHIR server</small>
 </div>

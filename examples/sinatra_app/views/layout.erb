@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Safire Demo</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=<%= File.mtime(File.join(settings.public_folder, 'css', 'style.css')).to_i %>">
+  <script src="/js/app.js?v=<%= File.mtime(File.join(settings.public_folder, 'js', 'app.js')).to_i %>" defer></script>
 </head>
 <body>
   <header>
@@ -18,8 +19,8 @@
 
   <main>
     <% if @flash[:message] %>
-      <div class="flash flash-<%= @flash[:type] %>">
-        <%= @flash[:message] %>
+      <div class="flash flash-<%= h(@flash[:type]) %>">
+        <%= h(@flash[:message]) %>
       </div>
     <% end %>
 

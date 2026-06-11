@@ -23,12 +23,11 @@
     <div class="action-card">
       <h3>Add Server Manually</h3>
       <p>
-        Already have a <code>client_id</code>? Enter your credentials directly to configure
-        a server entry and start exploring authorization flows.
+        Configure SMART credentials, UDAP discovery, or both for a FHIR server.
       </p>
       <p class="form-hint">
         Callback URL to register with your server:<br>
-        <code><%= redirect_uri %></code>
+        <code><%= h(redirect_uri) %></code>
       </p>
       <a href="/servers/new" class="btn btn-secondary">Add Server</a>
     </div>
@@ -50,6 +49,11 @@
             <h3><a href="/servers/<%= server.id %>"><%= h(server.name) %></a></h3>
             <p class="server-url"><%= h(server.base_url) %></p>
             <p class="server-meta">
+              <% server.protocols.each do |protocol| %>
+                <span class="badge badge-protocol badge-protocol-<%= h(protocol) %>">
+                  <%= h(FhirServer::PROTOCOL_LABELS.fetch(protocol, protocol)) %>
+                </span>
+              <% end %>
               <% if server.confidential? %>
                 <span class="badge badge-info">Confidential Client</span>
               <% end %>

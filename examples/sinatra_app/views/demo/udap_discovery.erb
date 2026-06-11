@@ -1,0 +1,126 @@
+<div class="page-header">
+  <h1>UDAP Discovery</h1>
+</div>
+
+<section class="discovery-results">
+  <h2>Server: <%= h(@server.name) %></h2>
+  <p class="server-url"><code><%= h(@server.base_url) %></code></p>
+
+  <% if @udap_presenter.trust_warning? %>
+    <div class="warning-box">
+      The <code>signed_metadata</code> JWT was validated without X.509 chain and revocation checks
+      <%= h(@udap_presenter.trust_warning_reason) %>.
+    </div>
+  <% end %>
+
+  <div class="metadata-section">
+    <h3>Discovery Request</h3>
+    <form action="/demo/<%= @server.id %>/udap-discovery" method="get" class="demo-form">
+      <div class="form-group">
+        <label for="community">Community URI</label>
+        <input
+          type="url"
+          id="community"
+          name="community"
+          class="form-input"
+          value="<%= h(@community) %>"
+          placeholder="https://community.example.org/udap">
+        <p class="form-hint">Optional UDAP community-scoped discovery parameter.</p>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Refresh UDAP Discovery</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="metadata-section">
+    <h3>Validation Status</h3>
+    <dl class="details-list">
+      <dt>Structural Metadata</dt>
+      <dd>
+        <span class="badge <%= @udap_presenter.badge_class(@udap_metadata_valid) %>">
+          <%= h(@udap_presenter.structural_status) %>
+        </span>
+      </dd>
+
+      <dt>Signed Metadata</dt>
+      <dd>
+        <span class="badge badge-added">
+          <%= h(@udap_presenter.signed_metadata_status) %>
+        </span>
+      </dd>
+
+      <dt>Chain Verification</dt>
+      <dd><%= @udap_trust_policy.verify_chain? ? 'Enabled' : 'Disabled' %></dd>
+
+      <dt>Community</dt>
+      <dd>
+        <% if @community.present? %>
+          <code><%= h(@community) %></code>
+        <% else %>
+          <em>Default discovery</em>
+        <% end %>
+      </dd>
+    </dl>
+  </div>
+
+  <div class="metadata-section">
+    <h3>STU2 Metadata Fields</h3>
+    <dl class="details-list">
+      <% @udap_presenter.metadata_fields.each do |field| %>
+        <dt><%= h(field[:label]) %></dt>
+        <dd>
+          <% value = field[:value] %>
+          <% if value.is_a?(Array) && value.any? %>
+            <% value.each do |item| %>
+              <span class="badge badge-info"><%= h(item) %></span>
+            <% end %>
+          <% elsif value.is_a?(Array) %>
+            <em>Empty array</em>
+          <% elsif value.present? && field[:key] == :signed_metadata %>
+            <div class="token-display">
+              <code class="token-value"><%= h(value) %></code>
+            </div>
+          <% elsif value.present? %>
+            <code><%= h(value) %></code>
+          <% else %>
+            <em>Not provided</em>
+          <% end %>
+        </dd>
+      <% end %>
+    </dl>
+  </div>
+
+  <div class="metadata-section">
+    <h3>Profile Advertisements</h3>
+    <dl class="details-list">
+      <% @udap_presenter.profile_checks.each do |check| %>
+        <dt><%= h(check[:label]) %></dt>
+        <dd>
+          <span class="badge <%= @udap_presenter.badge_class(check[:result]) %>">
+            <%= @udap_presenter.status_text(check[:result]) %>
+          </span>
+        </dd>
+      <% end %>
+    </dl>
+  </div>
+
+  <div class="metadata-section">
+    <h3>Capability Helpers</h3>
+    <dl class="details-list">
+      <% @udap_presenter.capability_checks.each do |check| %>
+        <dt><%= h(check[:label]) %></dt>
+        <dd>
+          <span class="badge <%= @udap_presenter.badge_class(check[:result]) %>">
+            <%= @udap_presenter.status_text(check[:result]) %>
+          </span>
+        </dd>
+      <% end %>
+    </dl>
+  </div>
+</section>
+
+<div class="back-link">
+  <a href="/servers/<%= @server.id %>">&larr; Back to Server</a>
+</div>

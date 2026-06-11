@@ -3,13 +3,13 @@
 require 'pry-byebug' if ENV['RACK_ENV'] == 'development'
 require 'dotenv/load'
 require 'sinatra/base'
-require 'sinatra/reloader'
 require 'securerandom'
 require 'openssl'
 require 'json'
 require 'base64'
 require 'safire'
 require_relative 'models/fhir_server'
+require_relative 'models/udap_discovery_presenter'
 
 # Sinatra demo application for Safire gem
 class SafireDemo < Sinatra::Base
@@ -22,7 +22,10 @@ class SafireDemo < Sinatra::Base
   end
 
   configure :development do
+    require 'sinatra/reloader'
+
     register Sinatra::Reloader
+    also_reload File.join(__dir__, 'models', '*.rb')
   end
 
   configure do
@@ -134,7 +137,7 @@ class SafireDemo < Sinatra::Base
   get '/servers/:id' do
     @server = FhirServer.find(params[:id])
     halt 404, 'Server not found' unless @server
-    @metadata = cached_server_metadata(@server)
+    @metadata = cached_server_metadata(@server) if @server.supports_smart?
     erb :'servers/show'
   end
 
@@ -210,23 +213,52 @@ class SafireDemo < Sinatra::Base
   # Demo Routes
   # ============================================
 
+  SMART_DEMO_FILTER_PATHS = %w[
+    /demo/:server_id/discovery
+    /demo/:server_id/authorize
+    /demo/:server_id/backend-token
+    /demo/:server_id/refresh
+  ].freeze
+
   # Before filter for demo routes that need server and metadata
   before '/demo/:server_id/*' do
     @server = FhirServer.find(params[:server_id])
     halt 404, 'Server not found' unless @server
+  end
 
-    @safire_client = build_safire_client(@server)
-    @metadata = cached_server_metadata(@server, client: @safire_client)
-
-    unless @metadata
-      set_flash(:error, 'Server discovery failed — check the server URL and try again.')
-      redirect "/servers/#{@server.id}"
+  SMART_DEMO_FILTER_PATHS.each do |path|
+    before path do
+      require_smart_protocol!
+      load_smart_demo_context
     end
+  end
+
+  before '/demo/:server_id/udap-discovery' do
+    require_udap_protocol!
   end
 
   # SMART Discovery
   get '/demo/:server_id/discovery' do
     erb :'demo/discovery'
+  end
+
+  # UDAP Discovery
+  get '/demo/:server_id/udap-discovery' do
+    @community = normalize_optional_param(params[:community])
+    @udap_trust_policy = UdapDiscoveryPresenter::TrustPolicy.new
+    @udap_metadata = discover_udap_metadata(@server, community: @community, trust_policy: @udap_trust_policy)
+    @udap_metadata_valid = @udap_metadata.valid?
+    @udap_presenter = UdapDiscoveryPresenter.new(
+      @udap_metadata,
+      metadata_valid: @udap_metadata_valid,
+      trust_policy: @udap_trust_policy,
+      community: @community
+    )
+
+    erb :'demo/udap_discovery'
+  rescue Safire::Errors::Error => e
+    set_flash(:error, flash_error_message('UDAP Discovery failed', e))
+    redirect "/servers/#{@server.id}"
   end
 
   # Authorization flow - configuration form
@@ -328,6 +360,7 @@ class SafireDemo < Sinatra::Base
       redirect '/'
       return
     end
+    require_smart_protocol!
 
     begin
       client = build_safire_client(@server, client_type: client_type)
@@ -452,7 +485,8 @@ class SafireDemo < Sinatra::Base
       base_url: params[:base_url],
       client_id: params[:client_id],
       client_secret: normalize_optional_param(params[:client_secret]),
-      scopes: parse_scopes(params[:scopes])
+      scopes: parse_scopes(params[:scopes]),
+      protocols: Array(params[:protocols])
     }
   end
 
@@ -485,7 +519,8 @@ class SafireDemo < Sinatra::Base
       base_url: params[:base_url].strip,
       scopes: parse_scopes(params[:scope] || ''),
       client_id: registration['client_id'],
-      client_secret: registration['client_secret']
+      client_secret: registration['client_secret'],
+      protocols: ['smart']
     )
   end
 
@@ -547,6 +582,35 @@ class SafireDemo < Sinatra::Base
     metadata
   rescue Safire::Errors::Error
     nil
+  end
+
+  def load_smart_demo_context
+    @safire_client = build_safire_client(@server)
+    @metadata = cached_server_metadata(@server, client: @safire_client)
+    return if @metadata
+
+    set_flash(:error, 'Server discovery failed — check the server URL and try again.')
+    redirect "/servers/#{@server.id}"
+  end
+
+  def require_smart_protocol!
+    require_protocol!(@server.supports_smart?, 'SMART App Launch')
+  end
+
+  def require_udap_protocol!
+    require_protocol!(@server.supports_udap?, 'UDAP Security')
+  end
+
+  def require_protocol!(supported, label)
+    return if supported
+
+    set_flash(:error, "#{@server.name} is not configured for #{label}.")
+    redirect "/servers/#{@server.id}"
+  end
+
+  def discover_udap_metadata(server, community:, trust_policy:)
+    client = Safire::Client.new({ base_url: server.base_url }, protocol: :udap)
+    client.server_metadata(community: community, **trust_policy.server_metadata_kwargs)
   end
 
   def build_safire_client(server, client_type: :public)

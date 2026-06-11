@@ -28,7 +28,8 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 ### UDAP Security (STU2 / v2.0.0)
 
 - **UDAP Discovery** — lazy fetch of `/.well-known/udap`; optional
-  community-scoped discovery; STU2 metadata parsing and structural validation
+  community-scoped discovery; STU2 metadata parsing plus explicit
+  `UdapMetadata#valid?` structural validation
 - **Signed Metadata Validation** — validates `signed_metadata` JWTs using RS256,
   JOSE `x5c`, certificate chain and revocation policy, required claims, and
   signed endpoint claim precedence

@@ -1,8 +1,11 @@
 # Safire Roadmap
 
-## Current Release — v0.3.0
+## Latest Published Release — v0.3.0
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
+
+The `main` branch may include features not yet published to RubyGems; see the
+[Unreleased section of CHANGELOG.md](CHANGELOG.md#unreleased).
 
 Feedback, bug reports, and pull requests are welcome via the [issue tracker](https://github.com/vanessuniq/safire/issues).
 
@@ -22,13 +25,24 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; scope defaults to `system/*.rs` when not configured
 - **Dynamic Client Registration** — runtime client registration per [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591); endpoint discovered from SMART metadata or supplied explicitly; supports initial access token
 
+### UDAP Security (STU2 / v2.0.0)
+
+- **UDAP Discovery** — lazy fetch of `/.well-known/udap`; optional
+  community-scoped discovery; STU2 metadata parsing and structural validation
+- **Signed Metadata Validation** — validates `signed_metadata` JWTs using RS256,
+  JOSE `x5c`, certificate chain and revocation policy, required claims, and
+  signed endpoint claim precedence
+- **Protocol-Aware Client Facade** — `Safire::Client.new(..., protocol: :udap)`
+  exposes UDAP discovery while rejecting SMART-only `client_type:` values
+- **Demo Workflow** — Sinatra demo supports protocol-aware server setup and a
+  UDAP Discovery screen with signed metadata trust status
+
 ---
 
 ## Planned Features
 
 ### UDAP Security
 
-- **UDAP Discovery** — `/.well-known/udap` metadata fetch and validation
 - **UDAP Dynamic Client Registration** — signed software statements and client registration
 - **UDAP JWT Client Auth** — B2B and consumer-facing authorization flows
 - **Tiered OAuth** — identity chaining for multi-system access
@@ -74,5 +88,5 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 | ActiveSupport | ~> 8.0 |
 | Rails (optional) | 7.x, 8.x |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 2.0.0 ( STU2 - planned) |
+| UDAP Security | 2.0.0 (STU2 discovery implemented; DCR/auth flows planned) |
 | FHIR | R4, R4B |

@@ -17,14 +17,23 @@ on:
         required: true
         type: number
 
-permissions:
-  contents: read
-  pull-requests: write
-
 jobs:
+  # The review job's token is read-only, so neither the Claude action's PR
+  # integration nor a prompt-injected agent can post to the PR directly. The
+  # PR-write token exists only in the post job, which never runs Claude and
+  # re-validates the structured output before posting.
   review:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.type != 'Bot'
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      pr_number: ${{ steps.pr_metadata.outputs.pr_number }}
+      base_sha: ${{ steps.pr_metadata.outputs.base_sha }}
+      head_sha: ${{ steps.pr_metadata.outputs.head_sha }}
+      same_repo: ${{ steps.pr_metadata.outputs.same_repo }}
+      review_json: ${{ steps.run_claude.outputs.structured_output }}
     steps:
       - name: Load PR metadata
         id: pr_metadata
@@ -199,14 +208,23 @@ jobs:
           echo "Claude completed without producing a structured review output."
           exit 1
 
+  # Posting runs in a separate job so the PR-write token never reaches the
+  # Claude action or anything it can influence besides the validated JSON.
+  post:
+    runs-on: ubuntu-latest
+    needs: review
+    if: needs.review.outputs.same_repo == 'true' && needs.review.outputs.review_json != ''
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
       - name: Post Claude review
-        if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_claude.outputs.structured_output != ''
         uses: actions/github-script@v9
         env:
-          CLAUDE_FINAL_MESSAGE: ${{ steps.run_claude.outputs.structured_output }}
-          PR_BASE_SHA: ${{ steps.pr_metadata.outputs.base_sha }}
-          PR_NUMBER: ${{ steps.pr_metadata.outputs.pr_number }}
-          PR_HEAD_SHA: ${{ steps.pr_metadata.outputs.head_sha }}
+          CLAUDE_FINAL_MESSAGE: ${{ needs.review.outputs.review_json }}
+          PR_BASE_SHA: ${{ needs.review.outputs.base_sha }}
+          PR_NUMBER: ${{ needs.review.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ needs.review.outputs.head_sha }}
         with:
           github-token: ${{ github.token }}
           script: |

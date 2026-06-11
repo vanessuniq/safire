@@ -210,10 +210,13 @@ jobs:
 
   # Posting runs in a separate job so the PR-write token never reaches the
   # Claude action or anything it can influence besides the validated JSON.
+  # It runs whenever the review job succeeded and fails (rather than silently
+  # skipping) if the review JSON did not survive the cross-job transfer, e.g.
+  # dropped by secret redaction or the job output size limit.
   post:
     runs-on: ubuntu-latest
     needs: review
-    if: needs.review.outputs.same_repo == 'true' && needs.review.outputs.review_json != ''
+    if: needs.review.outputs.same_repo == 'true'
     permissions:
       contents: read
       pull-requests: write
@@ -232,6 +235,8 @@ jobs:
             const prNumber = Number(process.env.PR_NUMBER);
             const prHeadSha = process.env.PR_HEAD_SHA;
             const maxInlineComments = 20;
+            const maxFindingTextLength = 4000;
+            const maxReviewBodyLength = 65000;
             const allowedSeverities = new Set(['must-fix', 'should-fix', 'nit', 'question']);
             const allowedAnchors = new Set(['inline', 'context']);
             const allowedDecisions = new Set(['APPROVE', 'REQUEST_CHANGES']);
@@ -274,6 +279,30 @@ jobs:
               return lines;
             }
 
+            // Untrusted model output is neutralized before posting: zero-width
+            // breaks after `@` prevent mention notifications, and length caps
+            // keep the review within GitHub's body size limits.
+            function neutralizeMentions(text) {
+              return text.replace(/@(?=\w)/g, '@\u200b');
+            }
+
+            function truncateText(text, maxLength) {
+              if (text.length <= maxLength) {
+                return text;
+              }
+
+              return `${text.slice(0, maxLength)}\n\n… (truncated)`;
+            }
+
+            function sanitizeText(text, maxLength) {
+              return truncateText(neutralizeMentions(text), maxLength);
+            }
+
+            if (!process.env.CLAUDE_FINAL_MESSAGE) {
+              core.setFailed('Claude review output did not reach this job; the review job output may have been dropped by secret redaction or the job output size limit.');
+              return;
+            }
+
             let review;
             try {
               review = JSON.parse(process.env.CLAUDE_FINAL_MESSAGE);
@@ -288,7 +317,9 @@ jobs:
             }
 
             const modelDecision = allowedDecisions.has(review.decision) ? review.decision : null;
-            const summary = typeof review.summary === 'string' ? review.summary.trim() : '';
+            const summary = typeof review.summary === 'string'
+              ? sanitizeText(review.summary.trim(), maxReviewBodyLength)
+              : '';
             const findings = Array.isArray(review.findings) ? review.findings : [];
 
             if (!modelDecision) {
@@ -348,8 +379,8 @@ jobs:
                 hasMustFix = true;
               }
               const anchor = allowedAnchors.has(finding.anchor) ? finding.anchor : 'context';
-              const title = typeof finding.title === 'string' ? finding.title.trim() : '';
-              const body = typeof finding.body === 'string' ? finding.body.trim() : '';
+              const title = typeof finding.title === 'string' ? sanitizeText(finding.title.trim(), maxFindingTextLength) : '';
+              const body = typeof finding.body === 'string' ? sanitizeText(finding.body.trim(), maxFindingTextLength) : '';
               const path = typeof finding.path === 'string' && finding.path.trim() ? finding.path.trim() : null;
               const line = Number.isInteger(finding.line) ? finding.line : null;
 
@@ -418,9 +449,11 @@ jobs:
               summarySuffix.push('Additional findings and fallback items:\n');
               summarySuffix.push(summaryFindings.join('\n\n'));
             }
-            summarySuffix.push(`<!-- REVIEW_DECISION: ${decision} -->`);
-
-            const body = [summary, ...summarySuffix].filter(Boolean).join('\n\n');
+            // The decision marker is appended after truncation so it can never
+            // be cut off the end of an oversized review body.
+            const decisionMarker = `<!-- REVIEW_DECISION: ${decision} -->`;
+            const untrustedBody = [summary, ...summarySuffix].filter(Boolean).join('\n\n');
+            const body = `${truncateText(untrustedBody, maxReviewBodyLength)}\n\n${decisionMarker}`;
 
             await github.rest.pulls.createReview({
               owner: context.repo.owner,

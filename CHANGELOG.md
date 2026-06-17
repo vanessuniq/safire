@@ -38,7 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Ruby requirement changed from >= 4.0.2 to >= 4.0.4.
+- Ruby requirement relaxed from `>= 4.0.4` to `>= 3.2` to support Rails 7.1+ apps still
+  running on Ruby 3.x. The minimum is 3.2 because the gem uses anonymous keyword splat
+  forwarding (`**` without a name), which was introduced in Ruby 3.2.
+- ActiveSupport requirement relaxed from `~> 8.0.0` to `>= 7.1, < 9`, resolving the
+  bundler conflict that prevented the gem from being used in Rails 8.1 apps or any app
+  pinning ActiveSupport 8.1.x.
 - `Safire::Client` now raises `ConfigurationError` when `client_type:` is passed explicitly for
   `protocol: :udap`, both at construction and via `client_type=`; previously the value was
   ignored silently.

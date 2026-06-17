@@ -85,9 +85,9 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 | Component | Version |
 |-----------|---------|
-| Ruby | ≥ 4.0.4 |
-| ActiveSupport | ~> 8.0 |
-| Rails (optional) | 7.x, 8.x |
+| Ruby | ≥ 3.2 |
+| ActiveSupport | ≥ 7.1, < 9 |
+| Rails (optional) | 7.1, 7.2, 8.x |
 | SMART App Launch | 2.2.0 (STU2) |
 | UDAP Security | 2.0.0 (STU2 discovery implemented; DCR/auth flows planned) |
 | FHIR | R4, R4B |

@@ -2,6 +2,11 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      ruby-version:
+        description: 'Ruby version to use'
+        type: string
+        default: '4.0.5'
 
 permissions:
   contents: read
@@ -16,7 +21,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.5'
+          ruby-version: ${{ inputs.ruby-version || '4.0.5' }}
           bundler-cache: true
 
       - name: Run tests and collect coverage

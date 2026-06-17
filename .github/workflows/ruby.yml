@@ -13,5 +13,11 @@ permissions:
 
 jobs:
   ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.2', '4.0.5']
     uses: ./.github/workflows/ci.yml
+    with:
+      ruby-version: ${{ matrix.ruby }}
     secrets: inherit

@@ -17,12 +17,13 @@ jobs:
       fail-fast: false
       matrix:
         ruby: ['3.2', '4.0.5']
+        gemfile: ['Gemfile']
         include:
-          # Lowest-supported ActiveSupport: exercises the >= 7.1 gemspec lower bound
-          - ruby: '3.4'
+          # Floor combination: Ruby 3.2 (declared minimum) + AS 7.1 (declared minimum)
+          - ruby: '3.2'
             gemfile: 'gemfiles/activesupport_71.gemfile'
     uses: ./.github/workflows/ci.yml
     with:
       ruby-version: ${{ matrix.ruby }}
-      gemfile: ${{ matrix.gemfile || 'Gemfile' }}
+      gemfile: ${{ matrix.gemfile }}
     secrets: inherit

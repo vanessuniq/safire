@@ -1215,6 +1215,22 @@ RSpec.describe Safire::Protocols::Smart do
       end
     end
 
+    context 'when a 2xx response contains a non-string client_id' do
+      before do
+        stub_request(:post, registration_endpoint).to_return(
+          status: 201,
+          body: { 'client_id' => 123, 'client_name' => 'My App' }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'raises RegistrationError instead of accepting malformed RFC 7591 metadata' do
+        expect do
+          described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
+        end.to raise_error(Safire::Errors::RegistrationError)
+      end
+    end
+
     context 'when the response body is not a JSON object' do
       before do
         stub_request(:post, registration_endpoint).to_return(

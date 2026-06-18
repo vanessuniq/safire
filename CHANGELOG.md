@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- SMART Dynamic Client Registration now requires successful RFC 7591 responses
+  to contain a non-blank string `client_id`. Malformed identifiers that were
+  previously accepted now raise `Safire::Errors::RegistrationError`; valid
+  registration responses are unchanged.
 - Ruby requirement relaxed from `>= 4.0.4` to `>= 3.2` to support Rails 7.1+ apps still
   running on Ruby 3.x. The minimum is 3.2 because the gem uses anonymous keyword splat
   forwarding (`**` without a name), which was introduced in Ruby 3.2.

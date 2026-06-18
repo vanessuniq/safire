@@ -15,6 +15,7 @@ module Safire
     # @api private
     class Smart
       include Behaviours
+      include OAuthResponseHandling
       include URIValidation
 
       ATTRIBUTES = %i[
@@ -239,7 +240,7 @@ module Safire
       # @raise [Safire::Errors::ConfigurationError] if the endpoint (explicit or discovered)
       #   uses HTTP on a non-localhost host
       # @raise [Safire::Errors::RegistrationError] if the server returns an error
-      #   response or a 2xx response missing +client_id+
+      #   response or a 2xx response with a missing, blank, or non-string +client_id+
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
       def register_client(metadata, registration_endpoint: nil, authorization: nil)
         endpoint = registration_endpoint.presence || discovered_registration_endpoint
@@ -486,21 +487,6 @@ module Safire
         oauth_error_from(faraday_error, Errors::RegistrationError)
       end
 
-      def oauth_error_from(faraday_error, error_class)
-        response = faraday_error.response
-        status   = response&.dig(:status)
-        raw_body = response&.dig(:body)
-        body = raw_body.is_a?(Hash) ? raw_body : JSON.parse(raw_body.to_s)
-
-        error_class.new(
-          status:,
-          error_code: body.is_a?(Hash) ? body['error'] : nil,
-          error_description: body.is_a?(Hash) ? body['error_description'] : nil
-        )
-      rescue JSON::ParserError
-        error_class.new(status:)
-      end
-
       def discovered_token_endpoint
         endpoint = server_metadata.token_endpoint
         return endpoint if endpoint.present?
@@ -528,14 +514,6 @@ module Safire
         when :invalid   then raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
         when :non_https then raise Errors::ConfigurationError.new(non_https_uri_attributes: [:registration_endpoint])
         end
-      end
-
-      def parse_registration_response(body)
-        raise Errors::RegistrationError.new(error_description: 'response is not a JSON object') unless body.is_a?(Hash)
-
-        return body if body['client_id'].present?
-
-        raise Errors::RegistrationError.new(received_fields: body.keys)
       end
 
       def well_known_endpoint

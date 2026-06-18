@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     safire (0.3.0)
-      activesupport (~> 8.0.0)
+      activesupport (>= 7.1, < 9)
       addressable (~> 2.8)
       faraday (~> 2.14)
       faraday-follow_redirects (~> 0.4)
@@ -199,9 +199,6 @@ DEPENDENCIES
   timecop (~> 0.9)
   webmock (~> 3.18)
   yard (~> 0.9)
-
-RUBY VERSION
-   ruby 4.0.5p0
 
 BUNDLED WITH
    2.7.1

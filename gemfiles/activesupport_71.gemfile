@@ -1,6 +1,10 @@
+# frozen_string_literal: true
+
 source 'https://rubygems.org'
 
-gemspec
+gem 'activesupport', '~> 7.1.0'
+
+gemspec path: '..'
 
 group :development, :test do
   gem 'bundler-audit', '~> 0.9'

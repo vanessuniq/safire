@@ -13,5 +13,17 @@ permissions:
 
 jobs:
   ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ['3.2', '4.0.5']
+        gemfile: ['Gemfile']
+        include:
+          # Floor combination: Ruby 3.2 (declared minimum) + AS 7.1 (declared minimum)
+          - ruby: '3.2'
+            gemfile: 'gemfiles/activesupport_71.gemfile'
     uses: ./.github/workflows/ci.yml
+    with:
+      ruby-version: ${{ matrix.ruby }}
+      gemfile: ${{ matrix.gemfile }}
     secrets: inherit

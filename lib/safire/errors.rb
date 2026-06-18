@@ -205,7 +205,8 @@ module Safire
     #
     # Two usage paths:
     # - HTTP failure: provide +status+, +error_code+, and/or +error_description+
-    # - Structural failure (missing +client_id+ in a 2xx response): provide +received_fields+
+    # - Structural failure (missing or invalid +client_id+ in a 2xx response):
+    #   provide +received_fields+ or +error_description+
     #
     # @!attribute [r] received_fields
     #   @return [Array<String>, nil] field names present in a response missing +client_id+ (no values logged)

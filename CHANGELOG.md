@@ -9,43 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Safire::Protocols::UdapSignedMetadataValidator` validates the `signed_metadata` JWT per UDAP
-  Security STU2: RS256 algorithm, `x5c` leaf certificate, JWT signature, X.509 chain and
-  revocation validation, and all required claims (`iss`, `sub`, `exp`, `jti`, `token_endpoint`,
-  `registration_endpoint`, conditionally `authorization_endpoint`). Signed endpoint claims are
-  returned for merging over unsigned discovery values.
-
-- `Udap#server_metadata` now validates `signed_metadata` on every fetch and merges the
-  authoritative signed endpoint claims into the returned `UdapMetadata`. Raises
-  `Safire::Errors::DiscoveryError` if validation fails. Accepts `trusted_anchors:` and
-  `crls:` or `revocation_checker:` for production chain and revocation validation, plus
-  `verify_chain:` (`verify_chain: false` for dev/test only). Cached UDAP metadata is
-  revalidated before reuse and refetched if its signed JWT, certificate chain, or revocation
-  policy no longer validates.
-
-- `UdapMetadata#signed_metadata_valid?` for explicit cryptographic re-validation of the
-  `signed_metadata` JWT against a specific set of trust anchors and revocation policy.
-
-- The Sinatra demo now includes a protocol-aware UDAP Discovery workflow with community-scoped
-  discovery, signed metadata validation status, and configurable UDAP trust material.
-
-- `Safire::Client.new(..., protocol: :udap).server_metadata` now works end-to-end:
-  `Protocols::Udap` fetches and parses `/.well-known/udap`, supports the optional `community:` URI
-  parameter, caches results per community, and raises `DiscoveryError` on HTTP errors or a 204 response.
-
-- Added `Safire::Protocols::UdapMetadata` for HL7 UDAP Security STU2 discovery metadata,
-  including structural `valid?` checks and helper methods for advertised UDAP profiles and capabilities.
-
-- `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default: `'SMART configuration'`)
-  and exposes it as a readable attribute; consumers can inspect `error.label` to identify which
-  protocol's discovery failed
+- UDAP Security STU2 discovery is now available with
+  `Safire::Client.new(..., protocol: :udap).server_metadata`. Safire fetches
+  `/.well-known/udap`, supports community-scoped discovery via `community:`, accepts
+  `trusted_anchors:`, `crls:`, `revocation_checker:`, and `verify_chain:` for
+  signed metadata trust validation (`verify_chain: false` is for development/test
+  only), parses metadata into `Safire::Protocols::UdapMetadata`, and raises
+  `DiscoveryError` for HTTP errors, 204 responses, a response body that is not a
+  JSON object, or failed signed metadata validation.
+- `Safire::Protocols::UdapMetadata` provides STU2 structural validation and helper
+  predicates for advertised UDAP profiles and capabilities.
+- `Safire::Protocols::UdapSignedMetadataValidator` validates the `signed_metadata`
+  JWT per UDAP Security STU2, including RS256, `x5c`, JWT signature, certificate
+  chain and revocation checks, issuer/subject/time claims, `jti`, and signed
+  endpoint claims.
+- UDAP signed endpoint claims are merged over unsigned discovery metadata after
+  successful validation. Cached UDAP metadata is revalidated before reuse and
+  refetched if the signed JWT, certificate chain, or revocation policy no longer
+  validates.
+- `UdapMetadata#signed_metadata_valid?` allows explicit cryptographic re-validation
+  against caller-provided trust anchors and revocation material.
+- The Sinatra demo includes a protocol-aware UDAP Discovery workflow with
+  community-scoped discovery, signed metadata validation status, and configurable
+  UDAP trust material.
+- `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default:
+  `'SMART configuration'`) and exposes it as a readable attribute so callers can
+  identify which protocol's discovery failed.
 
 ### Changed
 
-- Ruby requirement changed from >= 4.0.2 to >= 4.0.4.
+- Ruby requirement relaxed from `>= 4.0.4` to `>= 3.2` to support Rails 7.1+ apps still
+  running on Ruby 3.x. The minimum is 3.2 because the gem uses anonymous keyword splat
+  forwarding (`**` without a name), which was introduced in Ruby 3.2.
+- ActiveSupport requirement relaxed from `~> 8.0.0` to `>= 7.1, < 9`, resolving the
+  bundler conflict that prevented the gem from being used in Rails 8.1 apps or any app
+  pinning ActiveSupport 8.1.x.
 - `Safire::Client` now raises `ConfigurationError` when `client_type:` is passed explicitly for
   `protocol: :udap`, both at construction and via `client_type=`; previously the value was
-  ignored silently
+  ignored silently.
 
 ## [0.3.0] - 2026-04-15
 

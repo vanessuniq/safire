@@ -2,6 +2,15 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      ruby-version:
+        description: 'Ruby version to use'
+        type: string
+        default: '4.0.5'
+      gemfile:
+        description: 'Gemfile to use (relative path)'
+        type: string
+        default: 'Gemfile'
 
 permissions:
   contents: read
@@ -16,7 +25,8 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '4.0.5'
+          ruby-version: ${{ inputs.ruby-version }}
+          bundler-gemfile: ${{ inputs.gemfile }}
           bundler-cache: true
 
       - name: Run tests and collect coverage
@@ -25,7 +35,7 @@ jobs:
         run: bundle exec rspec
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: true
 

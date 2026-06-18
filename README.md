@@ -47,7 +47,7 @@ Auth flows (DCR, JWT assertion, Tiered OAuth) are planned. See [ROADMAP.md](http
 
 ## Installation
 
-Requires Ruby ≥ 4.0.4.
+Requires Ruby ≥ 3.2.
 
 ```ruby
 gem 'safire'

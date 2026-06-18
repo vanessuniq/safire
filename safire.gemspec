@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
                                '(client_credentials) grant.'
   spec.homepage              = 'https://github.com/vanessuniq/safire'
   spec.license               = 'Apache-2.0'
-  spec.required_ruby_version = Gem::Requirement.new('>= 4.0.4')
+  spec.required_ruby_version = '>= 3.2'
 
   spec.metadata['source_code_uri']   = spec.homepage
   spec.metadata['changelog_uri']     = "#{spec.homepage}/blob/main/CHANGELOG.md"
@@ -32,7 +32,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
 
   # Runtime deps
-  spec.add_dependency 'activesupport', '~> 8.0.0'
+  spec.add_dependency 'activesupport', '>= 7.1', '< 9'
   spec.add_dependency 'addressable', '~> 2.8'
   spec.add_dependency 'faraday', '~> 2.14'
   spec.add_dependency 'faraday-follow_redirects', '~> 0.4'

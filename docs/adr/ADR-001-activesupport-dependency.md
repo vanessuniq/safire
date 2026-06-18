@@ -31,7 +31,7 @@ Safire is also commonly used alongside Rails applications, where ActiveSupport i
 
 ## Decision
 
-Use `require 'active_support/all'` and treat ActiveSupport as a first-class runtime dependency (`spec.add_dependency 'activesupport', '~> 8.0.0'`).
+Use `require 'active_support/all'` and treat ActiveSupport as a first-class runtime dependency (`spec.add_dependency 'activesupport', '>= 7.1', '< 9'`).
 
 ActiveSupport utilities (`present?`, `blank?`, `fetch`, safe navigation, etc.) may be used freely throughout the codebase without needing to track individual requires.
 
@@ -46,5 +46,5 @@ ActiveSupport utilities (`present?`, `blank?`, `fetch`, safe navigation, etc.) m
 - Minimal overhead in non-Rails applications due to AS autoloading
 
 **Trade-offs:**
-- `activesupport` is pinned to `~> 8.0.0` — non-Rails Ruby applications must accept this dependency; a future major AS version bump requires a Safire dependency update
+- `activesupport` is constrained to `>= 7.1, < 9` — non-Rails Ruby applications must accept this dependency; a future major AS version bump (v9) requires a Safire dependency update
 - Developers unfamiliar with AS may not recognise AS methods as external — mitigated by the fact that AS conventions (`present?`, `blank?`) are widely known in the Ruby ecosystem

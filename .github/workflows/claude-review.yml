@@ -1,11 +1,14 @@
-name: Codex PR Review
+name: Claude PR Review
 
 on:
   # `pull_request_target` keeps the reviewer workflow definition on the trusted
   # base branch, so a PR cannot rewrite the prompt, schema, or posting logic
   # that reviews that same PR.
+  #
+  # Codex reviews PRs when they are opened or reopened; Claude reviews the
+  # follow-up pushes (`synchronize`), so each PR event gets one reviewer.
   pull_request_target:
-    types: [opened, reopened]
+    types: [synchronize]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -14,14 +17,23 @@ on:
         required: true
         type: number
 
-permissions:
-  contents: read
-  pull-requests: write
-
 jobs:
+  # The review job's token is read-only, so neither the Claude action's PR
+  # integration nor a prompt-injected agent can post to the PR directly. The
+  # PR-write token exists only in the post job, which never runs Claude and
+  # re-validates the structured output before posting.
   review:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.type != 'Bot'
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      pr_number: ${{ steps.pr_metadata.outputs.pr_number }}
+      base_sha: ${{ steps.pr_metadata.outputs.base_sha }}
+      head_sha: ${{ steps.pr_metadata.outputs.head_sha }}
+      same_repo: ${{ steps.pr_metadata.outputs.same_repo }}
+      review_json: ${{ steps.run_claude.outputs.structured_output }}
     steps:
       - name: Load PR metadata
         id: pr_metadata
@@ -52,7 +64,7 @@ jobs:
       - name: Skip unsupported fork PRs
         if: steps.pr_metadata.outputs.same_repo != 'true'
         run: |
-          echo "Skipping Codex review for fork-based PRs."
+          echo "Skipping Claude review for fork-based PRs."
           echo "This is intentional: the workflow needs repository secrets and inspects untrusted PR content."
 
       - uses: actions/checkout@v6
@@ -62,68 +74,7 @@ jobs:
           persist-credentials: false
           ref: ${{ steps.pr_metadata.outputs.base_sha }}
 
-      - name: Load trusted Codex review schema
-        if: steps.pr_metadata.outputs.same_repo == 'true'
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const schema = {
-              type: 'object',
-              additionalProperties: false,
-              required: ['decision', 'summary', 'findings'],
-              properties: {
-                decision: {
-                  type: 'string',
-                  enum: ['APPROVE', 'REQUEST_CHANGES'],
-                },
-                summary: {
-                  type: 'string',
-                  minLength: 1,
-                },
-                findings: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    required: ['severity', 'anchor', 'title', 'body', 'path', 'line'],
-                    properties: {
-                      severity: {
-                        type: 'string',
-                        enum: ['must-fix', 'should-fix', 'nit', 'question'],
-                      },
-                      anchor: {
-                        type: 'string',
-                        enum: ['inline', 'context'],
-                      },
-                      title: {
-                        type: 'string',
-                        minLength: 1,
-                      },
-                      body: {
-                        type: 'string',
-                        minLength: 1,
-                      },
-                      path: {
-                        type: ['string', 'null'],
-                      },
-                      line: {
-                        type: ['integer', 'null'],
-                        minimum: 1,
-                      },
-                    },
-                  },
-                },
-              },
-            };
-
-            await fs.promises.mkdir('.github/codex-trusted', { recursive: true });
-            await fs.promises.writeFile(
-              '.github/codex-trusted/pr-review-schema.json',
-              JSON.stringify(schema, null, 2),
-            );
-
-      - name: Prepare Codex review input
+      - name: Prepare Claude review input
         if: steps.pr_metadata.outputs.same_repo == 'true'
         uses: actions/github-script@v9
         env:
@@ -170,24 +121,23 @@ jobs:
               return file.patch ? `${header}\n${file.patch}` : `${header}\n# patch unavailable from GitHub API`;
             }).join('\n\n');
 
-            await fs.promises.mkdir('.github/codex-review-input', { recursive: true });
+            await fs.promises.mkdir('.github/claude-review-input', { recursive: true });
             await fs.promises.writeFile(
-              '.github/codex-review-input/pr-metadata.json',
+              '.github/claude-review-input/pr-metadata.json',
               `${JSON.stringify(metadata, null, 2)}\n`,
             );
             await fs.promises.writeFile(
-              '.github/codex-review-input/pr-diff.patch',
+              '.github/claude-review-input/pr-diff.patch',
               `${diff}\n`,
             );
 
-      - name: Run Codex review
+      - name: Run Claude review
         if: steps.pr_metadata.outputs.same_repo == 'true'
-        id: run_codex
-        uses: openai/codex-action@e0fdf01220eb9a88167c4898839d273e3f2609d1 # v1
+        id: run_claude
+        uses: anthropics/claude-code-action@806af32823ef69c8ef357086c573a902af641307 # v1
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          sandbox: read-only
-          output-schema-file: .github/codex-trusted/pr-review-schema.json
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
           prompt: |
             Please review PR #${{ steps.pr_metadata.outputs.pr_number }} for the Safire Ruby gem — an OAuth 2.0 client
             library implementing SMART App Launch 2.2.0 and UDAP Security for healthcare
@@ -201,8 +151,8 @@ jobs:
             The checked-out repository is the trusted PR base commit, not the PR head.
             Do not execute PR code or scripts. Review ONLY the PR changes represented by these
             generated untrusted input files:
-            - `.github/codex-review-input/pr-metadata.json`
-            - `.github/codex-review-input/pr-diff.patch`
+            - `.github/claude-review-input/pr-metadata.json`
+            - `.github/claude-review-input/pr-diff.patch`
 
             The reviewed base/head SHAs are:
             - base: `${{ steps.pr_metadata.outputs.base_sha }}`
@@ -215,7 +165,7 @@ jobs:
             ${{ toJSON(steps.pr_metadata.outputs.body) }}
 
             Focus on:
-            - Correctness and protocol compliance (OAuth 2.0, SMART App Launch, RFC 7591)
+            - Correctness and protocol compliance (OAuth 2.0, SMART App Launch, RFC 7591, UDAP STU2)
             - Security: credential handling, token exposure, input validation at trust boundaries
             - Ruby quality and elegance — flag anything that could be simpler, cleaner, DRY-er, or more idiomatic
             - Rubocop patterns: guard clause spacing, single quotes, `described_class` in specs,
@@ -229,7 +179,7 @@ jobs:
             - YARD docs & docs pages: accuracy and completeness for any public API changes
             - CHANGELOG: does the PR update `[Unreleased]` for any user-facing change?
 
-            Return ONLY JSON matching the provided schema.
+            Produce the review as structured output matching the enforced JSON schema.
             Set `decision` to:
             - `REQUEST_CHANGES` if there are any must-fix issues
             - `APPROVE` if there are no must-fix issues
@@ -248,21 +198,36 @@ jobs:
             - For `inline` findings, only set `path` and `line` when you are confident the issue maps to a changed line on the RIGHT side of the diff
             - For `context` findings, you may set `path` and `line` to reference unchanged code affected by the PR, or use `null` when the issue is broader
             - Keep each `body` concise, specific, and actionable
+          claude_args: |
+            --allowedTools "Read,Grep,Glob"
+            --json-schema '{"type":"object","additionalProperties":false,"required":["decision","summary","findings"],"properties":{"decision":{"type":"string","enum":["APPROVE","REQUEST_CHANGES"]},"summary":{"type":"string","minLength":1},"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["severity","anchor","title","body","path","line"],"properties":{"severity":{"type":"string","enum":["must-fix","should-fix","nit","question"]},"anchor":{"type":"string","enum":["inline","context"]},"title":{"type":"string","minLength":1},"body":{"type":"string","minLength":1},"path":{"type":["string","null"]},"line":{"type":["integer","null"],"minimum":1}}}}}}'
 
-      - name: Fail if Codex produced no review output
-        if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_codex.outputs.final-message == ''
+      - name: Fail if Claude produced no review output
+        if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_claude.outputs.structured_output == ''
         run: |
-          echo "Codex completed without producing a final review message."
+          echo "Claude completed without producing a structured review output."
           exit 1
 
-      - name: Post Codex review
-        if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_codex.outputs.final-message != ''
+  # Posting runs in a separate job so the PR-write token never reaches the
+  # Claude action or anything it can influence besides the validated JSON.
+  # It runs whenever the review job succeeded and fails (rather than silently
+  # skipping) if the review JSON did not survive the cross-job transfer, e.g.
+  # dropped by secret redaction or the job output size limit.
+  post:
+    runs-on: ubuntu-latest
+    needs: review
+    if: needs.review.outputs.same_repo == 'true'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Post Claude review
         uses: actions/github-script@v9
         env:
-          CODEX_FINAL_MESSAGE: ${{ steps.run_codex.outputs.final-message }}
-          PR_BASE_SHA: ${{ steps.pr_metadata.outputs.base_sha }}
-          PR_NUMBER: ${{ steps.pr_metadata.outputs.pr_number }}
-          PR_HEAD_SHA: ${{ steps.pr_metadata.outputs.head_sha }}
+          CLAUDE_FINAL_MESSAGE: ${{ needs.review.outputs.review_json }}
+          PR_BASE_SHA: ${{ needs.review.outputs.base_sha }}
+          PR_NUMBER: ${{ needs.review.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ needs.review.outputs.head_sha }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -270,6 +235,8 @@ jobs:
             const prNumber = Number(process.env.PR_NUMBER);
             const prHeadSha = process.env.PR_HEAD_SHA;
             const maxInlineComments = 20;
+            const maxFindingTextLength = 4000;
+            const maxReviewBodyLength = 65000;
             const allowedSeverities = new Set(['must-fix', 'should-fix', 'nit', 'question']);
             const allowedAnchors = new Set(['inline', 'context']);
             const allowedDecisions = new Set(['APPROVE', 'REQUEST_CHANGES']);
@@ -312,30 +279,56 @@ jobs:
               return lines;
             }
 
+            // Untrusted model output is neutralized before posting: zero-width
+            // breaks after `@` prevent mention notifications, and length caps
+            // keep the review within GitHub's body size limits.
+            function neutralizeMentions(text) {
+              return text.replace(/@(?=\w)/g, '@\u200b');
+            }
+
+            function truncateText(text, maxLength) {
+              if (text.length <= maxLength) {
+                return text;
+              }
+
+              return `${text.slice(0, maxLength)}\n\n… (truncated)`;
+            }
+
+            function sanitizeText(text, maxLength) {
+              return truncateText(neutralizeMentions(text), maxLength);
+            }
+
+            if (!process.env.CLAUDE_FINAL_MESSAGE) {
+              core.setFailed('Claude review output did not reach this job; the review job output may have been dropped by secret redaction or the job output size limit.');
+              return;
+            }
+
             let review;
             try {
-              review = JSON.parse(process.env.CODEX_FINAL_MESSAGE);
+              review = JSON.parse(process.env.CLAUDE_FINAL_MESSAGE);
             } catch (error) {
-              core.setFailed(`Codex output was not valid JSON: ${error.message}`);
+              core.setFailed(`Claude output was not valid JSON: ${error.message}`);
               return;
             }
 
             if (!review || typeof review !== 'object') {
-              core.setFailed('Codex output was not a JSON object.');
+              core.setFailed('Claude output was not a JSON object.');
               return;
             }
 
             const modelDecision = allowedDecisions.has(review.decision) ? review.decision : null;
-            const summary = typeof review.summary === 'string' ? review.summary.trim() : '';
+            const summary = typeof review.summary === 'string'
+              ? sanitizeText(review.summary.trim(), maxReviewBodyLength)
+              : '';
             const findings = Array.isArray(review.findings) ? review.findings : [];
 
             if (!modelDecision) {
-              core.setFailed('Codex review decision was missing or invalid.');
+              core.setFailed('Claude review decision was missing or invalid.');
               return;
             }
 
             if (!summary) {
-              core.setFailed('Codex review summary was empty.');
+              core.setFailed('Claude review summary was empty.');
               return;
             }
 
@@ -386,8 +379,8 @@ jobs:
                 hasMustFix = true;
               }
               const anchor = allowedAnchors.has(finding.anchor) ? finding.anchor : 'context';
-              const title = typeof finding.title === 'string' ? finding.title.trim() : '';
-              const body = typeof finding.body === 'string' ? finding.body.trim() : '';
+              const title = typeof finding.title === 'string' ? sanitizeText(finding.title.trim(), maxFindingTextLength) : '';
+              const body = typeof finding.body === 'string' ? sanitizeText(finding.body.trim(), maxFindingTextLength) : '';
               const path = typeof finding.path === 'string' && finding.path.trim() ? finding.path.trim() : null;
               const line = Number.isInteger(finding.line) ? finding.line : null;
 
@@ -427,17 +420,17 @@ jobs:
             }
 
             if (invalidFindings) {
-              core.setFailed('Codex produced malformed findings.');
+              core.setFailed('Claude produced malformed findings.');
               return;
             }
 
             if (modelDecision === 'APPROVE' && hasMustFix) {
-              core.setFailed('Codex approved the PR despite must-fix findings.');
+              core.setFailed('Claude approved the PR despite must-fix findings.');
               return;
             }
 
             if (modelDecision === 'REQUEST_CHANGES' && !hasMustFix) {
-              core.setFailed('Codex requested changes without valid must-fix findings.');
+              core.setFailed('Claude requested changes without valid must-fix findings.');
               return;
             }
 
@@ -456,9 +449,11 @@ jobs:
               summarySuffix.push('Additional findings and fallback items:\n');
               summarySuffix.push(summaryFindings.join('\n\n'));
             }
-            summarySuffix.push(`<!-- REVIEW_DECISION: ${decision} -->`);
-
-            const body = [summary, ...summarySuffix].filter(Boolean).join('\n\n');
+            // The decision marker is appended after truncation so it can never
+            // be cut off the end of an oversized review body.
+            const decisionMarker = `<!-- REVIEW_DECISION: ${decision} -->`;
+            const untrustedBody = [summary, ...summarySuffix].filter(Boolean).join('\n\n');
+            const body = `${truncateText(untrustedBody, maxReviewBodyLength)}\n\n${decisionMarker}`;
 
             await github.rest.pulls.createReview({
               owner: context.repo.owner,

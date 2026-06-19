@@ -49,13 +49,36 @@ rescue Safire::Errors::RegistrationError => e
   puts e.error_description # "Redirect URI must use HTTPS"
 ```
 
-### `RegistrationError`: 2xx response missing `client_id`
+### `RegistrationError`: 2xx response has a missing or invalid `client_id`
 
 ```
 Safire::Errors::RegistrationError: Registration response missing client_id; received fields: error, error_description
 ```
 
-The server returned a successful HTTP status but did not include `client_id`. This typically means the server returned an error body with a 2xx status code, which is a server-side bug. Check `e.received_fields` to see what was returned.
+The server returned a successful HTTP status without a valid `client_id`. A
+successful registration response must contain a non-blank string `client_id`.
+
+If the response omitted the key, check `e.received_fields` to see what the
+server returned:
+
+```ruby
+rescue Safire::Errors::RegistrationError => e
+  puts e.received_fields # ["error", "error_description"]
+end
+```
+
+If the key was present but its value was `nil`, blank, or not a string,
+`e.error_description` reports the validation failure and `e.received_fields`
+is `nil`:
+
+```ruby
+rescue Safire::Errors::RegistrationError => e
+  puts e.error_description # "response client_id must be a non-blank string"
+end
+```
+
+Either response is a server-side protocol error and should not be treated as a
+successful registration.
 
 ---
 

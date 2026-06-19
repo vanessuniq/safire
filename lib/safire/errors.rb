@@ -205,10 +205,12 @@ module Safire
     #
     # Two usage paths:
     # - HTTP failure: provide +status+, +error_code+, and/or +error_description+
-    # - Structural failure (missing +client_id+ in a 2xx response): provide +received_fields+
+    # - Structural failure (missing or invalid +client_id+ in a 2xx response):
+    #   provide +received_fields+ or +error_description+
     #
     # @!attribute [r] received_fields
-    #   @return [Array<String>, nil] field names present in a response missing +client_id+ (no values logged)
+    #   @return [Array<String>, nil] field names from a response whose +client_id+ key is absent
+    #     (no values logged); +nil+ when +client_id+ is present but invalid or the server returns an HTTP error
     class RegistrationError < OAuthError
       include ReceivesFields
 

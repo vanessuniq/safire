@@ -78,3 +78,54 @@ Each subclass defines only `operation_label` and, when needed, overrides `build_
 **Trade-offs:**
 - The `operation_label` template method raises `NotImplementedError` at runtime if a subclass forgets to define it; a compile-time check is not possible in Ruby
 - `ReceivesFields` modifies the constructor via `super(**)` forwarding, which requires care when the inheritance chain has multiple `initialize` overrides
+
+---
+
+## Amendment: Shared protocol response handling
+
+UDAP Dynamic Client Registration uses the same RFC 7591 success and OAuth-style
+error response shapes as SMART registration. Keeping response translation as
+private methods on `Protocols::Smart` would either couple UDAP to SMART or
+duplicate parsing at the protocol trust boundary.
+
+`Protocols::OAuthResponseHandling` now owns two private transformations shared
+by protocol implementations:
+
+- converting a Faraday error response into a typed `OAuthError` subclass
+- validating and normalizing an RFC 7591 registration success response
+
+The module accepts already-received response bodies. It does not send HTTP
+requests, select endpoints, log response values, or apply protocol-specific
+policy.
+
+Registration success responses are normalized to string-keyed hashes and must
+contain a non-blank string `client_id`, as required by RFC 7591. Missing
+`client_id` responses continue to report only the received field names. A
+present but blank or non-string `client_id` raises `RegistrationError` with a
+structural error description. This intentionally hardens SMART registration:
+valid RFC 7591 responses are unchanged, while malformed identifiers that were
+previously accepted through `present?` now fail closed.
+
+Malformed or non-object OAuth error bodies produce an error containing the HTTP
+status only. Parsed JSON objects preserve their protocol error codes, including
+UDAP-specific values such as `invalid_software_statement`.
+
+### Amendment consequences
+
+**Benefits:**
+
+- SMART and UDAP share one auditable response boundary without sharing request
+  construction or endpoint policy
+- response key normalization makes direct and middleware-parsed hashes behave
+  consistently
+- malformed successful registrations fail before an invalid identifier reaches
+  application state
+
+**Trade-offs:**
+
+- the private module contains generic OAuth error translation and
+  registration-specific success validation; splitting two small transformations
+  into separate objects would add indirection without creating an independent
+  responsibility
+- SMART servers returning a non-string `client_id` are now rejected even if an
+  earlier Safire version accepted the malformed value

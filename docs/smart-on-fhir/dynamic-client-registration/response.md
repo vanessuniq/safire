@@ -107,7 +107,8 @@ rescue Safire::Errors::DiscoveryError => e
 
 ### `Safire::Errors::RegistrationError`
 
-Raised when the server returns an HTTP error response (4xx or 5xx), or when a 2xx response does not include `client_id`.
+Raised when the server returns an HTTP error response (4xx or 5xx), or when a
+2xx response does not contain a non-blank string `client_id`.
 
 ```ruby
 rescue Safire::Errors::RegistrationError => e
@@ -116,10 +117,18 @@ rescue Safire::Errors::RegistrationError => e
   puts e.error_code        # "invalid_redirect_uri"
   puts e.error_description # "Redirect URI must use HTTPS"
 
-  # Structural failure path — 2xx response missing client_id
+  # Structural failure path — client_id key is missing
   puts e.received_fields   # ["error", "error_description"]
   puts e.message           # "Registration response missing client_id; received fields: ..."
+
+  # Structural failure path — client_id is nil, blank, or not a string
+  puts e.error_description # "response client_id must be a non-blank string"
 ```
+
+For a missing `client_id` key, `received_fields` contains the field names from
+the response. When the key is present but its value is invalid,
+`error_description` describes the validation failure and `received_fields` is
+`nil`.
 
 To rescue any OAuth protocol error in one clause, use `Safire::Errors::OAuthError`, the shared base class for `RegistrationError`, `TokenError`, and `AuthError`.
 

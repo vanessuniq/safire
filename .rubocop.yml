@@ -55,6 +55,12 @@ RSpec/MultipleMemoizedHelpers:
 RSpec/NestedGroups:
   Enabled: false
 
+RSpec/SpecFilePathFormat:
+  CustomTransform:
+    OAuthResponseHandling: oauth_response_handling
+    RuboCop: rubocop
+    RSpec: rspec
+
 # Integration tests describe workflows, not classes
 RSpec/DescribeClass:
   Exclude:

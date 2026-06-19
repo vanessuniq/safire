@@ -209,7 +209,8 @@ module Safire
     #   provide +received_fields+ or +error_description+
     #
     # @!attribute [r] received_fields
-    #   @return [Array<String>, nil] field names present in a response missing +client_id+ (no values logged)
+    #   @return [Array<String>, nil] field names from a response whose +client_id+ key is absent
+    #     (no values logged); +nil+ when +client_id+ is present but invalid or the server returns an HTTP error
     class RegistrationError < OAuthError
       include ReceivesFields
 

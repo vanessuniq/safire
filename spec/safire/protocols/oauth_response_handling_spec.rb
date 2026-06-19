@@ -24,6 +24,15 @@ RSpec.describe Safire::Protocols::OAuthResponseHandling do
       expect(handler.parse_registration(body)).to eq(body)
     end
 
+    it 'parses a valid JSON-string registration response' do
+      body = '{"client_id":"client-123","client_name":"Example App"}'
+
+      expect(handler.parse_registration(body)).to eq(
+        'client_id' => 'client-123',
+        'client_name' => 'Example App'
+      )
+    end
+
     it 'normalizes symbol keys to strings' do
       body = {
         client_id: 'client-123',

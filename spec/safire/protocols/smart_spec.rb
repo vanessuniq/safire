@@ -1227,7 +1227,10 @@ RSpec.describe Safire::Protocols::Smart do
       it 'raises RegistrationError instead of accepting malformed RFC 7591 metadata' do
         expect do
           described_class.new(no_client_id_config).register_client(client_metadata, registration_endpoint:)
-        end.to raise_error(Safire::Errors::RegistrationError)
+        end.to raise_error(
+          Safire::Errors::RegistrationError,
+          /client_id must be a non-blank string/
+        )
       end
     end
 

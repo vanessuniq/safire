@@ -67,7 +67,7 @@ jobs:
           echo "Skipping Claude review for fork-based PRs."
           echo "This is intentional: the workflow needs repository secrets and inspects untrusted PR content."
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: steps.pr_metadata.outputs.same_repo == 'true'
         with:
           fetch-depth: 0

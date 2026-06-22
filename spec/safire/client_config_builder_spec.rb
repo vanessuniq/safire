@@ -5,8 +5,7 @@ RSpec.describe Safire::ClientConfigBuilder do
 
   let(:certificate_chain) do
     [
-      "-----BEGIN CERTIFICATE-----\nleaf-certificate\n-----END CERTIFICATE-----\n",
-      OpenSSL::X509::Certificate.new
+      "-----BEGIN CERTIFICATE-----\nleaf-certificate\n-----END CERTIFICATE-----\n"
     ]
   end
 

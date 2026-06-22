@@ -30,7 +30,8 @@ module Safire
   # @!attribute [r] certificate_chain
   #   @return [Array<String, OpenSSL::X509::Certificate>, nil] leaf-first X.509 certificate chain
   #     for planned UDAP software-statement signing. Entries may be PEM strings or certificate objects.
-  #     Parsing and identity validation occur when the software statement is built.
+  #     Certificate objects are stored as DER snapshots and returned as fresh copies. Parsing PEM
+  #     strings and identity validation occur when the software statement is built.
   # @!attribute [r] kid
   #   @return [String, nil] the key ID matching the public key registered with the authorization server.
   #     Required for confidential asymmetric authentication.
@@ -71,12 +72,21 @@ module Safire
       private_key certificate_chain kid jwt_algorithm jwks_uri
     ].freeze
 
-    attr_reader(*ATTRIBUTES)
+    CertificateSnapshot = Data.define(:der)
+    private_constant :CertificateSnapshot
+
+    attr_reader(*(ATTRIBUTES - [:certificate_chain]))
+
+    def certificate_chain
+      return if @certificate_chain.nil?
+
+      @certificate_chain.map { |entry| materialize_certificate_entry(entry) }.freeze
+    end
 
     def initialize(config)
       super(config, ATTRIBUTES)
 
-      @certificate_chain = normalize_certificate_chain(certificate_chain)
+      @certificate_chain = normalize_certificate_chain(@certificate_chain)
       @issuer ||= base_url
       validate!
     end
@@ -96,7 +106,7 @@ module Safire
     # @api private
     def inspect
       attrs = ATTRIBUTES.map do |attr|
-        value = send(attr)
+        value = instance_variable_get(:"@#{attr}")
         next if value.nil?
 
         masked = SENSITIVE_ATTRIBUTES.include?(attr) ? '[FILTERED]' : value.inspect
@@ -118,25 +128,38 @@ module Safire
       return if chain.nil?
 
       validate_certificate_chain_type!(chain)
-      chain.map { |certificate| certificate.is_a?(String) ? certificate.dup.freeze : certificate }.freeze
+      chain.map { |entry| snapshot_certificate_entry(entry) }.freeze
     end
 
     def validate_certificate_chain_type!(chain)
-      unless chain.is_a?(Array)
-        raise Errors::ConfigurationError.new(
-          invalid_attribute: :certificate_chain,
-          invalid_value: chain.class,
-          valid_values: [Array]
-        )
-      end
+      raise_invalid_certificate_chain!(chain.class, [Array]) unless chain.is_a?(Array)
+      raise_invalid_certificate_chain!(chain.class, ['non-empty Array']) if chain.empty?
 
       invalid_entry = chain.find { |entry| CERTIFICATE_CHAIN_ENTRY_TYPES.none? { |type| entry.is_a?(type) } }
       return unless invalid_entry
 
+      raise_invalid_certificate_chain!(invalid_entry.class, CERTIFICATE_CHAIN_ENTRY_TYPES)
+    end
+
+    def snapshot_certificate_entry(entry)
+      return entry.dup.freeze if entry.is_a?(String)
+
+      CertificateSnapshot.new(der: entry.to_der.dup.freeze)
+    rescue OpenSSL::X509::CertificateError
+      raise_invalid_certificate_chain!(entry.class, ['serializable OpenSSL::X509::Certificate'])
+    end
+
+    def materialize_certificate_entry(entry)
+      return entry unless entry.is_a?(CertificateSnapshot)
+
+      OpenSSL::X509::Certificate.new(entry.der)
+    end
+
+    def raise_invalid_certificate_chain!(invalid_value, valid_values)
       raise Errors::ConfigurationError.new(
         invalid_attribute: :certificate_chain,
-        invalid_value: invalid_entry.class,
-        valid_values: CERTIFICATE_CHAIN_ENTRY_TYPES
+        invalid_value:,
+        valid_values:
       )
     end
 

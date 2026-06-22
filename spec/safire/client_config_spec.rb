@@ -1,7 +1,19 @@
 require 'spec_helper'
 
 RSpec.describe Safire::ClientConfig do
-  let(:certificate) { OpenSSL::X509::Certificate.new }
+  let(:certificate) do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = OpenSSL::X509::Certificate.new
+    cert.version = 2
+    cert.serial = 1
+    cert.subject = OpenSSL::X509::Name.parse('/CN=client.example.com')
+    cert.issuer = cert.subject
+    cert.public_key = key.public_key
+    cert.not_before = Time.now
+    cert.not_after = Time.now + 3600
+    cert.sign(key, OpenSSL::Digest.new('SHA256'))
+    cert
+  end
   let(:certificate_pem) do
     <<~PEM
       -----BEGIN CERTIFICATE-----
@@ -175,10 +187,15 @@ RSpec.describe Safire::ClientConfig do
       expect(described_class.new(valid_attrs).certificate_chain).to be_nil
     end
 
-    it 'accepts PEM strings and OpenSSL certificates without parsing them' do
+    it 'accepts PEM strings and OpenSSL certificates while preserving order' do
       config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem, certificate]))
 
       expect(config.certificate_chain).to eq([certificate_pem, certificate])
+    end
+
+    it 'rejects an empty certificate_chain' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [])) }
+        .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain.*non-empty Array/)
     end
 
     it 'rejects a non-array certificate_chain without exposing its value' do
@@ -197,6 +214,13 @@ RSpec.describe Safire::ClientConfig do
         }
     end
 
+    it 'rejects certificate objects that cannot be snapshotted' do
+      incomplete_certificate = OpenSSL::X509::Certificate.new
+
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [incomplete_certificate])) }
+        .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain.*serializable/)
+    end
+
     it 'defensively copies and freezes the chain and PEM strings' do
       source_pem = certificate_pem.dup
       source_chain = [source_pem]
@@ -208,6 +232,25 @@ RSpec.describe Safire::ClientConfig do
       expect(config.certificate_chain).to eq([certificate_pem])
       expect(config.certificate_chain).to be_frozen
       expect(config.certificate_chain.first).to be_frozen
+    end
+
+    it 'snapshots certificate objects independently of the caller-owned instance' do
+      original_der = certificate.to_der
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate]))
+
+      certificate.serial = 99
+
+      expect(config.certificate_chain.first.to_der).to eq(original_der)
+    end
+
+    it 'returns fresh certificate objects so accessor mutations do not alter the stored chain' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate]))
+      returned_certificate = config.certificate_chain.first
+
+      returned_certificate.serial = 99
+
+      expect(config.certificate_chain.first.serial.to_i).to eq(1)
+      expect(config.certificate_chain.first).not_to equal(returned_certificate)
     end
 
     it 'does not expose a certificate_chain writer' do

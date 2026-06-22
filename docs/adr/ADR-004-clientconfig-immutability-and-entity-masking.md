@@ -53,10 +53,14 @@ end
 
 Although X.509 certificates contain public material, `certificate_chain` is
 masked because it can be large and identifies the client's operational signing
-identity. The configured chain collection is defensively copied and frozen,
-and PEM strings are copied and frozen. Certificate parsing, private-key
-matching, validity checks, and URI SAN checks remain the responsibility of the
-UDAP software-statement builder. The leaf-first ordering follows the
+identity. The configured chain collection is defensively copied and frozen.
+PEM strings are copied and frozen; certificate objects are stored as immutable
+DER snapshots and materialized as fresh `OpenSSL::X509::Certificate` instances
+whenever the public accessor is called. Mutating either the caller-owned
+certificate or an accessor result therefore cannot alter the configured
+identity. Certificate parsing from PEM, private-key matching, validity checks,
+and URI SAN checks remain the responsibility of the UDAP software-statement
+builder. The leaf-first ordering follows the
 [UDAP Security STU2 JWT header requirements](https://hl7.org/fhir/us/udap-security/STU2/general.html#jwt-headers).
 
 ---

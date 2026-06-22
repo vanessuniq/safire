@@ -125,9 +125,11 @@ client = Safire::Client.new(config, protocol: :udap)
 `OpenSSL::X509::Certificate` instances. The leaf certificate must be first, as
 required by the
 [UDAP Security STU2 JWT header profile](https://hl7.org/fhir/us/udap-security/STU2/general.html#jwt-headers).
-`ClientConfig` validates the collection shape, copies and freezes the chain,
-and defers certificate parsing, private-key matching, validity checks, and URI
-SAN checks until a software statement is built.
+`ClientConfig` requires a non-empty collection, copies and freezes PEM strings,
+and snapshots certificate objects as DER. Accessing the chain returns fresh
+certificate objects, so subsequent caller mutations cannot alter the configured
+identity. Safire defers PEM parsing, private-key matching, validity checks, and
+URI SAN checks until a software statement is built.
 
 Configured credentials are intended to serve as defaults, with per-call
 overrides for applications that select signing identities dynamically. The

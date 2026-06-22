@@ -1,6 +1,14 @@
 require 'spec_helper'
 
 RSpec.describe Safire::ClientConfig do
+  let(:certificate) { OpenSSL::X509::Certificate.new }
+  let(:certificate_pem) do
+    <<~PEM
+      -----BEGIN CERTIFICATE-----
+      certificate-data
+      -----END CERTIFICATE-----
+    PEM
+  end
   let(:valid_attrs) do
     {
       base_url: 'https://fhir.example.com',
@@ -160,6 +168,53 @@ RSpec.describe Safire::ClientConfig do
     end
   end
 
+  # ---------- Certificate chain configuration ----------
+
+  describe 'certificate chain configuration' do
+    it 'defaults certificate_chain to nil' do
+      expect(described_class.new(valid_attrs).certificate_chain).to be_nil
+    end
+
+    it 'accepts PEM strings and OpenSSL certificates without parsing them' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem, certificate]))
+
+      expect(config.certificate_chain).to eq([certificate_pem, certificate])
+    end
+
+    it 'rejects a non-array certificate_chain without exposing its value' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: certificate_pem)) }
+        .to raise_error(Safire::Errors::ConfigurationError) { |error|
+          expect(error.message).to include('certificate_chain', 'Array')
+          expect(error.message).not_to include('certificate-data')
+        }
+    end
+
+    it 'rejects unsupported certificate entry types without exposing their values' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [Object.new])) }
+        .to raise_error(Safire::Errors::ConfigurationError) { |error|
+          expect(error.message).to include('certificate_chain', 'String', 'OpenSSL::X509::Certificate')
+          expect(error.message).not_to match(/#<Object/)
+        }
+    end
+
+    it 'defensively copies and freezes the chain and PEM strings' do
+      source_pem = certificate_pem.dup
+      source_chain = [source_pem]
+      config = described_class.new(valid_attrs.merge(certificate_chain: source_chain))
+
+      source_pem << 'mutated'
+      source_chain << certificate
+
+      expect(config.certificate_chain).to eq([certificate_pem])
+      expect(config.certificate_chain).to be_frozen
+      expect(config.certificate_chain.first).to be_frozen
+    end
+
+    it 'does not expose a certificate_chain writer' do
+      expect(described_class.new(valid_attrs)).not_to respond_to(:certificate_chain=)
+    end
+  end
+
   # ---------- to_hash ----------
 
   describe '#to_hash' do
@@ -179,6 +234,11 @@ RSpec.describe Safire::ClientConfig do
     it 'masks private_key with [FILTERED]' do
       config = described_class.new(valid_attrs.merge(private_key: 'pem_key_data'))
       expect(config.to_hash[:private_key]).to eq('[FILTERED]')
+    end
+
+    it 'masks certificate_chain with [FILTERED]' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem]))
+      expect(config.to_hash[:certificate_chain]).to eq('[FILTERED]')
     end
 
     it 'leaves nil client_secret as nil' do
@@ -215,6 +275,16 @@ RSpec.describe Safire::ClientConfig do
       expect(config.inspect).to include('[FILTERED]')
     end
 
+    it 'does not expose certificate_chain in output' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem]))
+      expect(config.inspect).not_to include('certificate-data')
+    end
+
+    it 'shows [FILTERED] in place of certificate_chain' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem]))
+      expect(config.inspect).to include('certificate_chain: [FILTERED]')
+    end
+
     it 'includes non-sensitive attributes in output' do
       config = described_class.new(valid_attrs)
       expect(config.inspect).to include('base_url')
@@ -225,6 +295,7 @@ RSpec.describe Safire::ClientConfig do
       config = described_class.new(valid_attrs)
       expect(config.inspect).not_to include('client_secret')
       expect(config.inspect).not_to include('private_key')
+      expect(config.inspect).not_to include('certificate_chain')
     end
   end
 end

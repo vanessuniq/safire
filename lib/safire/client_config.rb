@@ -1,7 +1,6 @@
 module Safire
-  # Client configuration entity providing necessary attributes to perform different
-  # auth flows such as SMART public, confidential symmetric, confidential asymmetric
-  # clients, and backend services.
+  # Client configuration entity providing attributes for SMART authorization flows,
+  # backend services, UDAP discovery, and UDAP client signing credentials.
   # The ClientConfig instance is passed to Safire::Client upon initialization.
   #
   # @!attribute [r] base_url
@@ -27,13 +26,20 @@ module Safire
   #   =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   # @!attribute [r] private_key
   #   @return [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil] the private key for signing
-  #     JWT assertions in confidential asymmetric auth. Can be an OpenSSL key object or PEM string.
+  #     SMART JWT assertions or planned UDAP software statements. Can be an OpenSSL key object or PEM string.
+  # @!attribute [r] certificate_chain
+  #   @return [Array<String, OpenSSL::X509::Certificate>, nil] leaf-first X.509 certificate chain
+  #     for planned UDAP software-statement signing. Entries may be PEM strings or certificate objects.
+  #     Certificate objects are stored as DER snapshots and returned as fresh copies. Parsing PEM
+  #     strings and identity validation occur when the software statement is built.
   # @!attribute [r] kid
   #   @return [String, nil] the key ID matching the public key registered with the authorization server.
   #     Required for confidential asymmetric authentication.
   # @!attribute [r] jwt_algorithm
-  #   @return [String, nil] the JWT signing algorithm (RS384 or ES384).
-  #     Optional, auto-detected from key type if not provided.
+  #   @return [String, nil] the JWT signing algorithm. SMART supports RS384 or ES384;
+  #     planned UDAP registration supports RS256, RS384, ES256, or ES384 subject to key
+  #     compatibility and server discovery. Optional; selected from the key and protocol
+  #     requirements when omitted.
   # @!attribute [r] jwks_uri
   #   @return [String, nil] URL to the client's JWKS containing the public key.
   #     Optional, included as jku header in JWT assertions when provided.
@@ -63,14 +69,24 @@ module Safire
     ATTRIBUTES = %i[
       base_url issuer client_id client_secret redirect_uri
       scopes authorization_endpoint token_endpoint
-      private_key kid jwt_algorithm jwks_uri
+      private_key certificate_chain kid jwt_algorithm jwks_uri
     ].freeze
 
-    attr_reader(*ATTRIBUTES)
+    CertificateSnapshot = Data.define(:der)
+    private_constant :CertificateSnapshot
+
+    attr_reader(*(ATTRIBUTES - [:certificate_chain]))
+
+    def certificate_chain
+      return if @certificate_chain.nil?
+
+      @certificate_chain.map { |entry| materialize_certificate_entry(entry) }.freeze
+    end
 
     def initialize(config)
       super(config, ATTRIBUTES)
 
+      @certificate_chain = normalize_certificate_chain(@certificate_chain)
       @issuer ||= base_url
       validate!
     end
@@ -81,15 +97,17 @@ module Safire
       end
     end
 
-    SENSITIVE_ATTRIBUTES = %i[client_secret private_key].freeze
+    CERTIFICATE_CHAIN_ENTRY_TYPES = [String, OpenSSL::X509::Certificate].freeze
+    SENSITIVE_ATTRIBUTES = %i[client_secret private_key certificate_chain].freeze
     URI_ATTRS = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint jwks_uri].freeze
     OPTIONAL_URI_ATTRS = %i[redirect_uri authorization_endpoint token_endpoint jwks_uri].freeze
-    private_constant :SENSITIVE_ATTRIBUTES, :URI_ATTRS, :OPTIONAL_URI_ATTRS
+    private_constant :CERTIFICATE_CHAIN_ENTRY_TYPES, :SENSITIVE_ATTRIBUTES, :URI_ATTRS, :OPTIONAL_URI_ATTRS
 
     # @api private
     def inspect
       attrs = ATTRIBUTES.map do |attr|
-        value = send(attr)
+        # Read stored values directly so masked compound types are not materialized before being discarded.
+        value = instance_variable_get(:"@#{attr}")
         next if value.nil?
 
         masked = SENSITIVE_ATTRIBUTES.include?(attr) ? '[FILTERED]' : value.inspect
@@ -106,6 +124,46 @@ module Safire
     end
 
     private
+
+    def normalize_certificate_chain(chain)
+      return if chain.nil?
+
+      validate_certificate_chain_type!(chain)
+      chain.map { |entry| snapshot_certificate_entry(entry) }.freeze
+    end
+
+    def validate_certificate_chain_type!(chain)
+      raise_invalid_certificate_chain!(chain.class, [Array]) unless chain.is_a?(Array)
+      raise_invalid_certificate_chain!(chain.class, ['non-empty Array']) if chain.empty?
+
+      chain.each do |entry|
+        next if CERTIFICATE_CHAIN_ENTRY_TYPES.any? { |type| entry.is_a?(type) }
+
+        raise_invalid_certificate_chain!(entry.class, CERTIFICATE_CHAIN_ENTRY_TYPES)
+      end
+    end
+
+    def snapshot_certificate_entry(entry)
+      return entry.dup.freeze if entry.is_a?(String)
+
+      CertificateSnapshot.new(der: entry.to_der.freeze)
+    rescue OpenSSL::X509::CertificateError
+      raise_invalid_certificate_chain!(entry.class, ['serializable OpenSSL::X509::Certificate'])
+    end
+
+    def materialize_certificate_entry(entry)
+      return entry unless entry.is_a?(CertificateSnapshot)
+
+      OpenSSL::X509::Certificate.new(entry.der)
+    end
+
+    def raise_invalid_certificate_chain!(invalid_value, valid_values)
+      raise Errors::ConfigurationError.new(
+        invalid_attribute: :certificate_chain,
+        invalid_value:,
+        valid_values:
+      )
+    end
 
     # Validates all URI attributes for structure and HTTPS requirement.
     #

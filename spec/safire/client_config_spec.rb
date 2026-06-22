@@ -1,6 +1,26 @@
 require 'spec_helper'
 
 RSpec.describe Safire::ClientConfig do
+  let(:certificate) do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = OpenSSL::X509::Certificate.new
+    cert.version = 2
+    cert.serial = 1
+    cert.subject = OpenSSL::X509::Name.parse('/CN=client.example.com')
+    cert.issuer = cert.subject
+    cert.public_key = key.public_key
+    cert.not_before = Time.now
+    cert.not_after = Time.now + 3600
+    cert.sign(key, OpenSSL::Digest.new('SHA256'))
+    cert
+  end
+  let(:certificate_pem) do
+    <<~PEM
+      -----BEGIN CERTIFICATE-----
+      certificate-data
+      -----END CERTIFICATE-----
+    PEM
+  end
   let(:valid_attrs) do
     {
       base_url: 'https://fhir.example.com',
@@ -160,6 +180,89 @@ RSpec.describe Safire::ClientConfig do
     end
   end
 
+  # ---------- Certificate chain configuration ----------
+
+  describe 'certificate chain configuration' do
+    it 'defaults certificate_chain to nil' do
+      expect(described_class.new(valid_attrs).certificate_chain).to be_nil
+    end
+
+    it 'accepts PEM strings and OpenSSL certificates while preserving order' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem, certificate]))
+
+      expect(config.certificate_chain).to eq([certificate_pem, certificate])
+    end
+
+    it 'rejects an empty certificate_chain' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [])) }
+        .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain.*non-empty Array/)
+    end
+
+    it 'rejects a non-array certificate_chain without exposing its value' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: certificate_pem)) }
+        .to raise_error(Safire::Errors::ConfigurationError) { |error|
+          expect(error.message).to include('certificate_chain', 'Array')
+          expect(error.message).not_to include('certificate-data')
+        }
+    end
+
+    it 'rejects unsupported certificate entry types without exposing their values' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [Object.new])) }
+        .to raise_error(Safire::Errors::ConfigurationError) { |error|
+          expect(error.message).to include('certificate_chain', 'String', 'OpenSSL::X509::Certificate')
+          expect(error.message).not_to match(/#<Object/)
+        }
+    end
+
+    it 'rejects nil entries within the certificate_chain' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem, nil])) }
+        .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain.*NilClass/)
+    end
+
+    it 'rejects certificate objects that cannot be snapshotted' do
+      incomplete_certificate = OpenSSL::X509::Certificate.new
+
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [incomplete_certificate])) }
+        .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain.*serializable/)
+    end
+
+    it 'defensively copies and freezes the chain and PEM strings' do
+      source_pem = certificate_pem.dup
+      source_chain = [source_pem]
+      config = described_class.new(valid_attrs.merge(certificate_chain: source_chain))
+
+      source_pem << 'mutated'
+      source_chain << certificate
+
+      expect(config.certificate_chain).to eq([certificate_pem])
+      expect(config.certificate_chain).to be_frozen
+      expect(config.certificate_chain.first).to be_frozen
+    end
+
+    it 'snapshots certificate objects independently of the caller-owned instance' do
+      original_der = certificate.to_der
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate]))
+
+      certificate.serial = 99
+
+      expect(config.certificate_chain.first.to_der).to eq(original_der)
+    end
+
+    it 'returns fresh certificate objects so accessor mutations do not alter the stored chain' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate]))
+      returned_certificate = config.certificate_chain.first
+
+      returned_certificate.serial = 99
+
+      expect(config.certificate_chain.first.serial.to_i).to eq(1)
+      expect(config.certificate_chain.first).not_to equal(returned_certificate)
+    end
+
+    it 'does not expose a certificate_chain writer' do
+      expect(described_class.new(valid_attrs)).not_to respond_to(:certificate_chain=)
+    end
+  end
+
   # ---------- to_hash ----------
 
   describe '#to_hash' do
@@ -179,6 +282,11 @@ RSpec.describe Safire::ClientConfig do
     it 'masks private_key with [FILTERED]' do
       config = described_class.new(valid_attrs.merge(private_key: 'pem_key_data'))
       expect(config.to_hash[:private_key]).to eq('[FILTERED]')
+    end
+
+    it 'masks certificate_chain with [FILTERED]' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem]))
+      expect(config.to_hash[:certificate_chain]).to eq('[FILTERED]')
     end
 
     it 'leaves nil client_secret as nil' do
@@ -215,6 +323,16 @@ RSpec.describe Safire::ClientConfig do
       expect(config.inspect).to include('[FILTERED]')
     end
 
+    it 'does not expose certificate_chain in output' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem]))
+      expect(config.inspect).not_to include('certificate-data')
+    end
+
+    it 'shows [FILTERED] in place of certificate_chain' do
+      config = described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem]))
+      expect(config.inspect).to include('certificate_chain: [FILTERED]')
+    end
+
     it 'includes non-sensitive attributes in output' do
       config = described_class.new(valid_attrs)
       expect(config.inspect).to include('base_url')
@@ -225,6 +343,7 @@ RSpec.describe Safire::ClientConfig do
       config = described_class.new(valid_attrs)
       expect(config.inspect).not_to include('client_secret')
       expect(config.inspect).not_to include('private_key')
+      expect(config.inspect).not_to include('certificate_chain')
     end
   end
 end

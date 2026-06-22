@@ -13,7 +13,9 @@ nav_order: 4
 
 ## Context
 
-`ClientConfig` holds all credentials and endpoints for a Safire client — including `client_secret` and `private_key`. Two separate concerns need to be addressed:
+`ClientConfig` holds all credentials and endpoints for a Safire client — including
+`client_secret`, `private_key`, and the client certificate chain intended for
+UDAP signing. Two separate concerns need to be addressed:
 
 **Concern 1 — Mutability:** should `ClientConfig` allow attributes to be changed after construction?
 
@@ -27,11 +29,16 @@ These two concerns are related: if `ClientConfig` is mutable, masking is harder 
 
 ## Decision
 
-**`ClientConfig` is immutable after construction.** All attributes are `attr_reader` only — no setters. Validation runs once at construction. After `initialize` returns, the object's state cannot change.
+**The `ClientConfig` configuration surface is immutable after construction.**
+All attributes are `attr_reader` only — no setters — and validation runs once
+at construction. Mutable credential collections that require a stable order,
+such as `certificate_chain`, are defensively stored as described below.
 
 **Sensitive attributes are masked at two layers** via the `Entity` base class:
 
-**Layer 1 — `#to_hash`:** the `sensitive_attributes` hook (overridden in `ClientConfig` to return `[:client_secret, :private_key]`) causes those values to appear as `'[FILTERED]'` in any hash serialisation.
+**Layer 1 — `#to_hash`:** the `sensitive_attributes` hook (overridden in
+`ClientConfig` to return `[:client_secret, :private_key, :certificate_chain]`)
+causes those values to appear as `'[FILTERED]'` in any hash serialisation.
 
 ```ruby
 def to_hash
@@ -44,12 +51,22 @@ end
 
 **Layer 2 — `#inspect`:** `ClientConfig` overrides `inspect` directly, emitting `[FILTERED]` for sensitive attributes. This prevents credential leakage in exception backtraces, IRB/pry sessions, and logging middleware that calls `inspect` on objects.
 
+Although X.509 certificates contain public material, `certificate_chain` is
+masked because it can be large and identifies the client's operational signing
+identity. The configured chain collection is defensively copied and frozen,
+and PEM strings are copied and frozen. Certificate parsing, private-key
+matching, validity checks, and URI SAN checks remain the responsibility of the
+UDAP software-statement builder. The leaf-first ordering follows the
+[UDAP Security STU2 JWT header requirements](https://hl7.org/fhir/us/udap-security/STU2/general.html#jwt-headers).
+
 ---
 
 ## Consequences
 
 **Benefits:**
-- Thread-safe by default — a `ClientConfig` shared across threads has no mutable state
+- Configuration attributes cannot be reassigned through `ClientConfig`
+- The order and PEM contents of a configured certificate-chain collection
+  cannot be changed through the original input array or strings
 - Credentials cannot leak through `inspect`, `to_s`, exception trackers, or log output
 - Validation at construction means invalid configs are caught early, before any network calls
 - The `sensitive_attributes` hook is extensible — subclasses can add fields without modifying `Entity`
@@ -57,3 +74,6 @@ end
 **Trade-offs:**
 - Callers cannot modify a `ClientConfig` in place — they must construct a new one; this is intentional and makes state changes explicit
 - `private_key` masking means the key object itself is not serialisable via `to_hash` — callers needing to inspect or store the key must access it directly via `config.private_key`
+- `certificate_chain` masking similarly means callers must access
+  `config.certificate_chain` directly when passing the configured identity to a
+  signing operation

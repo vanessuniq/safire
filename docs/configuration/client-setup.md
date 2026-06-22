@@ -218,7 +218,7 @@ large and identifies the client's operational signing identity.
 
 ```ruby
 config.to_hash[:client_secret]      # => "[FILTERED]"
-config.to_hash[:certificate_chain] # => "[FILTERED]"
+config.to_hash[:certificate_chain]  # => "[FILTERED]"
 config.to_hash[:base_url]           # => "https://fhir.example.com"
 ```
 

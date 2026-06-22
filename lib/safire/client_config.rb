@@ -106,6 +106,7 @@ module Safire
     # @api private
     def inspect
       attrs = ATTRIBUTES.map do |attr|
+        # Read stored values directly so masked compound types are not materialized before being discarded.
         value = instance_variable_get(:"@#{attr}")
         next if value.nil?
 
@@ -135,16 +136,17 @@ module Safire
       raise_invalid_certificate_chain!(chain.class, [Array]) unless chain.is_a?(Array)
       raise_invalid_certificate_chain!(chain.class, ['non-empty Array']) if chain.empty?
 
-      invalid_entry = chain.find { |entry| CERTIFICATE_CHAIN_ENTRY_TYPES.none? { |type| entry.is_a?(type) } }
-      return unless invalid_entry
+      chain.each do |entry|
+        next if CERTIFICATE_CHAIN_ENTRY_TYPES.any? { |type| entry.is_a?(type) }
 
-      raise_invalid_certificate_chain!(invalid_entry.class, CERTIFICATE_CHAIN_ENTRY_TYPES)
+        raise_invalid_certificate_chain!(entry.class, CERTIFICATE_CHAIN_ENTRY_TYPES)
+      end
     end
 
     def snapshot_certificate_entry(entry)
       return entry.dup.freeze if entry.is_a?(String)
 
-      CertificateSnapshot.new(der: entry.to_der.dup.freeze)
+      CertificateSnapshot.new(der: entry.to_der.freeze)
     rescue OpenSSL::X509::CertificateError
       raise_invalid_certificate_chain!(entry.class, ['serializable OpenSSL::X509::Certificate'])
     end

@@ -214,6 +214,11 @@ RSpec.describe Safire::ClientConfig do
         }
     end
 
+    it 'rejects nil entries within the certificate_chain' do
+      expect { described_class.new(valid_attrs.merge(certificate_chain: [certificate_pem, nil])) }
+        .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain.*NilClass/)
+    end
+
     it 'rejects certificate objects that cannot be snapshotted' do
       incomplete_certificate = OpenSSL::X509::Certificate.new
 

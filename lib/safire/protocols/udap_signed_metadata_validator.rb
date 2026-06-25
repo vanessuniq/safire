@@ -314,7 +314,7 @@ module Safire
           next unless payload.key?(claim)
           next if valid_endpoint_url?(payload[claim])
 
-          log_failure("'#{claim}' must be an absolute HTTPS URL (localhost HTTP is accepted for development)")
+          log_failure("'#{claim}' must be an absolute HTTPS URL")
           valid = false
         end
         valid

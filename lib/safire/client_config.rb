@@ -43,6 +43,10 @@ module Safire
   # @!attribute [r] jwks_uri
   #   @return [String, nil] URL to the client's JWKS containing the public key.
   #     Optional, included as jku header in JWT assertions when provided.
+  # @!attribute [r] allow_insecure_localhost
+  #   @return [Boolean] whether HTTP loopback URIs are accepted for local development.
+  #     Defaults to +false+. Set to +true+ only in development when a local FHIR
+  #     server cannot terminate TLS.
   #
   # @example Initializing a ClientConfig
   #   config = Safire::ClientConfig.new(
@@ -70,6 +74,7 @@ module Safire
       base_url issuer client_id client_secret redirect_uri
       scopes authorization_endpoint token_endpoint
       private_key certificate_chain kid jwt_algorithm jwks_uri
+      allow_insecure_localhost
     ].freeze
 
     CertificateSnapshot = Data.define(:der)
@@ -86,6 +91,7 @@ module Safire
     def initialize(config)
       super(config, ATTRIBUTES)
 
+      @allow_insecure_localhost = normalize_localhost_policy(config)
       @certificate_chain = normalize_certificate_chain(@certificate_chain)
       @issuer ||= base_url
       validate!
@@ -165,19 +171,41 @@ module Safire
       )
     end
 
+    def normalize_localhost_policy(config)
+      value = if config.key?(:allow_insecure_localhost)
+                config[:allow_insecure_localhost]
+              elsif config.key?('allow_insecure_localhost')
+                config['allow_insecure_localhost']
+              else
+                false
+              end
+
+      return value if [true, false].include?(value)
+
+      raise Errors::ConfigurationError.new(
+        invalid_attribute: :allow_insecure_localhost,
+        invalid_value: value,
+        valid_values: [true, false]
+      )
+    end
+
     # Validates all URI attributes for structure and HTTPS requirement.
     #
     # Per SMART App Launch 2.2.0 (§App Protection, §Confidential Asymmetric),
     # all exchanges involving sensitive data SHALL use TLS. All endpoint URIs
     # must therefore use the `https` scheme.
     #
-    # Exception: `http` is permitted when the host is `localhost` or `127.0.0.1`
-    # to support local development without a TLS termination proxy.
+    # Exception: `http` is permitted when `allow_insecure_localhost` is true
+    # and the host is `localhost` or `127.0.0.1` to support local development
+    # without a TLS termination proxy.
     #
     # @raise [Errors::ConfigurationError] if any URI is malformed or uses HTTP on a non-localhost host
     def validate_uris!
       invalid_uris, non_https_uris = collect_uri_violations
-      return if invalid_uris.empty? && non_https_uris.empty?
+      if invalid_uris.empty? && non_https_uris.empty?
+        warn_if_insecure_localhost_used
+        return
+      end
 
       raise Errors::ConfigurationError.new(
         invalid_uri_attributes: invalid_uris,
@@ -193,13 +221,28 @@ module Safire
         value = send(attr)
         next if value.nil? && OPTIONAL_URI_ATTRS.include?(attr)
 
-        case classify_uri(value)
+        case classify_uri(value, allow_insecure_localhost:)
         when :invalid   then invalid_uris << attr
         when :non_https then non_https_uris << attr
         end
       end
 
       [invalid_uris, non_https_uris]
+    end
+
+    def warn_if_insecure_localhost_used
+      return unless allow_insecure_localhost
+
+      local_http_attrs = URI_ATTRS.select do |attr|
+        value = send(attr)
+        value && localhost_http_uri?(value)
+      end
+      return if local_http_attrs.empty?
+
+      Safire.logger.warn(
+        '[Safire] allow_insecure_localhost permits development-only HTTP loopback URIs; ' \
+        'SMART App Launch and UDAP require HTTPS in production'
+      )
     end
 
     def validate!

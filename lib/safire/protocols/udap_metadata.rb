@@ -307,9 +307,7 @@ module Safire
         attrs = STRING_URL_ATTRIBUTES.dup
         attrs << :authorization_endpoint unless authorization_endpoint.nil?
         invalid = attrs.reject { |attr| valid_https_url?(public_send(attr)) }
-        invalid.each do |attr|
-          warn_noncompliance("#{attr} must be an absolute HTTPS URL (localhost HTTP is accepted for development)")
-        end
+        invalid.each { |attr| warn_noncompliance("#{attr} must be an absolute HTTPS URL") }
         invalid.empty?
       end
 

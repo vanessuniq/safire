@@ -22,7 +22,7 @@ module Safire
 
       def initialize(config)
         @base_url       = config.base_url
-        @http_client    = Safire::HTTPClient.new
+        @http_client    = Safire::HTTPClient.new(allow_insecure_localhost: config.allow_insecure_localhost)
         @metadata_cache = {}
       end
 

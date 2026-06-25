@@ -238,7 +238,8 @@ module Safire
       # @raise [Safire::Errors::DiscoveryError] if no +registration_endpoint+ is given
       #   and the server does not advertise one in SMART metadata
       # @raise [Safire::Errors::ConfigurationError] if the endpoint (explicit or discovered)
-      #   uses HTTP on a non-localhost host
+      #   is not an HTTPS URI; HTTP loopback endpoints are accepted only when
+      #   +allow_insecure_localhost: true+ is configured
       # @raise [Safire::Errors::RegistrationError] if the server returns an error
       #   response or a 2xx response with a missing, blank, or non-string +client_id+
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error

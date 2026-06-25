@@ -235,6 +235,12 @@ RSpec.describe Safire::Protocols::UdapRegistrationMetadata do
       expect(metadata.to_h['grant_types']).to eq(['authorization_code'])
     end
 
+    it 'normalizes accepted grant types to canonical order' do
+      input[:grant_types] = %w[refresh_token authorization_code]
+
+      expect(metadata.to_h['grant_types']).to eq(%w[authorization_code refresh_token])
+    end
+
     it 'rejects refresh_token without authorization_code' do
       input[:grant_types] = %w[client_credentials refresh_token]
       input.delete(:redirect_uris)

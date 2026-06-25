@@ -229,9 +229,13 @@ module Safire
       end
 
       def generate_protocol_fields!(metadata)
-        metadata['grant_types'] = [] unless register?
+        metadata['grant_types'] = register? ? canonical_grant_types(metadata['grant_types']) : []
         metadata['response_types'] = ['code'] if authorization_code?(metadata)
         metadata['token_endpoint_auth_method'] = 'private_key_jwt'
+      end
+
+      def canonical_grant_types(grants)
+        ALLOWED_GRANT_TYPES.select { |grant| grants.include?(grant) }
       end
 
       def validate_non_blank_string!(metadata, field)

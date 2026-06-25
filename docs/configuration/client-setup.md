@@ -188,7 +188,8 @@ All URI parameters are validated at initialization. Safire raises `Safire::Error
 
 - URIs must be well-formed (scheme + host required)
 - URIs must use `https` — required for SMART App Launch and UDAP discovery
-- **Exception:** `http` is permitted for `localhost` and `127.0.0.1` (local development only)
+- **Development exception:** `http` loopback URIs (`localhost` and `127.0.0.1`)
+  are permitted only when `allow_insecure_localhost: true` is configured
 
 The following attributes are validated:
 
@@ -202,6 +203,19 @@ The following attributes are validated:
 | `jwks_uri` | When provided |
 
 If you need to bypass discovery and provide endpoints directly, set `authorization_endpoint` and `token_endpoint` in your config. Safire will use them as-is instead of fetching `/.well-known/smart-configuration`.
+
+For a local development server without TLS, opt in deliberately:
+
+```ruby
+config = Safire::ClientConfig.new(
+  base_url: 'http://localhost:3000/fhir',
+  redirect_uri: 'http://localhost:3000/callback',
+  allow_insecure_localhost: ENV['APP_ENV'] == 'development'
+)
+```
+
+Safire does not infer your framework environment. Leave the default `false` in
+production.
 
 UDAP discovery always uses the FHIR `base_url` and the `/.well-known/udap` endpoint. UDAP endpoint values are taken from discovered, signed metadata rather than from SMART endpoint overrides.
 

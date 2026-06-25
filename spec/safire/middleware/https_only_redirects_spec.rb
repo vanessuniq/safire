@@ -1,9 +1,15 @@
 require 'spec_helper'
 
 RSpec.describe Safire::Middleware::HttpsOnlyRedirects do
-  subject(:middleware) { described_class.new(app) }
+  subject(:middleware) { described_class.new(app, allow_insecure_localhost:) }
 
   let(:app) { ->(env) { Faraday::Response.new(env) } }
+  let(:allow_insecure_localhost) { false }
+
+  it 'rejects a non-boolean allow_insecure_localhost option' do
+    expect { described_class.new(app, allow_insecure_localhost: 'true') }
+      .to raise_error(Safire::Errors::ConfigurationError, /allow_insecure_localhost/)
+  end
 
   def build_env(status:, location: nil)
     headers = {}
@@ -41,14 +47,30 @@ RSpec.describe Safire::Middleware::HttpsOnlyRedirects do
   end
 
   context 'when redirect Location is HTTP on localhost' do
-    it 'does not raise for localhost' do
+    it 'raises NetworkError for localhost by default' do
       env = build_env(status: 301, location: 'http://localhost:3000/callback')
-      expect { middleware.call(env) }.not_to raise_error
+      expect { middleware.call(env) }
+        .to raise_error(Safire::Errors::NetworkError, /non-HTTPS.*blocked/i)
     end
 
-    it 'does not raise for 127.0.0.1' do
+    it 'raises NetworkError for 127.0.0.1 by default' do
       env = build_env(status: 302, location: 'http://127.0.0.1:8080/path')
-      expect { middleware.call(env) }.not_to raise_error
+      expect { middleware.call(env) }
+        .to raise_error(Safire::Errors::NetworkError, /non-HTTPS.*blocked/i)
+    end
+
+    context 'when insecure localhost is explicitly allowed' do
+      let(:allow_insecure_localhost) { true }
+
+      it 'does not raise for localhost' do
+        env = build_env(status: 301, location: 'http://localhost:3000/callback')
+        expect { middleware.call(env) }.not_to raise_error
+      end
+
+      it 'does not raise for 127.0.0.1' do
+        env = build_env(status: 302, location: 'http://127.0.0.1:8080/path')
+        expect { middleware.call(env) }.not_to raise_error
+      end
     end
   end
 

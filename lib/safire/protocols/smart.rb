@@ -21,7 +21,7 @@ module Safire
       ATTRIBUTES = %i[
         base_url client_id client_secret redirect_uri scopes issuer
         authorization_endpoint token_endpoint
-        private_key kid jwt_algorithm jwks_uri
+        private_key kid jwt_algorithm jwks_uri allow_insecure_localhost
       ].freeze
 
       # Attributes that are not required during initialization; validated per-flow when needed
@@ -39,7 +39,7 @@ module Safire
         ATTRIBUTES.each { |attr| instance_variable_set("@#{attr}", config.public_send(attr)) }
 
         @client_type = client_type.to_sym
-        @http_client = Safire::HTTPClient.new
+        @http_client = Safire::HTTPClient.new(allow_insecure_localhost:)
         @issuer ||= base_url
       end
 
@@ -510,7 +510,7 @@ module Safire
       end
 
       def validate_registration_endpoint_https!(endpoint)
-        case classify_uri(endpoint)
+        case classify_uri(endpoint, allow_insecure_localhost:)
         when :invalid   then raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
         when :non_https then raise Errors::ConfigurationError.new(non_https_uri_attributes: [:registration_endpoint])
         end

@@ -1,10 +1,13 @@
 require 'active_support/all'
 require 'faraday'
 require 'faraday/follow_redirects'
+require_relative 'uri_validation'
 
 module Safire
   # HTTP client wrapper for Safire
   class HTTPClient
+    include URIValidation
+
     def initialize(base_url: nil, adapter: nil, request_format: :url_encoded, ssl_options: {},
                    allow_insecure_localhost: false)
       @options = {
@@ -69,16 +72,6 @@ module Safire
       end
     rescue Faraday::ConnectionFailed, Faraday::TimeoutError, Faraday::SSLError => e
       raise Safire::Errors::NetworkError.new(error_description: e.message)
-    end
-
-    def validate_localhost_policy(value)
-      return value if [true, false].include?(value)
-
-      raise Safire::Errors::ConfigurationError.new(
-        invalid_attribute: :allow_insecure_localhost,
-        invalid_value: value,
-        valid_values: [true, false]
-      )
     end
 
     def warn_if_ssl_verification_disabled(ssl_options)

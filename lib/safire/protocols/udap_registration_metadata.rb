@@ -112,12 +112,6 @@ module Safire
         fail_validation!(:operation, 'must be register or cancel')
       end
 
-      def validate_localhost_policy(value)
-        return value if [true, false].include?(value)
-
-        fail_validation!(:allow_insecure_localhost, 'must be true or false')
-      end
-
       def normalize_input(input)
         fail_validation!(:metadata, 'must be a Hash') unless input.is_a?(Hash)
 
@@ -245,6 +239,10 @@ module Safire
         fail_validation!(field.to_sym, 'must be a non-blank string')
       end
 
+      def raise_invalid_localhost_policy!(_value)
+        fail_validation!(:allow_insecure_localhost, 'must be true or false')
+      end
+
       def authorization_code?(metadata)
         metadata['grant_types']&.include?('authorization_code')
       end
@@ -279,12 +277,15 @@ module Safire
       end
 
       def absolute_uri?(value)
-        uri = URI.parse(value)
+        return false unless value.is_a?(String)
+
+        uri = Addressable::URI.parse(value)
         return false unless uri.scheme
+        return valid_mailto_contact?(value) if uri.scheme == 'mailto'
         return uri.host.present? if %w[http https].include?(uri.scheme)
 
         true
-      rescue URI::Error
+      rescue Addressable::URI::InvalidURIError
         false
       end
 
@@ -293,11 +294,15 @@ module Safire
         return false unless uri.is_a?(URI::MailTo)
 
         uri.to.split(',').any? { |address| URI::MailTo::EMAIL_REGEXP.match?(address) }
+      rescue URI::Error
+        false
       end
 
       def image_uri?(value)
         path = Addressable::URI.parse(value).path.to_s
         IMAGE_PATH_PATTERN.match?(path)
+      rescue Addressable::URI::InvalidURIError
+        false
       end
 
       def json_compatible?(value)

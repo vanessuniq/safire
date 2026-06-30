@@ -1,5 +1,6 @@
 require 'faraday'
 require 'uri'
+require_relative '../uri_validation'
 
 module Safire
   module Middleware
@@ -10,7 +11,7 @@ module Safire
     # to localhost/127.0.0.1 are allowed only when the caller explicitly enables
     # the local-development exception.
     class HttpsOnlyRedirects < Faraday::Middleware
-      LOCALHOST = %w[localhost 127.0.0.1].freeze
+      include URIValidation
 
       def initialize(app, allow_insecure_localhost: false)
         super(app)
@@ -33,20 +34,10 @@ module Safire
 
         uri = URI.parse(location)
         return if uri.scheme == 'https'
-        return if @allow_insecure_localhost && LOCALHOST.include?(uri.host)
+        return if @allow_insecure_localhost && localhost_host?(uri.host)
 
         raise Safire::Errors::NetworkError.new(
           error_description: "Redirect to non-HTTPS URL blocked: #{location}"
-        )
-      end
-
-      def validate_localhost_policy(value)
-        return value if [true, false].include?(value)
-
-        raise Safire::Errors::ConfigurationError.new(
-          invalid_attribute: :allow_insecure_localhost,
-          invalid_value: value,
-          valid_values: [true, false]
         )
       end
     end

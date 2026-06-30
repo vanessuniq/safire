@@ -5,7 +5,7 @@ RSpec.describe Safire::URIValidation do
     Class.new do
       include Safire::URIValidation
 
-      public :classify_uri, :localhost_http_uri?, :strict_https_uri?
+      public :classify_uri, :localhost_http_uri?, :strict_https_uri?, :validate_localhost_policy
     end.new
   end
 
@@ -117,6 +117,18 @@ RSpec.describe Safire::URIValidation do
     it 'returns false for malformed and non-string values' do
       expect(host.localhost_http_uri?('http://local host/callback')).to be(false)
       expect(host.localhost_http_uri?(nil)).to be(false)
+    end
+  end
+
+  describe '#validate_localhost_policy' do
+    it 'accepts boolean values' do
+      expect(host.validate_localhost_policy(true)).to be(true)
+      expect(host.validate_localhost_policy(false)).to be(false)
+    end
+
+    it 'raises ConfigurationError for non-boolean values by default' do
+      expect { host.validate_localhost_policy('true') }
+        .to raise_error(Safire::Errors::ConfigurationError, /allow_insecure_localhost/)
     end
   end
 end

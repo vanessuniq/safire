@@ -1,3 +1,6 @@
+require 'addressable/uri'
+require_relative 'errors'
+
 module Safire
   # Shared URI classification for HTTPS enforcement.
   #
@@ -8,6 +11,9 @@ module Safire
   #
   # @api private
   module URIValidation
+    LOCALHOST_POLICY_VALUES = [true, false].freeze
+    private_constant :LOCALHOST_POLICY_VALUES
+
     private
 
     # Classifies a URI value as +:invalid+, +:non_https+, or +nil+ (acceptable).
@@ -74,6 +80,20 @@ module Safire
     # @return [Boolean]
     def localhost_host?(host)
       %w[localhost 127.0.0.1].include?(host)
+    end
+
+    def validate_localhost_policy(value)
+      return value if LOCALHOST_POLICY_VALUES.include?(value)
+
+      raise_invalid_localhost_policy!(value)
+    end
+
+    def raise_invalid_localhost_policy!(value)
+      raise Errors::ConfigurationError.new(
+        invalid_attribute: :allow_insecure_localhost,
+        invalid_value: value,
+        valid_values: LOCALHOST_POLICY_VALUES
+      )
     end
   end
 end

@@ -180,13 +180,7 @@ module Safire
                 false
               end
 
-      return value if [true, false].include?(value)
-
-      raise Errors::ConfigurationError.new(
-        invalid_attribute: :allow_insecure_localhost,
-        invalid_value: value,
-        valid_values: [true, false]
-      )
+      validate_localhost_policy(value)
     end
 
     # Validates all URI attributes for structure and HTTPS requirement.

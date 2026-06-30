@@ -49,12 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `'SMART configuration'`) and exposes it as a readable attribute so callers can
   identify which protocol's discovery failed.
 
-### Changed
+### Breaking Changes
 
 - SMART and shared HTTP URI handling now require an explicit
   `allow_insecure_localhost: true` opt-in before accepting HTTP loopback URIs
   or redirects. This aligns SMART local-development behavior with UDAP DCR
   metadata validation while keeping production defaults HTTPS-only.
+
+### Changed
+
 - SMART Dynamic Client Registration now requires successful RFC 7591 responses
   to contain a non-blank string `client_id`. Malformed identifiers that were
   previously accepted now raise `Safire::Errors::RegistrationError`; valid

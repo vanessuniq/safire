@@ -1,4 +1,5 @@
 require 'uri'
+require_relative '../uri_validation'
 
 module Safire
   module Protocols
@@ -285,6 +286,7 @@ module Safire
         return valid_mailto_contact?(value) if uri.scheme == 'mailto'
         return uri.host.present? if %w[http https].include?(uri.scheme)
 
+        # RFC 7591 contacts may use non-HTTP absolute URI schemes such as tel: or sip:.
         true
       rescue Addressable::URI::InvalidURIError
         false

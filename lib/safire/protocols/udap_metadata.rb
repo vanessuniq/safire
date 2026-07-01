@@ -87,11 +87,13 @@ module Safire
 
       attr_reader(*ATTRIBUTES)
 
-      def initialize(metadata)
+      def initialize(metadata, allow_insecure_localhost: false)
+        @allow_insecure_localhost = validate_localhost_policy(allow_insecure_localhost)
         super(metadata, ATTRIBUTES)
       end
 
-      # Checks whether the server's UDAP metadata is valid according to UDAP Security STU2.
+      # Checks whether the server's UDAP metadata satisfies Safire's UDAP Security STU2
+      # structural policy.
       #
       # This is a user-callable helper. Safire performs discovery without automatically
       # asserting server compliance — it is the caller's responsibility to invoke this
@@ -104,11 +106,14 @@ module Safire
       # - +udap_profiles_supported+ includes +"udap_dcr"+ and +"udap_authn"+
       # - +token_endpoint_auth_methods_supported+ must equal <tt>["private_key_jwt"]</tt> exactly (STU2 fixed value)
       # - +scopes_supported+, +grant_types_supported+, and both signing algorithm arrays each have at least one element
-      # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs;
-      #   +authorization_endpoint+ is also validated when present
+      # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs
+      #   (or localhost HTTP URLs when explicitly enabled for development);
+      #   +authorization_endpoint+ is validated by the same rule when present
       # - +signed_metadata+ is a compact-JWS string (three base64url-encoded dot-separated segments);
       #   full cryptographic validation (signature, chain, claims) requires {#signed_metadata_valid?}
-      # - endpoint URL checks accept localhost HTTP to support development without TLS
+      # - endpoint URL checks accept localhost HTTP only when +allow_insecure_localhost: true+
+      #   was supplied at construction time; this is a Safire development exception,
+      #   not a UDAP production conformance rule
       # - +authorization_endpoint+ present when +authorization_code+ is in +grant_types_supported+
       # - +udap_authz+ present in +udap_profiles_supported+ when +client_credentials+ is in +grant_types_supported+
       # - +authorization_code+ present in +grant_types_supported+ when +refresh_token+ is also present
@@ -149,12 +154,15 @@ module Safire
       # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for production chain validation
       # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
       # @param verify_chain [Boolean] set +false+ to skip chain validation (dev/test only)
+      # @param allow_insecure_localhost [Boolean] permit signed HTTP endpoint claims only on
+      #   +localhost+ or +127.0.0.1+ for local development; defaults to this metadata object's policy
       # @return [Boolean] +true+ if all cryptographic and claim checks pass
-      def signed_metadata_valid?(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
+      def signed_metadata_valid?(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true,
+                                 allow_insecure_localhost: @allow_insecure_localhost)
         return false unless signed_metadata.present?
 
         UdapSignedMetadataValidator.new(signed_metadata, to_hash).valid?(
-          base_url:, trusted_anchors:, crls:, revocation_checker:, verify_chain:
+          base_url:, trusted_anchors:, crls:, revocation_checker:, verify_chain:, allow_insecure_localhost:
         )
       end
 
@@ -177,20 +185,20 @@ module Safire
       # @return [Boolean] true when the server supports UDAP Dynamic Client Registration
       #   (advertises +udap_dcr+ profile and provides a valid +registration_endpoint+)
       def supports_dynamic_registration?
-        dynamic_registration_profile? && valid_https_url?(registration_endpoint)
+        dynamic_registration_profile? && valid_endpoint_url?(registration_endpoint)
       end
 
       # @return [Boolean] true when the server supports JWT client authentication
       #   (advertises +udap_authn+ profile and provides a valid +token_endpoint+)
       def supports_jwt_client_auth?
-        jwt_client_auth_profile? && valid_https_url?(token_endpoint)
+        jwt_client_auth_profile? && valid_endpoint_url?(token_endpoint)
       end
 
       # @return [Boolean] true when the server supports the UDAP client authorization profile
       #   (advertises +udap_authz+ profile, supports the +client_credentials+ grant, and provides
       #   a valid +token_endpoint+)
       def supports_client_authorization?
-        client_authorization_profile? && grant_type?('client_credentials') && valid_https_url?(token_endpoint)
+        client_authorization_profile? && grant_type?('client_credentials') && valid_endpoint_url?(token_endpoint)
       end
 
       # @return [Boolean] true when the server supports the authorization_code grant type
@@ -306,7 +314,7 @@ module Safire
       def url_fields_valid?
         attrs = STRING_URL_ATTRIBUTES.dup
         attrs << :authorization_endpoint unless authorization_endpoint.nil?
-        invalid = attrs.reject { |attr| valid_https_url?(public_send(attr)) }
+        invalid = attrs.reject { |attr| valid_endpoint_url?(public_send(attr)) }
         invalid.each { |attr| warn_noncompliance("#{attr} must be an absolute HTTPS URL") }
         invalid.empty?
       end
@@ -323,8 +331,8 @@ module Safire
         parts.length == 3 && parts.all? { |p| BASE64URL_SEGMENT.match?(p) }
       end
 
-      def valid_https_url?(value)
-        value.is_a?(String) && classify_uri(value).nil?
+      def valid_endpoint_url?(value)
+        value.is_a?(String) && classify_uri(value, allow_insecure_localhost: @allow_insecure_localhost).nil?
       end
 
       def conditional_presence_valid?

@@ -21,7 +21,9 @@ This guide covers security requirements and best practices for every Safire inte
 
 ## HTTPS and Redirect URI Rules
 
-All production FHIR integrations must use HTTPS. Safire enforces this at configuration time — HTTP redirect URIs are rejected in non-localhost environments.
+All production FHIR integrations must use HTTPS. Safire enforces this at
+configuration time — HTTP URIs are rejected unless the caller explicitly opts
+into the local-development loopback exception.
 
 ```ruby
 # config/environments/production.rb
@@ -42,11 +44,15 @@ config = Safire::ClientConfig.new(
 )
 ```
 
-Localhost is permitted during development:
+Localhost HTTP is permitted only when the application enables it deliberately:
 
 ```ruby
 # ✅ Allowed for local development only
-redirect_uri: 'http://localhost:3000/auth/callback'
+config = Safire::ClientConfig.new(
+  base_url: 'http://localhost:3000/fhir',
+  redirect_uri: 'http://localhost:3000/auth/callback',
+  allow_insecure_localhost: ENV['APP_ENV'] == 'development'
+)
 ```
 
 ---

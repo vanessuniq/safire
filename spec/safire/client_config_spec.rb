@@ -119,35 +119,94 @@ RSpec.describe Safire::ClientConfig do
       end
     end
 
-    context 'with localhost exception' do
-      it 'allows HTTP for localhost base_url' do
+    context 'when allow_insecure_localhost is not enabled' do
+      it 'rejects HTTP for localhost base_url' do
         expect do
           described_class.new(valid_attrs.merge(base_url: 'http://localhost:3000/fhir'))
+        end.to raise_error(Safire::Errors::ConfigurationError, /requires HTTPS.*base_url/)
+      end
+
+      it 'rejects HTTP for localhost redirect_uri' do
+        expect do
+          described_class.new(valid_attrs.merge(redirect_uri: 'http://localhost:3000/callback'))
+        end.to raise_error(Safire::Errors::ConfigurationError, /requires HTTPS.*redirect_uri/)
+      end
+    end
+
+    context 'when allow_insecure_localhost is enabled' do
+      before { allow(Safire.logger).to receive(:warn) }
+
+      it 'allows HTTP for localhost base_url' do
+        expect do
+          described_class.new(valid_attrs.merge(base_url: 'http://localhost:3000/fhir', allow_insecure_localhost: true))
         end.not_to raise_error
+      end
+
+      it 'reads allow_insecure_localhost from a string key' do
+        config = described_class.new(
+          valid_attrs.merge(
+            base_url: 'http://localhost:3000/fhir',
+            'allow_insecure_localhost' => true
+          )
+        )
+
+        expect(config.allow_insecure_localhost).to be(true)
       end
 
       it 'allows HTTP for 127.0.0.1 base_url' do
         expect do
-          described_class.new(valid_attrs.merge(base_url: 'http://127.0.0.1:8080/fhir'))
+          described_class.new(valid_attrs.merge(base_url: 'http://127.0.0.1:8080/fhir', allow_insecure_localhost: true))
         end.not_to raise_error
       end
 
       it 'allows HTTP for localhost redirect_uri' do
         expect do
-          described_class.new(valid_attrs.merge(redirect_uri: 'http://localhost:3000/callback'))
+          described_class.new(valid_attrs.merge(redirect_uri: 'http://localhost:3000/callback',
+                                                allow_insecure_localhost: true))
         end.not_to raise_error
       end
 
       it 'allows HTTP for localhost token_endpoint' do
         expect do
-          described_class.new(valid_attrs.merge(token_endpoint: 'http://localhost:9000/token'))
+          described_class.new(valid_attrs.merge(token_endpoint: 'http://localhost:9000/token',
+                                                allow_insecure_localhost: true))
         end.not_to raise_error
       end
 
       it 'allows HTTP for 127.0.0.1 redirect_uri' do
         expect do
-          described_class.new(valid_attrs.merge(redirect_uri: 'http://127.0.0.1:4000/callback'))
+          described_class.new(valid_attrs.merge(redirect_uri: 'http://127.0.0.1:4000/callback',
+                                                allow_insecure_localhost: true))
         end.not_to raise_error
+      end
+
+      it 'still rejects HTTP for remote hosts' do
+        expect do
+          described_class.new(valid_attrs.merge(base_url: 'http://fhir.example.com',
+                                                allow_insecure_localhost: true))
+        end.to raise_error(Safire::Errors::ConfigurationError, /requires HTTPS.*base_url/)
+      end
+
+      it 'logs a warning when the exception is used' do
+        described_class.new(valid_attrs.merge(redirect_uri: 'http://localhost:3000/callback',
+                                              allow_insecure_localhost: true))
+
+        expect(Safire.logger).to have_received(:warn)
+          .with(/allow_insecure_localhost.*development.*HTTPS/i)
+      end
+
+      it 'does not log when the flag is enabled but no HTTP loopback URI is configured' do
+        described_class.new(valid_attrs.merge(allow_insecure_localhost: true))
+
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+
+    context 'when allow_insecure_localhost is not boolean' do
+      it 'raises ConfigurationError' do
+        expect do
+          described_class.new(valid_attrs.merge(allow_insecure_localhost: 'true'))
+        end.to raise_error(Safire::Errors::ConfigurationError, /allow_insecure_localhost/)
       end
     end
 

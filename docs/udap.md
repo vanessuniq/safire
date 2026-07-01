@@ -3,7 +3,8 @@ layout: default
 title: UDAP
 nav_order: 5
 permalink: /udap/
-description: "UDAP Security STU2 server metadata discovery in Safire, with community-scoped discovery, plus planned auth flows including dynamic client registration, JWT client authentication, and tiered OAuth."
+description: "UDAP Security STU2 discovery and registration-metadata validation in Safire, with community scoping and planned signing, authentication, and authorization flows."
+has_children: true
 ---
 
 # UDAP
@@ -11,7 +12,13 @@ description: "UDAP Security STU2 server metadata discovery in Safire, with commu
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-**Implemented now:** UDAP Security STU2 discovery (`/.well-known/udap`), including signed metadata validation and optional community scoping. UDAP DCR, JWT client authentication, and Tiered OAuth flows remain planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md).
+**Implemented now:** UDAP Security STU2 discovery (`/.well-known/udap`),
+including signed metadata validation and optional community scoping. The
+[Dynamic Client Registration guide]({% link udap/dynamic-client-registration/index.md %})
+also covers the implemented registration-metadata validation foundation.
+Software-statement signing, registration submission, JWT client authentication,
+and Tiered OAuth remain planned. See
+[ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md).
 </div>
 
 ## Table of contents
@@ -71,6 +78,11 @@ puts metadata.udap_profiles_supported.inspect
 > ```ruby
 > metadata = client.server_metadata(verify_chain: false)
 > ```
+>
+> Local HTTP loopback servers also require `allow_insecure_localhost: true`
+> in the client configuration. That option permits HTTP only on `localhost`
+> and `127.0.0.1`; it is a Safire development exception, not UDAP production
+> conformance.
 
 ### Community-scoped discovery
 
@@ -110,13 +122,17 @@ metadata.signed_metadata_valid?(
 )
 ```
 
-Support helpers expose advertised profiles and usable discovery capabilities. Capability helpers combine profile or grant signals with the endpoint preconditions Safire can verify during discovery. These describe what the server advertises; Safire's UDAP DCR, JWT client authentication, and Tiered OAuth flows are still planned.
+Support helpers expose advertised profiles and usable discovery capabilities.
+Capability helpers combine profile or grant signals with the endpoint
+preconditions Safire can verify during discovery. These describe what the
+server advertises; Safire's DCR metadata validator is available, while DCR
+signing/submission, JWT client authentication, and Tiered OAuth remain planned.
 
 | Helper | Checks |
 |--------|--------|
-| `supports_dynamic_registration?` | `udap_dcr` profile and a valid HTTPS `registration_endpoint` |
-| `supports_jwt_client_auth?` | `udap_authn` profile and a valid HTTPS `token_endpoint` |
-| `supports_client_authorization?` | `udap_authz` profile, `client_credentials` grant, and a valid HTTPS `token_endpoint` |
+| `supports_dynamic_registration?` | `udap_dcr` profile and a valid endpoint URL for `registration_endpoint` |
+| `supports_jwt_client_auth?` | `udap_authn` profile and a valid endpoint URL for `token_endpoint` |
+| `supports_client_authorization?` | `udap_authz` profile, `client_credentials` grant, and a valid endpoint URL for `token_endpoint` |
 | `supports_authorization_code?` | `authorization_code` appears in `grant_types_supported` |
 | `supports_refresh_token?` | `refresh_token` appears in `grant_types_supported` |
 | `supports_tiered_oauth?` | `udap_to` profile is advertised |
@@ -159,7 +175,9 @@ metadata.tiered_oauth_profile?
 
 ### Client Flows
 
-- **Dynamic Client Registration (DCR)** — one-time registration using a signed software statement to obtain a `client_id`; required only when the client has not previously registered with the server and the server supports DCR
+- **Dynamic Client Registration (DCR)** — metadata validation is implemented;
+  software-statement signing and submission remain planned for the one-time
+  registration that obtains a `client_id`
 - **JWT Client Authentication** — authenticate on every request using a signed JWT assertion (Authentication Token, AnT) with an X.509 certificate chain in the `x5c` header; the registered `client_id` is reused as `iss` and `sub` in each assertion
 - **Tiered OAuth** — delegated authorization for multi-system access per the UDAP Security IG
 - **Pushed Authorization Requests (RFC 9126)** — PAR support for pre-registering authorization requests

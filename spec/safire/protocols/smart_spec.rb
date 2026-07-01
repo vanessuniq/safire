@@ -1112,9 +1112,21 @@ RSpec.describe Safire::Protocols::Smart do
     context 'when registration_endpoint uses HTTP on localhost' do
       before { stub_registration(endpoint: 'http://localhost:3000/register') }
 
-      it 'does not raise (localhost exception)' do
+      it 'raises ConfigurationError by default' do
         expect do
           described_class.new(no_client_id_config).register_client(
+            client_metadata, registration_endpoint: 'http://localhost:3000/register'
+          )
+        end.to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+      end
+
+      it 'does not raise when insecure localhost is explicitly allowed' do
+        local_config = Safire::ClientConfig.new(
+          config_attrs.except(:client_id).merge(allow_insecure_localhost: true)
+        )
+
+        expect do
+          described_class.new(local_config).register_client(
             client_metadata, registration_endpoint: 'http://localhost:3000/register'
           )
         end.not_to raise_error

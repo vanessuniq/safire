@@ -1,11 +1,15 @@
 require 'active_support/all'
 require 'faraday'
 require 'faraday/follow_redirects'
+require_relative 'uri_validation'
 
 module Safire
   # HTTP client wrapper for Safire
   class HTTPClient
-    def initialize(base_url: nil, adapter: nil, request_format: :url_encoded, ssl_options: {})
+    include URIValidation
+
+    def initialize(base_url: nil, adapter: nil, request_format: :url_encoded, ssl_options: {},
+                   allow_insecure_localhost: false)
       @options = {
         url: normalize_base_url(base_url),
         ssl: ssl_options,
@@ -16,6 +20,7 @@ module Safire
       }
       @adapter = adapter || Faraday.default_adapter
       @request_format = request_format.to_sym
+      @allow_insecure_localhost = validate_localhost_policy(allow_insecure_localhost)
       warn_if_ssl_verification_disabled(ssl_options)
       @connection = build_connection
     end
@@ -42,7 +47,7 @@ module Safire
       Faraday.new(@options) do |builder|
         builder.request @request_format
         builder.response :follow_redirects
-        builder.use Safire::Middleware::HttpsOnlyRedirects
+        builder.use Safire::Middleware::HttpsOnlyRedirects, allow_insecure_localhost: @allow_insecure_localhost
         builder.response :json
         builder.response :raise_error
         configure_logger(builder)

@@ -21,7 +21,7 @@ module Safire
       ATTRIBUTES = %i[
         base_url client_id client_secret redirect_uri scopes issuer
         authorization_endpoint token_endpoint
-        private_key kid jwt_algorithm jwks_uri
+        private_key kid jwt_algorithm jwks_uri allow_insecure_localhost
       ].freeze
 
       # Attributes that are not required during initialization; validated per-flow when needed
@@ -39,7 +39,7 @@ module Safire
         ATTRIBUTES.each { |attr| instance_variable_set("@#{attr}", config.public_send(attr)) }
 
         @client_type = client_type.to_sym
-        @http_client = Safire::HTTPClient.new
+        @http_client = Safire::HTTPClient.new(allow_insecure_localhost:)
         @issuer ||= base_url
       end
 
@@ -238,7 +238,8 @@ module Safire
       # @raise [Safire::Errors::DiscoveryError] if no +registration_endpoint+ is given
       #   and the server does not advertise one in SMART metadata
       # @raise [Safire::Errors::ConfigurationError] if the endpoint (explicit or discovered)
-      #   uses HTTP on a non-localhost host
+      #   is not an HTTPS URI; HTTP loopback endpoints are accepted only when
+      #   +allow_insecure_localhost: true+ is configured
       # @raise [Safire::Errors::RegistrationError] if the server returns an error
       #   response or a 2xx response with a missing, blank, or non-string +client_id+
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
@@ -510,7 +511,7 @@ module Safire
       end
 
       def validate_registration_endpoint_https!(endpoint)
-        case classify_uri(endpoint)
+        case classify_uri(endpoint, allow_insecure_localhost:)
         when :invalid   then raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
         when :non_https then raise Errors::ConfigurationError.new(non_https_uri_attributes: [:registration_endpoint])
         end

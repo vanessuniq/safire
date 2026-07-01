@@ -4,7 +4,14 @@ RSpec.describe Safire::Protocols::Udap do
   subject(:udap) { described_class.new(config) }
 
   let(:base_url) { 'https://fhir.example.com' }
-  let(:config) { instance_double(Safire::ClientConfig, base_url: base_url) }
+  let(:allow_insecure_localhost) { false }
+  let(:config) do
+    instance_double(
+      Safire::ClientConfig,
+      base_url:,
+      allow_insecure_localhost:
+    )
+  end
   let(:well_known_url) { "#{base_url}/.well-known/udap" }
 
   let(:valid_metadata) do
@@ -43,6 +50,26 @@ RSpec.describe Safire::Protocols::Udap do
     end
     let(:validator_double) do
       instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: signed_claims)
+    end
+
+    it 'passes the insecure-localhost policy to the HTTP client' do
+      allow(Safire::HTTPClient).to receive(:new).and_call_original
+
+      udap
+
+      expect(Safire::HTTPClient).to have_received(:new).with(allow_insecure_localhost: false)
+    end
+
+    context 'when insecure localhost is enabled in config' do
+      let(:allow_insecure_localhost) { true }
+
+      it 'passes the opt-in to the HTTP client' do
+        allow(Safire::HTTPClient).to receive(:new).and_call_original
+
+        udap
+
+        expect(Safire::HTTPClient).to have_received(:new).with(allow_insecure_localhost: true)
+      end
     end
 
     context 'without community parameter' do
@@ -170,8 +197,43 @@ RSpec.describe Safire::Protocols::Udap do
           trusted_anchors: [anchor],
           crls: [crl],
           revocation_checker: checker,
-          verify_chain: true
+          verify_chain: true,
+          allow_insecure_localhost: false
         )
+      end
+
+      context 'when insecure localhost is enabled in config' do
+        let(:allow_insecure_localhost) { true }
+
+        it 'passes the opt-in to signed metadata validation' do
+          udap.server_metadata
+
+          expect(validator_double).to have_received(:signed_endpoint_claims).with(
+            base_url: base_url,
+            trusted_anchors: [],
+            crls: [],
+            revocation_checker: nil,
+            verify_chain: true,
+            allow_insecure_localhost: true
+          )
+        end
+
+        it 'returns metadata that applies the same opt-in to capability checks' do
+          allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(
+            instance_double(
+              Safire::Protocols::UdapSignedMetadataValidator,
+              signed_endpoint_claims: {
+                'token_endpoint' => 'http://localhost:3000/token',
+                'registration_endpoint' => 'http://127.0.0.1:3000/register'
+              }
+            )
+          )
+
+          metadata = udap.server_metadata
+
+          expect(metadata.supports_dynamic_registration?).to be(true)
+          expect(metadata.supports_jwt_client_auth?).to be(true)
+        end
       end
 
       it 'does not share cached metadata across different CRL sets' do

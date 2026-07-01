@@ -65,9 +65,10 @@ semantics.
   algorithm (`alg`), required claim presence, and signature are not validated here — these are
   deferred to the cryptographic validator
 - endpoint URL fields (`token_endpoint`, `registration_endpoint`, conditionally
-  `authorization_endpoint`) must be absolute HTTPS URLs; plain HTTP is accepted only for
-  `localhost` and `127.0.0.1` to support development without TLS — any other scheme on
-  those hosts (e.g. `ftp://localhost`) is rejected; this exception does not apply in production
+  `authorization_endpoint`) must be absolute HTTPS URLs; plain HTTP is accepted only when
+  `allow_insecure_localhost: true` is configured and the host is `localhost` or `127.0.0.1`
+  to support development without TLS — any other scheme on those hosts (e.g. `ftp://localhost`)
+  is rejected; this exception does not apply in production
 - `authorization_endpoint` is conditionally required when `grant_types_supported` includes
   `"authorization_code"`
 - `"udap_authz"` is conditionally required in `udap_profiles_supported` when `grant_types_supported`

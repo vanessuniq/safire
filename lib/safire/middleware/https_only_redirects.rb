@@ -1,5 +1,6 @@
 require 'faraday'
 require 'uri'
+require_relative '../uri_validation'
 
 module Safire
   module Middleware
@@ -7,10 +8,15 @@ module Safire
     #
     # Sits inside the follow_redirects middleware's app stack so it sees every
     # intermediate 3xx response before the redirect is followed. HTTP redirects
-    # to localhost/127.0.0.1 are allowed (consistent with ClientConfig's
-    # localhost exception for local development).
+    # to localhost/127.0.0.1 are allowed only when the caller explicitly enables
+    # the local-development exception.
     class HttpsOnlyRedirects < Faraday::Middleware
-      LOCALHOST = %w[localhost 127.0.0.1].freeze
+      include URIValidation
+
+      def initialize(app, allow_insecure_localhost: false)
+        super(app)
+        @allow_insecure_localhost = validate_localhost_policy(allow_insecure_localhost)
+      end
 
       def call(env)
         @app.call(env).on_complete do |response_env|
@@ -28,7 +34,7 @@ module Safire
 
         uri = URI.parse(location)
         return if uri.scheme == 'https'
-        return if LOCALHOST.include?(uri.host)
+        return if @allow_insecure_localhost && localhost_host?(uri.host)
 
         raise Safire::Errors::NetworkError.new(
           error_description: "Redirect to non-HTTPS URL blocked: #{location}"

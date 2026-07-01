@@ -21,8 +21,9 @@ module Safire
       WELL_KNOWN_PATH = '/.well-known/udap'.freeze
 
       def initialize(config)
-        @base_url       = config.base_url
-        @http_client    = Safire::HTTPClient.new
+        @base_url = config.base_url
+        @allow_insecure_localhost = config.allow_insecure_localhost
+        @http_client = Safire::HTTPClient.new(allow_insecure_localhost: @allow_insecure_localhost)
         @metadata_cache = {}
       end
 
@@ -57,7 +58,8 @@ module Safire
           trusted_anchors:,
           crls:,
           revocation_checker:,
-          verify_chain:
+          verify_chain:,
+          allow_insecure_localhost: @allow_insecure_localhost
         }
         cache_key = build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
         cached_entry = @metadata_cache[cache_key]
@@ -115,7 +117,10 @@ module Safire
 
       def build_cache_entry(raw, signed_claims)
         {
-          metadata: UdapMetadata.new(raw.merge(signed_claims)),
+          metadata: UdapMetadata.new(
+            raw.merge(signed_claims),
+            allow_insecure_localhost: @allow_insecure_localhost
+          ),
           raw:
         }
       end

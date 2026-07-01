@@ -195,6 +195,31 @@ RSpec.describe Safire::Protocols::UdapMetadata do
       end
     end
 
+    context 'when endpoint URLs use HTTP localhost' do
+      let(:local_metadata) do
+        full_metadata.merge(
+          'token_endpoint' => 'http://localhost:3000/token',
+          'registration_endpoint' => 'http://127.0.0.1:3000/register'
+        )
+      end
+
+      it 'rejects localhost HTTP endpoints by default' do
+        m = described_class.new(local_metadata)
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/token_endpoint must be an absolute HTTPS URL/)
+        expect(Safire.logger).to have_received(:warn).with(/registration_endpoint must be an absolute HTTPS URL/)
+      end
+
+      it 'accepts localhost HTTP endpoints when explicitly enabled' do
+        m = described_class.new(local_metadata, allow_insecure_localhost: true)
+
+        expect(m.valid?).to be(true)
+        expect(m.supports_dynamic_registration?).to be(true)
+        expect(m.supports_jwt_client_auth?).to be(true)
+      end
+    end
+
     context 'when authorization_endpoint is present but not an absolute HTTPS URL' do
       it 'returns false and logs a warning' do
         m = described_class.new(full_metadata.merge('authorization_endpoint' => 'http://fhir.example.com/auth'))
@@ -587,6 +612,22 @@ RSpec.describe Safire::Protocols::UdapMetadata do
 
         expect(result).to be(false)
         expect(Safire.logger).to have_received(:warn).with(/signed_metadata/)
+      end
+
+      it 'passes the metadata localhost policy to the signed metadata validator' do
+        validator = instance_double(Safire::Protocols::UdapSignedMetadataValidator, valid?: true)
+        allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator)
+        m = described_class.new(full_metadata, allow_insecure_localhost: true)
+
+        expect(m.signed_metadata_valid?(base_url: 'https://fhir.example.com')).to be(true)
+        expect(validator).to have_received(:valid?).with(
+          base_url: 'https://fhir.example.com',
+          trusted_anchors: [],
+          crls: [],
+          revocation_checker: nil,
+          verify_chain: true,
+          allow_insecure_localhost: true
+        )
       end
 
       it 'enforces the conditional authorization_endpoint claim through symbol-keyed metadata' do

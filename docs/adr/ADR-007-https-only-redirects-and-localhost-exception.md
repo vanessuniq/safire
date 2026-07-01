@@ -1,11 +1,11 @@
 ---
 layout: default
-title: "ADR-007: HTTPS-only redirect enforcement and localhost exception"
+title: "ADR-007: HTTPS-only enforcement and explicit localhost opt-in"
 parent: Architecture Decision Records
 nav_order: 7
 ---
 
-# ADR-007: HTTPS-only redirect enforcement and localhost exception
+# ADR-007: HTTPS-only enforcement and explicit localhost opt-in
 
 **Status:** Accepted
 
@@ -17,17 +17,22 @@ SMART App Launch 2.2.0 requires TLS for all exchanges involving sensitive data. 
 
 This is a known attack surface: a compromised or misconfigured server can use open redirects to redirect a client to an attacker-controlled HTTP endpoint.
 
-There is also a practical concern: developers running local FHIR servers (e.g. HAPI FHIR, Inferno test environments) use `http://localhost` or `http://127.0.0.1`. Blocking these in a development environment would make Safire unusable without a TLS termination proxy.
+There is also a practical concern: developers running local FHIR servers (e.g.
+HAPI FHIR, Inferno test environments) use `http://localhost` or
+`http://127.0.0.1`. Blocking these entirely would make Safire awkward to use
+without a TLS termination proxy, but accepting them implicitly weakens a
+security boundary and can hide production misconfiguration.
 
 ---
 
 ## Decision
 
-HTTPS is enforced at **two layers**, both with the same localhost exception:
+For SMART configuration and HTTP redirects, HTTPS is enforced at **two layers**.
+Both layers use the same explicit local-development opt-in:
 
-**Layer 1 — `ClientConfig` URI validation:** all URI attributes (`base_url`, `redirect_uri`, `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`) must use `https://`, except when the host is `localhost` or `127.0.0.1`.
+**Layer 1 — `ClientConfig` URI validation:** all URI attributes (`base_url`, `redirect_uri`, `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`) must use `https://`, except when `allow_insecure_localhost: true` is configured and the host is `localhost` or `127.0.0.1`.
 
-**Layer 2 — `HttpsOnlyRedirects` Faraday middleware:** intercepts every 3xx response before `faraday-follow_redirects` follows it. If the redirect target is not HTTPS (and not localhost), a `Safire::Errors::NetworkError` is raised immediately rather than following the redirect.
+**Layer 2 — `HttpsOnlyRedirects` Faraday middleware:** intercepts every 3xx response before `faraday-follow_redirects` follows it. If the redirect target is not HTTPS, and the local-development exception is not enabled for a loopback host, a `Safire::Errors::NetworkError` is raised immediately rather than following the redirect.
 
 ```ruby
 # middleware/https_only_redirects.rb
@@ -36,14 +41,32 @@ def on_complete(env)
 
   location = env.response_headers['location']
   uri = URI.parse(location)
-  return if uri.scheme == 'https' || localhost?(uri.host)
+  return if uri.scheme == 'https'
+  return if allow_insecure_localhost && localhost_host?(uri.host)
 
   raise Safire::Errors::NetworkError,
         "Blocked redirect to non-HTTPS URL: #{location}"
 end
 ```
 
-Both layers use the same localhost exception (`localhost` and `127.0.0.1`) and must stay consistent. The middleware raises `NetworkError` (transport layer) rather than `ConfigurationError` (construction time) because redirect enforcement is a runtime concern.
+Both layers use the shared loopback host set in `URIValidation` (`localhost`
+and `127.0.0.1`). The middleware raises `NetworkError` (transport layer) rather
+than `ConfigurationError` (construction time) because redirect enforcement is a
+runtime concern.
+
+UDAP registration metadata applies the same secure default to its registration
+URI fields. The UDAP Security STU2 registration profile requires
+`redirect_uris` and `logo_uri` to use HTTPS.
+`URIValidation#strict_https_uri?` provides that default predicate, while
+`URIValidation#localhost_http_uri?` identifies the only local HTTP shape that
+can be accepted when a caller explicitly opts into development mode.
+
+`UdapRegistrationMetadata` uses the same explicit option name for non-TLS local
+redirect and logo URIs. It accepts only HTTP on `localhost` or `127.0.0.1`,
+logs a development-only warning when used, and never permits remote HTTP.
+Safire does not infer Rails, Rack, or another framework's environment; the host
+application must opt in deliberately. Metadata produced through this exception
+is non-conformant and must not be used in production.
 
 ---
 
@@ -51,9 +74,16 @@ Both layers use the same localhost exception (`localhost` and `127.0.0.1`) and m
 
 **Benefits:**
 - Defence-in-depth: HTTPS is enforced at both config time and at every HTTP redirect, closing the redirect-based attack vector
-- Consistent localhost exception across both enforcement points — `http://localhost` works in both URI validation and redirect following
+- Consistent explicit localhost opt-in across config validation, redirect following,
+  and UDAP registration metadata
+- UDAP registration fields remain strict by default while non-TLS local testing
+  requires an explicit, narrowly scoped opt-in
 - Clear error message when a non-HTTPS redirect is blocked, pointing directly at the offending URL
 
 **Trade-offs:**
-- The localhost exception must be maintained in two places — `ClientConfig#localhost_host?` and `HttpsOnlyRedirects` — any change to the exception policy must be applied to both; this duplication is intentional (the two layers are independent defences) but must be kept in sync
+- The config and redirect layers are independent defences, but they share the
+  loopback host policy through `URIValidation`; changes to that helper affect
+  both layers and must be reviewed as a security policy change
+- Callers enabling the local-development exception are responsible for tying it
+  to their application's environment and preventing production use
 - Blocking non-HTTPS redirects can cause unexpected failures if a FHIR server uses HTTP-to-HTTPS redirect chains (e.g. `http://fhir.example.com` → `https://fhir.example.com`); callers should configure `base_url` with the final HTTPS URL directly

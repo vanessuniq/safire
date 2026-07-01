@@ -74,6 +74,15 @@ module Safire
       self
     end
 
+    # Allows HTTP loopback URIs for local development.
+    #
+    # @param enabled [Boolean] set to +true+ only when a local server cannot terminate TLS
+    # @return [self]
+    def allow_insecure_localhost(enabled: true)
+      @config[:allow_insecure_localhost] = enabled
+      self
+    end
+
     def build
       Safire::ClientConfig.new(@config)
     end

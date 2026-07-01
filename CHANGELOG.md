@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Safire::Protocols::UdapRegistrationMetadata` validates and normalizes
+  caller-controlled UDAP Security STU2 registration and cancellation metadata
+  before software-statement signing. It enforces exact grant shapes, HTTPS
+  redirect and logo URIs, required `mailto:` contact data, protocol-owned
+  fields, JSON-compatible extensions, and immutable canonical output. An
+  explicit `allow_insecure_localhost: true` option permits development-only
+  HTTP loopback URIs without allowing remote HTTP.
 - `Safire::ClientConfig` accepts a leaf-first `certificate_chain` of PEM strings
   or `OpenSSL::X509::Certificate` instances as the client signing identity
   foundation for UDAP Dynamic Client Registration. Configured chains must be
@@ -41,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default:
   `'SMART configuration'`) and exposes it as a readable attribute so callers can
   identify which protocol's discovery failed.
+
+### Breaking Changes
+
+- SMART and shared HTTP URI handling now require an explicit
+  `allow_insecure_localhost: true` opt-in before accepting HTTP loopback URIs
+  or redirects. This aligns SMART local-development behavior with UDAP DCR
+  metadata validation while keeping production defaults HTTPS-only.
 
 ### Changed
 

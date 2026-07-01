@@ -39,9 +39,13 @@ module Safire
       # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for fail-closed chain validation
       # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
       # @param verify_chain [Boolean] when +false+, skips X.509 chain validation (dev/test only)
+      # @param allow_insecure_localhost [Boolean] permit signed HTTP endpoint claims only on
+      #   +localhost+ or +127.0.0.1+ for local development
       # @return [Hash, nil] signed endpoint claims to merge, or +nil+ if validation fails
       # @raise [Safire::Errors::CertificateError] if an +x5c+ certificate cannot be parsed
-      def signed_endpoint_claims(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
+      def signed_endpoint_claims(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true,
+                                 allow_insecure_localhost: false)
+        allow_insecure_localhost = validate_localhost_policy(allow_insecure_localhost)
         decoded = decode_and_validate_jwt
         return unless decoded
 
@@ -50,7 +54,7 @@ module Safire
         trust_policy = { trusted_anchors:, crls:, revocation_checker:, verify_chain: }
         return unless signature_and_chain_valid?(header, leaf_cert, trust_policy)
 
-        return unless claims_valid?(payload, base_url, leaf_cert)
+        return unless claims_valid?(payload, base_url, leaf_cert, allow_insecure_localhost:)
 
         extract_endpoint_claims(payload)
       end
@@ -62,9 +66,14 @@ module Safire
       # @param crls [Array<OpenSSL::X509::CRL>] certificate revocation lists for fail-closed chain validation
       # @param revocation_checker [#call, nil] custom revocation policy; must return +true+ to pass
       # @param verify_chain [Boolean] when +false+, skips X.509 chain validation
+      # @param allow_insecure_localhost [Boolean] permit signed HTTP endpoint claims only on
+      #   +localhost+ or +127.0.0.1+ for local development
       # @return [Boolean]
-      def valid?(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true)
-        signed_endpoint_claims(base_url:, trusted_anchors:, crls:, revocation_checker:, verify_chain:).present?
+      def valid?(base_url:, trusted_anchors: [], crls: [], revocation_checker: nil, verify_chain: true,
+                 allow_insecure_localhost: false)
+        signed_endpoint_claims(
+          base_url:, trusted_anchors:, crls:, revocation_checker:, verify_chain:, allow_insecure_localhost:
+        ).present?
       end
 
       private
@@ -205,7 +214,7 @@ module Safire
         raise Errors::CertificateError.new(reason: "malformed x5c #{label} certificate: #{e.message}")
       end
 
-      def claims_valid?(payload, base_url, leaf_cert)
+      def claims_valid?(payload, base_url, leaf_cert, allow_insecure_localhost:)
         # Intentionally runs all checks to surface every validation failure at once
         [
           iss_san_valid?(payload['iss'], leaf_cert),
@@ -215,7 +224,7 @@ module Safire
           exp_valid?(payload['exp'], payload['iat']),
           jti_present?(payload['jti']),
           endpoint_claims_present?(payload),
-          endpoint_claims_valid?(payload)
+          endpoint_claims_valid?(payload, allow_insecure_localhost:)
         ].all?
       end
 
@@ -308,13 +317,13 @@ module Safire
         valid
       end
 
-      def endpoint_claims_valid?(payload)
+      def endpoint_claims_valid?(payload, allow_insecure_localhost:)
         valid = true
         ENDPOINT_CLAIMS.each do |claim|
           next unless payload.key?(claim)
-          next if valid_endpoint_url?(payload[claim])
+          next if valid_endpoint_url?(payload[claim], allow_insecure_localhost:)
 
-          log_failure("'#{claim}' must be an absolute HTTPS URL (localhost HTTP is accepted for development)")
+          log_failure("'#{claim}' must be an absolute HTTPS URL")
           valid = false
         end
         valid
@@ -324,8 +333,8 @@ module Safire
         payload.slice('token_endpoint', 'registration_endpoint', 'authorization_endpoint').compact
       end
 
-      def valid_endpoint_url?(value)
-        value.is_a?(String) && classify_uri(value).nil?
+      def valid_endpoint_url?(value, allow_insecure_localhost:)
+        value.is_a?(String) && classify_uri(value, allow_insecure_localhost:).nil?
       end
 
       def normalize_base_url(base_url)

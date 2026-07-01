@@ -526,6 +526,36 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
       end
     end
 
+    context 'when endpoint claims use HTTP localhost' do
+      let(:jwt) do
+        build_udap_jwt(
+          valid_payload.merge(
+            'token_endpoint' => 'http://localhost:3000/token',
+            'registration_endpoint' => 'http://127.0.0.1:3000/register'
+          )
+        )
+      end
+
+      it 'returns nil by default' do
+        expect(validator.signed_endpoint_claims(base_url:, verify_chain: false)).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/token_endpoint.*HTTPS URL/)
+        expect(Safire.logger).to have_received(:warn).with(/registration_endpoint.*HTTPS URL/)
+      end
+
+      it 'accepts the claims when insecure localhost is explicitly enabled' do
+        result = validator.signed_endpoint_claims(
+          base_url:,
+          verify_chain: false,
+          allow_insecure_localhost: true
+        )
+
+        expect(result).to include(
+          'token_endpoint' => 'http://localhost:3000/token',
+          'registration_endpoint' => 'http://127.0.0.1:3000/register'
+        )
+      end
+    end
+
     context 'when registration_endpoint is missing from the signed payload' do
       let(:jwt) { build_udap_jwt(valid_payload.except('registration_endpoint')) }
 

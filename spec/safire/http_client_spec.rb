@@ -65,6 +65,11 @@ RSpec.describe Safire::HTTPClient do
       expect(connection_options.verify?).to be(false)
       expect(connection_options.ca_file).to eq('/path/to/ca')
     end
+
+    it 'rejects a non-boolean allow_insecure_localhost option' do
+      expect { described_class.new(base_url:, allow_insecure_localhost: 'true') }
+        .to raise_error(Safire::Errors::ConfigurationError, /allow_insecure_localhost/)
+    end
   end
 
   describe 'SSL verification warning' do
@@ -168,13 +173,22 @@ RSpec.describe Safire::HTTPClient do
         .to raise_error(Safire::Errors::NetworkError, /non-HTTPS.*blocked/i)
     end
 
-    it 'follows a redirect to HTTP localhost' do
+    it 'raises NetworkError when redirect points to HTTP localhost by default' do
+      stub_request(:get, base_url)
+        .to_return(status: 301, headers: { 'Location' => 'http://localhost:3000/callback' })
+
+      expect { client.get }
+        .to raise_error(Safire::Errors::NetworkError, /non-HTTPS.*blocked/i)
+    end
+
+    it 'follows a redirect to HTTP localhost when explicitly allowed' do
+      local_client = described_class.new(base_url:, allow_insecure_localhost: true)
       stub_request(:get, base_url)
         .to_return(status: 301, headers: { 'Location' => 'http://localhost:3000/callback' })
       stub_request(:get, 'http://localhost:3000/callback')
         .to_return(status: 200, body: {}.to_json)
 
-      expect { client.get }.not_to raise_error
+      expect { local_client.get }.not_to raise_error
     end
   end
 

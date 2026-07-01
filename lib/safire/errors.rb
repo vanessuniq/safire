@@ -41,7 +41,7 @@ module Safire
     # @!attribute [r] invalid_uri_attributes
     #   @return [Array<Symbol>] attributes whose URIs are malformed
     # @!attribute [r] non_https_uri_attributes
-    #   @return [Array<Symbol>] attributes whose URIs use HTTP on a non-localhost host
+    #   @return [Array<Symbol>] attributes whose URIs do not satisfy the HTTPS policy
     class ConfigurationError < Error
       attr_reader :missing_attributes, :invalid_attribute, :invalid_value, :valid_values,
                   :invalid_uri_attributes, :non_https_uri_attributes
@@ -74,7 +74,7 @@ module Safire
         parts << "Configuration has invalid URIs: #{@invalid_uri_attributes.join(', ')}" if @invalid_uri_attributes.any?
         if @non_https_uri_attributes.any?
           parts << "Configuration requires HTTPS for: #{@non_https_uri_attributes.join(', ')} " \
-                   '(SMART App Launch 2.2.0 requires TLS; HTTP is only allowed for localhost)'
+                   '(SMART App Launch 2.2.0 requires TLS; HTTP localhost requires allow_insecure_localhost: true)'
         end
         parts.any? ? parts.join('. ') : 'Configuration error'
       end

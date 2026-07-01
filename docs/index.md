@@ -40,8 +40,10 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 ### UDAP Security (STU2)
 
 - Discovery (`/.well-known/udap`) with optional community scoping
+- Dynamic Client Registration metadata validation and normalization
 
-Auth flows (DCR, JWT assertion, Tiered OAuth) are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
+Software-statement signing, registration submission, JWT assertion authentication,
+and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ## Demo Application
 

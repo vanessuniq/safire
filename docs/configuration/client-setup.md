@@ -102,6 +102,41 @@ metadata = client.server_metadata(
 
 See [UDAP]({{ site.baseurl }}/udap/) for validation helpers, 404/204 discovery behavior, and the `verify_chain: false` development caveat.
 
+#### UDAP client signing credentials
+
+UDAP software statements use a client private key and a leaf-first X.509
+certificate chain. Configure these reusable credentials on the client:
+
+```ruby
+config = Safire::ClientConfig.new(
+  base_url:   'https://fhir.example.com',
+  private_key: File.read(ENV.fetch('UDAP_CLIENT_PRIVATE_KEY_PATH')),
+  certificate_chain: [
+    File.read(ENV.fetch('UDAP_CLIENT_CERTIFICATE_PATH')),
+    File.read(ENV.fetch('UDAP_CLIENT_ISSUING_CA_PATH'))
+  ],
+  jwt_algorithm: 'RS256'
+)
+
+client = Safire::Client.new(config, protocol: :udap)
+```
+
+`certificate_chain` accepts PEM strings or
+`OpenSSL::X509::Certificate` instances. The leaf certificate must be first, as
+required by the
+[UDAP Security STU2 JWT header profile](https://hl7.org/fhir/us/udap-security/STU2/general.html#jwt-headers).
+`ClientConfig` requires a non-empty collection, copies and freezes PEM strings,
+and snapshots certificate objects as DER. Accessing the chain returns fresh
+certificate objects, so subsequent caller mutations cannot alter the configured
+identity. Safire defers PEM parsing, private-key matching, validity checks, and
+URI SAN checks until a software statement is built.
+
+Configured credentials are intended to serve as defaults, with per-call
+overrides for applications that select signing identities dynamically. The
+end-to-end UDAP Dynamic Client Registration API is not available yet. These
+fields provide its configuration foundation; UDAP discovery does not access
+them.
+
 ### Client Type
 
 Selects the SMART authentication method. Applies only when `protocol: :smart`. Defaults to `:public`.
@@ -153,7 +188,8 @@ All URI parameters are validated at initialization. Safire raises `Safire::Error
 
 - URIs must be well-formed (scheme + host required)
 - URIs must use `https` — required for SMART App Launch and UDAP discovery
-- **Exception:** `http` is permitted for `localhost` and `127.0.0.1` (local development only)
+- **Development exception:** `http` loopback URIs (`localhost` and `127.0.0.1`)
+  are permitted only when `allow_insecure_localhost: true` is configured
 
 The following attributes are validated:
 
@@ -168,19 +204,36 @@ The following attributes are validated:
 
 If you need to bypass discovery and provide endpoints directly, set `authorization_endpoint` and `token_endpoint` in your config. Safire will use them as-is instead of fetching `/.well-known/smart-configuration`.
 
+For a local development server without TLS, opt in deliberately:
+
+```ruby
+config = Safire::ClientConfig.new(
+  base_url: 'http://localhost:3000/fhir',
+  redirect_uri: 'http://localhost:3000/callback',
+  allow_insecure_localhost: ENV['APP_ENV'] == 'development'
+)
+```
+
+Safire does not infer your framework environment. Leave the default `false` in
+production.
+
 UDAP discovery always uses the FHIR `base_url` and the `/.well-known/udap` endpoint. UDAP endpoint values are taken from discovered, signed metadata rather than from SMART endpoint overrides.
 
 ---
 
 ## Credential Protection
 
-`ClientConfig` prevents `client_secret` and `private_key` from leaking in logs or REPL output.
+`ClientConfig` prevents `client_secret`, `private_key`, and
+`certificate_chain` from leaking in logs or REPL output. The certificate chain
+is masked even though certificates are public because the full chain can be
+large and identifies the client's operational signing identity.
 
 `#to_hash` replaces sensitive fields with `'[FILTERED]'`:
 
 ```ruby
-config.to_hash[:client_secret]  # => "[FILTERED]"
-config.to_hash[:base_url]       # => "https://fhir.example.com"
+config.to_hash[:client_secret]      # => "[FILTERED]"
+config.to_hash[:certificate_chain]  # => "[FILTERED]"
+config.to_hash[:base_url]           # => "https://fhir.example.com"
 ```
 
 `#inspect` is overridden to mask sensitive fields and omit `nil` attributes, so REPL sessions and error messages never expose credentials:

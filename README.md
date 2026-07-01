@@ -45,12 +45,14 @@ Dynamic Client Registration metadata validation is also implemented:
 
 ```ruby
 registration_metadata = Safire::Protocols::UdapRegistrationMetadata.new(
-  client_name: 'Example Health App',
-  contacts: ['mailto:security@example.com'],
-  grant_types: %w[authorization_code refresh_token],
-  scope: 'openid system/Patient.rs',
-  redirect_uris: ['https://app.example.com/callback'],
-  logo_uri: 'https://app.example.com/logo.png'
+  {
+    client_name: 'Example Health App',
+    contacts: ['mailto:security@example.com'],
+    grant_types: %w[authorization_code refresh_token],
+    scope: 'openid system/Patient.rs',
+    redirect_uris: ['https://app.example.com/callback'],
+    logo_uri: 'https://app.example.com/logo.png'
+  }
 )
 
 registration_metadata.to_h

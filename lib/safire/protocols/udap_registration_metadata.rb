@@ -34,6 +34,7 @@ module Safire
     #     operation: :cancel
     #   )
     #
+    # @see https://hl7.org/fhir/us/udap-security/STU2/registration.html
     # @see https://www.udap.org/udap-dynamic-client-registration-stu1.html
     class UdapRegistrationMetadata
       include URIValidation

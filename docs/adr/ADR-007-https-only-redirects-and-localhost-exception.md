@@ -42,17 +42,17 @@ def on_complete(env)
   location = env.response_headers['location']
   uri = URI.parse(location)
   return if uri.scheme == 'https'
-  return if allow_insecure_localhost && localhost?(uri.host)
+  return if allow_insecure_localhost && localhost_host?(uri.host)
 
   raise Safire::Errors::NetworkError,
         "Blocked redirect to non-HTTPS URL: #{location}"
 end
 ```
 
-Both layers use the same loopback host set (`localhost` and `127.0.0.1`) and
-must stay consistent. The middleware raises `NetworkError` (transport layer)
-rather than `ConfigurationError` (construction time) because redirect
-enforcement is a runtime concern.
+Both layers use the shared loopback host set in `URIValidation` (`localhost`
+and `127.0.0.1`). The middleware raises `NetworkError` (transport layer) rather
+than `ConfigurationError` (construction time) because redirect enforcement is a
+runtime concern.
 
 UDAP registration metadata applies the same secure default to its registration
 URI fields. The UDAP Security STU2 registration profile requires
@@ -81,10 +81,9 @@ is non-conformant and must not be used in production.
 - Clear error message when a non-HTTPS redirect is blocked, pointing directly at the offending URL
 
 **Trade-offs:**
-- The loopback host set must be maintained in two places —
-  `URIValidation#localhost_host?` and `HttpsOnlyRedirects` — any change to the
-  host policy must be applied to both; this duplication is intentional (the two
-  layers are independent defences) but must be kept in sync
+- The config and redirect layers are independent defences, but they share the
+  loopback host policy through `URIValidation`; changes to that helper affect
+  both layers and must be reviewed as a security policy change
 - Callers enabling the local-development exception are responsible for tying it
   to their application's environment and preventing production use
 - Blocking non-HTTPS redirects can cause unexpected failures if a FHIR server uses HTTP-to-HTTPS redirect chains (e.g. `http://fhir.example.com` → `https://fhir.example.com`); callers should configure `base_url` with the final HTTPS URL directly

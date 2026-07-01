@@ -78,6 +78,11 @@ puts metadata.udap_profiles_supported.inspect
 > ```ruby
 > metadata = client.server_metadata(verify_chain: false)
 > ```
+>
+> Local HTTP loopback servers also require `allow_insecure_localhost: true`
+> in the client configuration. That option permits HTTP only on `localhost`
+> and `127.0.0.1`; it is a Safire development exception, not UDAP production
+> conformance.
 
 ### Community-scoped discovery
 
@@ -125,9 +130,9 @@ signing/submission, JWT client authentication, and Tiered OAuth remain planned.
 
 | Helper | Checks |
 |--------|--------|
-| `supports_dynamic_registration?` | `udap_dcr` profile and a valid HTTPS `registration_endpoint` |
-| `supports_jwt_client_auth?` | `udap_authn` profile and a valid HTTPS `token_endpoint` |
-| `supports_client_authorization?` | `udap_authz` profile, `client_credentials` grant, and a valid HTTPS `token_endpoint` |
+| `supports_dynamic_registration?` | `udap_dcr` profile and a valid endpoint URL for `registration_endpoint` |
+| `supports_jwt_client_auth?` | `udap_authn` profile and a valid endpoint URL for `token_endpoint` |
+| `supports_client_authorization?` | `udap_authz` profile, `client_credentials` grant, and a valid endpoint URL for `token_endpoint` |
 | `supports_authorization_code?` | `authorization_code` appears in `grant_types_supported` |
 | `supports_refresh_token?` | `refresh_token` appears in `grant_types_supported` |
 | `supports_tiered_oauth?` | `udap_to` profile is advertised |

@@ -47,8 +47,9 @@ module Safire
     # Returns whether +value+ is an absolute HTTPS URI.
     #
     # Unlike {#classify_uri}, this predicate never permits plain HTTP on
-    # localhost. Use it for protocol fields, such as UDAP registration
-    # metadata, whose specification requires HTTPS without an exception.
+    # localhost. Use it as the strict HTTPS primitive for protocol fields;
+    # callers that provide a development-only localhost exception should
+    # compose it explicitly with {#localhost_http_uri?}.
     #
     # @param value [Object] value to validate
     # @return [Boolean]
@@ -88,6 +89,8 @@ module Safire
       raise_invalid_localhost_policy!(value)
     end
 
+    # Hook for including classes that need a domain-specific error type while
+    # sharing the boolean localhost policy check.
     def raise_invalid_localhost_policy!(value)
       raise Errors::ConfigurationError.new(
         invalid_attribute: :allow_insecure_localhost,

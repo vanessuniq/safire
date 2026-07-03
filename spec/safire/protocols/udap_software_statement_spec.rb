@@ -47,13 +47,26 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
 
   describe '#to_jwt' do
     it 'builds the minimal JOSE header with a leaf-first x5c chain' do
-      intermediate = build_valid_certificate(key: rsa_key, uri_san: 'https://issuer.example.com', serial: 2)
-      statement = build_statement(certificate_chain: [leaf_cert, intermediate])
-      _payload, header = decode_statement(statement)
+      issuer_key = OpenSSL::PKey::RSA.generate(2048)
+      issuer_cert = build_valid_certificate(
+        key: issuer_key,
+        uri_san: 'https://issuer.example.com',
+        subject: '/CN=UDAP Issuer',
+        serial: 2
+      )
+      issued_leaf = build_valid_certificate(
+        key: rsa_key,
+        uri_san: client_uri,
+        issuer_cert:,
+        issuer_key:,
+        serial: 3
+      )
+      statement = build_statement(certificate_chain: [issued_leaf, issuer_cert])
+      _payload, header = decode_statement(statement, cert: issued_leaf)
 
       expect(header).to eq(
         'alg' => 'RS256',
-        'x5c' => [leaf_cert, intermediate].map { |cert| Base64.strict_encode64(cert.to_der) }
+        'x5c' => [issued_leaf, issuer_cert].map { |cert| Base64.strict_encode64(cert.to_der) }
       )
     end
 
@@ -104,6 +117,23 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
       expect(payload).to include('iss' => exact_client_uri, 'sub' => exact_client_uri, 'aud' => exact_endpoint)
     end
 
+    it 'snapshots validated URI inputs before signing' do
+      mutable_client_uri = client_uri.dup
+      mutable_endpoint = registration_endpoint.dup
+      cert = build_valid_certificate(key: rsa_key, uri_san: mutable_client_uri)
+      statement = build_statement(
+        client_uri: mutable_client_uri,
+        registration_endpoint: mutable_endpoint,
+        certificate_chain: [cert]
+      )
+
+      mutable_client_uri.replace('https://attacker.example.com/app')
+      mutable_endpoint.replace('https://attacker.example.com/register')
+      payload, = decode_statement(statement, cert:)
+
+      expect(payload).to include('iss' => client_uri, 'sub' => client_uri, 'aud' => registration_endpoint)
+    end
+
     it 'allows non-HTTPS absolute client URIs when the exact URI appears in the certificate SAN' do
       did_uri = 'did:web:client.example.com:app'
       cert = build_valid_certificate(key: rsa_key, uri_san: did_uri)
@@ -125,6 +155,22 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
       second_payload, = decode_statement(build_statement(jti_generator: nil))
 
       expect(first_payload['jti']).not_to eq(second_payload['jti'])
+    end
+
+    it 'revalidates certificate validity at signing time' do
+      signing_clock = Struct.new(:now).new(now)
+      expiring_cert = build_udap_certificate(
+        key: rsa_key,
+        uri_san: client_uri,
+        not_before: now - 60,
+        not_after: now + 60
+      )
+      statement = build_statement(clock: signing_clock, certificate_chain: [expiring_cert])
+
+      signing_clock.now = now + 61
+
+      expect { statement.to_jwt }
+        .to raise_error(Safire::Errors::CertificateError, /expired/)
     end
   end
 
@@ -162,6 +208,16 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
 
     it 'honors an explicit compatible algorithm when advertised' do
       statement = build_statement(algorithm: 'RS384', supported_algorithms: %w[RS256 RS384])
+      _payload, header = decode_statement(statement, algorithm: 'RS384')
+
+      expect(header['alg']).to eq('RS384')
+    end
+
+    it 'snapshots an explicit algorithm before signing' do
+      algorithm = 'RS384'.dup
+      statement = build_statement(algorithm:, supported_algorithms: ['RS384'])
+
+      algorithm.replace('RS256')
       _payload, header = decode_statement(statement, algorithm: 'RS384')
 
       expect(header['alg']).to eq('RS384')
@@ -244,6 +300,19 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
         .to raise_error(Safire::Errors::CertificateError, /not yet valid/)
     end
 
+    it 'rejects a certificate chain that is not issuer-ordered' do
+      unrelated_key = OpenSSL::PKey::RSA.generate(2048)
+      unrelated = build_valid_certificate(
+        key: unrelated_key,
+        uri_san: 'https://unrelated.example.com',
+        subject: '/CN=Unrelated Issuer',
+        serial: 2
+      )
+
+      expect { build_statement(certificate_chain: [leaf_cert, unrelated]) }
+        .to raise_error(Safire::Errors::CertificateError, /issuer-ordered/)
+    end
+
     it 'rejects a leaf certificate whose public key does not match the private key' do
       other_key = OpenSSL::PKey::RSA.generate(2048)
       mismatched = build_valid_certificate(key: other_key, uri_san: client_uri)
@@ -299,10 +368,17 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
         .to raise_error(Safire::Errors::ConfigurationError, /jti_generator/)
     end
 
-    it 'requires the clock to return a time-like object' do
+    it 'requires the clock to return Time' do
       bad_clock = class_double(Time, now: Object.new)
 
       expect { build_statement(clock: bad_clock) }
+        .to raise_error(Safire::Errors::ConfigurationError, /clock/)
+    end
+
+    it 'rejects NumericDate clock values before certificate comparisons' do
+      numeric_clock = class_double(Time, now: now.to_i)
+
+      expect { build_statement(clock: numeric_clock) }
         .to raise_error(Safire::Errors::ConfigurationError, /clock/)
     end
   end

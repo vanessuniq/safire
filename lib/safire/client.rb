@@ -18,8 +18,8 @@ module Safire
   # * :client_secret [String, optional] required for confidential_symmetric clients
   # * :private_key [OpenSSL::PKey, String, optional] private key for SMART asymmetric clients,
   #     backend services, and UDAP software-statement signing
-  # * :certificate_chain [Array<String, OpenSSL::X509::Certificate>, optional] leaf-first X.509
-  #     certificate chain for UDAP software-statement signing
+  # * :certificate_chain [Array<String, OpenSSL::X509::Certificate>, optional] leaf-first,
+  #     issuer-ordered X.509 certificate chain for UDAP software-statement signing
   # * :kid [String, optional] key ID matching the registered public key for asymmetric clients and backend services
   # * :jwt_algorithm [String, optional] JWT signing algorithm. SMART supports RS384 or ES384;
   #     UDAP software-statement signing supports RS256, RS384, ES256, or ES384 subject to key

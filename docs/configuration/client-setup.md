@@ -104,8 +104,9 @@ See [UDAP]({{ site.baseurl }}/udap/) for validation helpers, 404/204 discovery b
 
 #### UDAP client signing credentials
 
-UDAP software statements use a client private key and a leaf-first X.509
-certificate chain. Configure these reusable credentials on the client:
+UDAP software statements use a client private key and a leaf-first,
+issuer-ordered X.509 certificate chain. Configure these reusable credentials on
+the client:
 
 ```ruby
 config = Safire::ClientConfig.new(

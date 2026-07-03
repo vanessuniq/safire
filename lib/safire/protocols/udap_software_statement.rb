@@ -39,10 +39,11 @@ module Safire
       # @param client_uri [String] absolute client URI used as +iss+ and +sub+
       # @param registration_endpoint [String] discovered registration endpoint used exactly as +aud+
       # @param private_key [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String] signing private key or PEM
-      # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>] leaf-first client certificate chain
+      # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>] leaf-first,
+      #   issuer-ordered client certificate chain
       # @param supported_algorithms [Array<String>] algorithms advertised by UDAP discovery
       # @param algorithm [String, nil] optional explicit signing algorithm
-      # @param clock [#now] time source for deterministic NumericDate claims
+      # @param clock [#now] time source returning +Time+ for deterministic NumericDate claims
       # @param jti_generator [#call, nil] JTI source; defaults to +SecureRandom.uuid+
       # @param allow_insecure_localhost [Boolean] permit HTTP localhost registration endpoint for development
       # @raise [Safire::Errors::ValidationError] when +metadata+ is not validated registration metadata
@@ -69,14 +70,18 @@ module Safire
       #
       # @return [String]
       # @raise [Safire::Errors::ConfigurationError] when the clock or JTI generator returns an invalid value
+      # @raise [Safire::Errors::CertificateError] when the certificate chain is not valid at signing time
       def to_jwt
-        JWT.encode(payload, @private_key, @algorithm, header)
+        signing_time = current_time
+        validate_certificate_times!(signing_time)
+
+        JWT.encode(payload(signing_time), @private_key, @algorithm, header)
       end
 
       private
 
-      def payload
-        now = current_timestamp
+      def payload(signing_time)
+        now = signing_time.to_i
         @metadata.to_h.merge(
           'iss' => @client_uri,
           'sub' => @client_uri,
@@ -104,7 +109,7 @@ module Safire
       end
 
       def validate_client_uri(value)
-        return value if absolute_client_uri?(value)
+        return immutable_string(value) if absolute_client_uri?(value)
 
         configuration_error!(:client_uri, value.class, ['absolute URI string'])
       end
@@ -123,8 +128,8 @@ module Safire
 
       def validate_registration_endpoint(value, allow_insecure_localhost)
         allow_insecure_localhost = validate_localhost_policy(allow_insecure_localhost)
-        return value if strict_https_uri?(value)
-        return value if allow_insecure_localhost && localhost_http_uri?(value)
+        return immutable_string(value) if strict_https_uri?(value)
+        return immutable_string(value) if allow_insecure_localhost && localhost_http_uri?(value)
 
         configuration_error!(:registration_endpoint, value.class, ['absolute HTTPS URI'])
       end
@@ -190,7 +195,7 @@ module Safire
           configuration_error!(:supported_algorithms, values.class, ['Array<String>'])
         end
 
-        values.dup.freeze
+        values.map { |value| immutable_string(value) }.freeze
       end
 
       def select_algorithm(explicit_algorithm)
@@ -202,9 +207,11 @@ module Safire
       end
 
       def select_explicit_algorithm(algorithm, compatible)
-        return algorithm if SUPPORTED_ALGORITHMS.include?(algorithm) &&
-                            compatible.include?(algorithm) &&
-                            @supported_algorithms.include?(algorithm)
+        if SUPPORTED_ALGORITHMS.include?(algorithm) &&
+           compatible.include?(algorithm) &&
+           @supported_algorithms.include?(algorithm)
+          return immutable_string(algorithm)
+        end
 
         configuration_error!(:algorithm, algorithm, compatible & @supported_algorithms)
       end
@@ -222,9 +229,14 @@ module Safire
 
       def validate_certificate_chain!
         time = current_time
-        @certificate_chain.each { |cert| validate_certificate_time!(cert, time) }
+        validate_certificate_times!(time)
+        validate_chain_order!
         validate_key_matches_leaf!
         validate_leaf_uri_san!
+      end
+
+      def validate_certificate_times!(time)
+        @certificate_chain.each { |cert| validate_certificate_time!(cert, time) }
       end
 
       def validate_certificate_time!(cert, time)
@@ -234,6 +246,19 @@ module Safire
         return unless cert.not_after <= time
 
         raise Errors::CertificateError.new(reason: 'certificate is expired', subject: cert.subject.to_s)
+      end
+
+      def validate_chain_order!
+        @certificate_chain.each_cons(2) do |child, issuer|
+          next if child.issuer == issuer.subject && child.verify(issuer.public_key)
+
+          raise Errors::CertificateError.new(
+            reason: 'certificate_chain must be leaf-first and issuer-ordered',
+            subject: child.subject.to_s
+          )
+        end
+      rescue OpenSSL::X509::CertificateError, OpenSSL::PKey::PKeyError
+        raise Errors::CertificateError.new(reason: 'certificate_chain must be leaf-first and issuer-ordered')
       end
 
       def validate_key_matches_leaf!
@@ -280,15 +305,11 @@ module Safire
         @certificate_chain.first
       end
 
-      def current_timestamp
-        current_time.to_i
-      end
-
       def current_time
         time = @clock.now
-        return time if time.respond_to?(:to_i)
+        return time if time.is_a?(Time)
 
-        configuration_error!(:clock, time.class, ['object whose #now result responds to #to_i'])
+        configuration_error!(:clock, time.class, ['object whose #now result is a Time'])
       end
 
       def generate_jti
@@ -304,6 +325,10 @@ module Safire
           invalid_value:,
           valid_values:
         )
+      end
+
+      def immutable_string(value)
+        value.dup.freeze
       end
     end
   end

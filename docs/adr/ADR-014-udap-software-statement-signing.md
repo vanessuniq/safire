@@ -63,8 +63,8 @@ Safire includes only the required `alg` and `x5c` header fields. It does not
 emit `typ`, `kid`, `jku`, or `x5u`. STU2's experimental `jku` alternative does
 not apply to registration requests.
 
-`x5c` is generated from the supplied certificate chain in leaf-first order. Each
-entry is Base64 DER with no PEM wrapper.
+`x5c` is generated from the supplied certificate chain in leaf-first issuer
+order. Each entry is Base64 DER with no PEM wrapper.
 
 ### Constrain algorithm selection
 
@@ -83,15 +83,16 @@ for RSA keys because `RS256` is the STU2 baseline.
 
 ### Validate local signing identity, not server trust
 
-Before signing, Safire parses and snapshots the certificate chain, checks
-certificate validity dates with the injected clock, verifies that the private
+Before signing, Safire parses and snapshots the certificate chain, checks that
+the supplied chain is leaf-first and issuer-ordered, verifies that the private
 key matches the leaf certificate, and checks that the client URI appears in the
-leaf certificate URI SAN.
+leaf certificate URI SAN. Certificate validity dates are checked when the
+builder is constructed and rechecked each time a software statement is emitted.
 
 Safire does not decide whether the authorization server will trust the client
-certificate chain. Chain-building, revocation policy, and community trust for
-the client certificate remain authorization-server decisions during
-registration processing.
+certificate chain. Chain-building to trust anchors, revocation policy, and
+community trust for the client certificate remain authorization-server
+decisions during registration processing.
 
 ### Keep test seams explicit
 

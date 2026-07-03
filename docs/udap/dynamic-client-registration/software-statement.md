@@ -34,16 +34,16 @@ security claims:
 | `jti` | Fresh UUID by default |
 
 The JOSE header contains only `alg` and `x5c`. The `x5c` value is the supplied
-leaf-first certificate chain encoded as Base64 DER strings, without PEM
-wrappers.
+leaf-first, issuer-ordered certificate chain encoded as Base64 DER strings,
+without PEM wrappers.
 
 Safire does not emit `typ`, `kid`, `jku`, or `x5u` for registration software
 statements.
 
 ## Signing Identity
 
-Configure a private key and a leaf-first certificate chain as the client
-signing identity:
+Configure a private key and a leaf-first, issuer-ordered certificate chain as
+the client signing identity:
 
 ```ruby
 config = Safire::ClientConfig.new(
@@ -87,9 +87,10 @@ algorithm must be advertised by the server and compatible with the key.
 Safire performs local consistency checks before signing:
 
 - registration metadata must already be a `UdapRegistrationMetadata` object
-- certificate chains must be non-empty and leaf-first
+- certificate chains must be non-empty, leaf-first, and issuer-ordered
 - certificate entries must be parseable PEM strings or `OpenSSL::X509::Certificate` objects
-- every certificate must be currently valid according to the signing clock
+- every certificate must be valid according to the signing clock when the
+  builder is created and when the JWT is emitted
 - the private key must contain private material and match the leaf certificate
 - the client URI must exactly match a URI SAN in the leaf certificate
 - the registration endpoint must be HTTPS unless `allow_insecure_localhost: true`

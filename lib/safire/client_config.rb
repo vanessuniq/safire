@@ -28,10 +28,10 @@ module Safire
   #   @return [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil] the private key for signing
   #     SMART JWT assertions or UDAP software statements. Can be an OpenSSL key object or PEM string.
   # @!attribute [r] certificate_chain
-  #   @return [Array<String, OpenSSL::X509::Certificate>, nil] leaf-first X.509 certificate chain
-  #     for UDAP software-statement signing. Entries may be PEM strings or certificate objects.
-  #     Certificate objects are stored as DER snapshots and returned as fresh copies. Parsing PEM
-  #     strings and identity validation occur when the software statement is built.
+  #   @return [Array<String, OpenSSL::X509::Certificate>, nil] leaf-first, issuer-ordered X.509
+  #     certificate chain for UDAP software-statement signing. Entries may be PEM strings or
+  #     certificate objects. Certificate objects are stored as DER snapshots and returned as fresh
+  #     copies. Parsing PEM strings and identity validation occur when the software statement is built.
   # @!attribute [r] kid
   #   @return [String, nil] the key ID matching the public key registered with the authorization server.
   #     Required for confidential asymmetric authentication.

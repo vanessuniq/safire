@@ -22,11 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five-minute lifetime, fresh `jti`, RSA/EC algorithm negotiation constrained
   by discovery and key type, and local certificate/key/SAN consistency checks.
   End-to-end UDAP registration remains planned.
-- `Safire::ClientConfig` accepts a leaf-first `certificate_chain` of PEM strings
-  or `OpenSSL::X509::Certificate` instances as the client signing identity
-  foundation for UDAP Dynamic Client Registration. Configured chains must be
-  non-empty; certificate objects are stored as DER snapshots, and the chain is
-  masked alongside private keys and client secrets in configuration output.
+- `Safire::ClientConfig` accepts a leaf-first, issuer-ordered
+  `certificate_chain` of PEM strings or `OpenSSL::X509::Certificate` instances
+  as the client signing identity foundation for UDAP Dynamic Client
+  Registration. Configured chains must be non-empty; certificate objects are
+  stored as DER snapshots, and the chain is masked alongside private keys and
+  client secrets in configuration output.
   End-to-end UDAP registration remains planned.
 - UDAP Security STU2 discovery is now available with
   `Safire::Client.new(..., protocol: :udap).server_metadata`. Safire fetches

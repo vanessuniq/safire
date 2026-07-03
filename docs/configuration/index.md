@@ -29,7 +29,7 @@ flowchart TD
     A -->|"resolves config"| B
     A -->|"validates protocol + client_type"| C
     C -->|":smart (default)"| D
-    C -->|":udap"| G["Protocols::Udap\n— discovery implemented\n— auth flows planned"]
+    C -->|":udap"| G["Protocols::Udap\n— discovery implemented\n— DCR foundations implemented\n— auth flows planned"]
     D -->|"lazily fetches"| E
     E -->|"HTTP"| F
 ```
@@ -55,9 +55,9 @@ flowchart TD
 | `authorization_endpoint` | String | No | — | Override the discovered authorization endpoint |
 | `token_endpoint` | String | No | — | Override the discovered token endpoint |
 
-`certificate_chain` and the UDAP algorithm values are configuration groundwork
-for Dynamic Client Registration. The current UDAP runtime supports discovery;
-registration is not available yet.
+`certificate_chain` and the UDAP algorithm values are used by Safire's UDAP
+software-statement signing foundation. Network registration is not available
+yet.
 
 ## In This Section
 

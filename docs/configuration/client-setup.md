@@ -128,14 +128,14 @@ required by the
 `ClientConfig` requires a non-empty collection, copies and freezes PEM strings,
 and snapshots certificate objects as DER. Accessing the chain returns fresh
 certificate objects, so subsequent caller mutations cannot alter the configured
-identity. Safire defers PEM parsing, private-key matching, validity checks, and
-URI SAN checks until a software statement is built.
+identity. Safire performs PEM parsing, private-key matching, validity checks,
+and URI SAN checks when a software statement is built.
 
 Configured credentials are intended to serve as defaults, with per-call
-overrides for applications that select signing identities dynamically. The
-end-to-end UDAP Dynamic Client Registration API is not available yet. These
-fields provide its configuration foundation; UDAP discovery does not access
-them.
+overrides for applications that select signing identities dynamically. Safire
+can build the software statement foundation now; the end-to-end UDAP Dynamic
+Client Registration API is not available yet. UDAP discovery does not access
+these signing credentials.
 
 ### Client Type
 

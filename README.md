@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) server metadata discovery and registration metadata validation. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
+Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) server metadata discovery plus UDAP registration metadata and software-statement foundations. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
 
 ---
 
@@ -58,7 +58,7 @@ registration_metadata = Safire::Protocols::UdapRegistrationMetadata.new(
 registration_metadata.to_h
 ```
 
-UDAP software-statement signing, registration submission, JWT client authentication, and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
+UDAP registration submission, JWT client authentication, and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ---
 

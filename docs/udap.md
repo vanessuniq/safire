@@ -3,7 +3,7 @@ layout: default
 title: UDAP
 nav_order: 5
 permalink: /udap/
-description: "UDAP Security STU2 discovery, registration metadata validation, and software-statement signing foundations in Safire."
+description: "UDAP Security STU2 discovery and Dynamic Client Registration in Safire."
 has_children: true
 ---
 
@@ -12,11 +12,10 @@ has_children: true
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-**Implemented now:** UDAP Security STU2 discovery (`/.well-known/udap`),
-including signed metadata validation and optional community scoping. The
-[Dynamic Client Registration guide]({% link udap/dynamic-client-registration/index.md %})
-also covers implemented registration metadata validation and software-statement
-signing foundations. Registration submission, JWT client authentication, and
+**Implemented now:** UDAP Security STU2 discovery (`/.well-known/udap`)
+including signed metadata validation and optional community scoping, plus
+certificate-backed Dynamic Client Registration for new registrations and
+modifications. Registration cancellation, JWT client authentication, and
 Tiered OAuth remain planned. See
 [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md).
 </div>
@@ -125,9 +124,8 @@ metadata.signed_metadata_valid?(
 Support helpers expose advertised profiles and usable discovery capabilities.
 Capability helpers combine profile or grant signals with the endpoint
 preconditions Safire can verify during discovery. These describe what the
-server advertises; Safire's DCR metadata validator and software-statement
-signing foundation are available, while DCR submission, JWT client
-authentication, and Tiered OAuth remain planned.
+server advertises; `register_client` performs its own discovery-bound checks
+before submitting a UDAP registration request.
 
 | Helper | Checks |
 |--------|--------|
@@ -158,6 +156,53 @@ metadata.client_authorization_profile?
 metadata.tiered_oauth_profile?
 ```
 
+---
+
+## Dynamic Client Registration
+
+UDAP Dynamic Client Registration is available through the same facade method as
+SMART registration, selected by `protocol: :udap`. Safire discovers and
+validates UDAP metadata, signs your registration metadata into a
+`software_statement`, posts the fixed UDAP request envelope, and returns the
+server's registration response.
+
+```ruby
+client = Safire::Client.new(
+  {
+    base_url: 'https://fhir.example.com',
+    private_key: File.read('client-key.pem'),
+    certificate_chain: [
+      File.read('client-cert.pem'),
+      File.read('issuing-ca.pem')
+    ]
+  },
+  protocol: :udap
+)
+
+registration = client.register_client(
+  {
+    client_name: 'Example Backend Service',
+    contacts: ['mailto:security@example.com'],
+    grant_types: ['client_credentials'],
+    scope: 'system/Patient.rs system/Observation.rs'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+
+registration['client_id']
+```
+
+Pass `community:` when registering within a specific UDAP trust community.
+Pass `certifications:` when the community requires third-party certification
+JWTs. Safire shape-checks those JWT strings and sends them to the authorization
+server; it does not create, verify, or interpret certification contents.
+
+See [Dynamic Client Registration]({% link udap/dynamic-client-registration/index.md %})
+for metadata rules, software-statement behavior, trust-policy keywords,
+certification handling, and error boundaries.
+
 ### Error handling
 
 | Condition | Error raised |
@@ -176,18 +221,18 @@ metadata.tiered_oauth_profile?
 
 ### Client Flows
 
-- **Dynamic Client Registration (DCR)** — metadata validation and
-  software-statement signing foundations are implemented; registration
-  submission remains planned for the one-time registration that obtains a
-  `client_id`
+- **Registration cancellation** — cancel an existing UDAP registration by
+  submitting a signed cancellation request with an empty `grant_types` array
 - **JWT Client Authentication** — authenticate on every request using a signed JWT assertion (Authentication Token, AnT) with an X.509 certificate chain in the `x5c` header; the registered `client_id` is reused as `iss` and `sub` in each assertion
 - **Tiered OAuth** — delegated authorization for multi-system access per the UDAP Security IG
 - **Pushed Authorization Requests (RFC 9126)** — PAR support for pre-registering authorization requests
 
 ### Trust Framework
 
-- **Client certificate trust management** — apply trust anchors and community policy to future
-  UDAP client authentication and registration flows
+- **Client certificate trust management for auth flows** — apply trust anchors
+  and community policy to future UDAP client authentication flows; registration
+  server acceptance of the submitted client certificate remains the
+  authorization server's trust decision
 - **Trust Community Support** — integration with UDAP trust communities (e.g. Carequality, CommonWell)
 
 ---

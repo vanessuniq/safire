@@ -37,8 +37,10 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   exposes UDAP discovery while rejecting SMART-only `client_type:` values
 - **Demo Workflow** — Sinatra demo supports protocol-aware server setup and a
   UDAP Discovery screen with signed metadata trust status
-- **UDAP DCR Foundations** — registration metadata validation and internal
-  X.509-backed software statement signing
+- **UDAP Dynamic Client Registration** — certificate-backed STU2 new
+  registration and modification via signed software statements; includes
+  metadata validation, signed endpoint precedence, community-scoped discovery,
+  certification envelope handling, and RFC 7591-shaped response parsing
 
 ---
 
@@ -46,8 +48,8 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 ### UDAP Security
 
-- **UDAP Dynamic Client Registration Submission** — signed registration request
-  envelope POST and response handling
+- **UDAP Registration Cancellation** — signed cancellation request with an empty
+  `grant_types` array and response confirmation
 - **UDAP JWT Client Auth** — B2B and consumer-facing authorization flows
 - **Tiered OAuth** — identity chaining for multi-system access
 
@@ -92,5 +94,5 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 | ActiveSupport | ≥ 7.1, < 9 |
 | Rails (optional) | ≥ 7.1 |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 2.0.0 (STU2 discovery and DCR signing foundations implemented; registration submission/auth flows planned) |
+| UDAP Security | 2.0.0 (STU2 discovery and Dynamic Client Registration implemented; cancellation/auth flows planned) |
 | FHIR | R4, R4B |

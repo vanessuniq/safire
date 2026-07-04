@@ -46,7 +46,7 @@ client = Safire::Client.new(config)
 ```
 
 {: .note }
-> `client_id` is the only authorization parameter validated at call time rather than at construction. `authorization_url`, `request_access_token`, `refresh_token`, and `request_backend_token` each raise `Safire::Errors::ConfigurationError` if `client_id` is absent when called. This means you can build a client without a `client_id` and call `register_client` to obtain one at runtime. See [Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) for details.
+> `client_id` is the only authorization parameter validated at call time rather than at construction. `authorization_url`, `request_access_token`, `refresh_token`, and `request_backend_token` each raise `Safire::Errors::ConfigurationError` if `client_id` is absent when called. This means you can build a client without a `client_id` and call `register_client` to obtain one at runtime. See [SMART Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) or [UDAP Dynamic Client Registration]({{ site.baseurl }}/udap/dynamic-client-registration/) for details.
 
 ---
 
@@ -65,7 +65,7 @@ Selects the authorization protocol. Defaults to `:smart`.
 | Value | Status | Description |
 |-------|--------|-------------|
 | `:smart` | Implemented | SMART App Launch 2.2.0 |
-| `:udap` | Partial | UDAP Security STU2 discovery — `server_metadata` validates `signed_metadata`, supports optional `community:`, and accepts trust policy keywords (`trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:`); auth flows raise `NotImplementedError` |
+| `:udap` | Partial | UDAP Security STU2 discovery and Dynamic Client Registration — `server_metadata` validates `signed_metadata`, supports optional `community:`, and accepts trust policy keywords (`trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:`); `register_client` submits certificate-backed UDAP registration requests; auth/token flows raise `NotImplementedError` |
 
 For UDAP, `client_type:` is not applicable. Passing any explicit value, either at initialization or through `client.client_type=`, raises `Safire::Errors::ConfigurationError`. Future UDAP authentication flows will use signed JWT assertions rather than SMART client types.
 
@@ -132,11 +132,24 @@ certificate objects, so subsequent caller mutations cannot alter the configured
 identity. Safire performs PEM parsing, private-key matching, validity checks,
 and URI SAN checks when a software statement is built.
 
-Configured credentials are intended to serve as defaults, with per-call
-overrides for applications that select signing identities dynamically. Safire
-can build the software statement foundation now; the end-to-end UDAP Dynamic
-Client Registration API is not available yet. UDAP discovery does not access
-these signing credentials.
+Configured credentials are intended to serve as defaults for UDAP Dynamic
+Client Registration, with per-call overrides for applications that select
+signing identities dynamically. UDAP discovery does not access these signing
+credentials.
+
+```ruby
+registration = client.register_client(
+  {
+    client_name: 'Example Backend Service',
+    contacts: ['mailto:security@example.com'],
+    grant_types: ['client_credentials'],
+    scope: 'system/Patient.rs'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [udap_ca],
+  crls:            [udap_crl]
+)
+```
 
 ### Client Type
 
@@ -249,6 +262,6 @@ config.inspect
 ## Next Steps
 
 - [Logging]({{ site.baseurl }}/configuration/logging/) — configure Safire's logger and HTTP request logging
-- [UDAP Discovery]({{ site.baseurl }}/udap/) — discover and validate UDAP Security STU2 server metadata
-- [Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) — obtain a `client_id` at runtime using RFC 7591
+- [UDAP]({{ site.baseurl }}/udap/) — discover UDAP metadata and register certificate-backed clients
+- [SMART Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) — obtain a `client_id` at runtime using RFC 7591
 - [SMART App Launch Workflows]({{ site.baseurl }}/smart-on-fhir/) — step-by-step authorization flow guides

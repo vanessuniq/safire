@@ -37,8 +37,8 @@ discovered registration endpoint, a private key, a leaf-first certificate
 chain, and the server-advertised registration signing algorithms.
 
 The builder has no HTTP behavior and does not perform discovery. UDAP protocol
-orchestration will remain responsible for fetching metadata, checking DCR
-capability, and POSTing the request envelope in a later PR.
+orchestration is responsible for fetching metadata, checking DCR capability,
+POSTing the request envelope, and parsing the response.
 
 ### Keep URI comparison exact
 
@@ -111,6 +111,6 @@ stubbing global randomness.
 - The generated JWT is short-lived: `exp` is always `iat + 300`.
 - Private keys, compact JWTs, and certificate contents are not included in
   validation error messages.
-- End-to-end UDAP registration still requires the protocol orchestration PR
-  that discovers metadata, builds the request envelope, POSTs to the
-  registration endpoint, and parses the response.
+- End-to-end UDAP registration uses this builder through
+  `Protocols::Udap#register_client`; applications should prefer the facade
+  method over direct software-statement construction.

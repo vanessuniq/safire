@@ -101,5 +101,5 @@ regular expression.
 - Extension metadata remains forward-compatible without permitting arbitrary
   Ruby objects into a JWT payload.
 - Metadata validation remains independent of software-statement signing and the
-  network registration flow; this ADR by itself does not make UDAP DCR end to
-  end available.
+  network registration flow. `Protocols::Udap#register_client` consumes this
+  value object when performing end-to-end UDAP registration.

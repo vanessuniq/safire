@@ -184,7 +184,11 @@ module Safire
           configuration_error!(:certificate_chain, entry.class, CERTIFICATE_ENTRY_TYPES)
         end
 
-        cert = entry.is_a?(String) ? OpenSSL::X509::Certificate.new(entry) : OpenSSL::X509::Certificate.new(entry.to_der)
+        cert = if entry.is_a?(String)
+                 OpenSSL::X509::Certificate.new(entry)
+               else
+                 OpenSSL::X509::Certificate.new(entry.to_der)
+               end
         cert.freeze
       rescue OpenSSL::X509::CertificateError
         raise Errors::CertificateError.new(reason: 'malformed certificate in certificate_chain')
@@ -243,7 +247,7 @@ module Safire
         if cert.not_before > time
           raise Errors::CertificateError.new(reason: 'certificate is not yet valid', subject: cert.subject.to_s)
         end
-        return unless cert.not_after <= time
+        return unless cert.not_after < time
 
         raise Errors::CertificateError.new(reason: 'certificate is expired', subject: cert.subject.to_s)
       end
@@ -292,13 +296,22 @@ module Safire
         san_ext = cert.extensions.find { |extension| extension.oid == 'subjectAltName' }
         return [] unless san_ext
 
-        # OpenSSL renders SAN values as comma-separated text. That covers the
-        # simple UDAP client URI identifiers this builder supports without
-        # introducing ASN.1 parsing solely for uncommon literal comma cases.
-        san_ext.value.split(',').filter_map do |entry|
-          san = entry.strip
-          san.delete_prefix('URI:') if san.start_with?('URI:')
+        subject_alt_name_entries(san_ext).filter_map do |entry|
+          entry.value if entry.tag_class == :CONTEXT_SPECIFIC && entry.tag == 6
         end
+      end
+
+      def subject_alt_name_entries(extension)
+        extension_asn1 = OpenSSL::ASN1.decode(extension.to_der)
+        extn_value = extension_asn1.value.find { |entry| entry.is_a?(OpenSSL::ASN1::OctetString) }
+        return [] unless extn_value
+
+        general_names = OpenSSL::ASN1.decode(extn_value.value)
+        return [] unless general_names.value.is_a?(Array)
+
+        general_names.value
+      rescue OpenSSL::ASN1::ASN1Error
+        []
       end
 
       def leaf_certificate

@@ -45,6 +45,32 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
     JWT.decode(statement.to_jwt, cert.public_key, true, algorithms: [algorithm], verify_expiration: false)
   end
 
+  def build_issuer_spoofed_chain
+    real_issuer_key = OpenSSL::PKey::RSA.generate(2048)
+    issuer_subject = '/CN=UDAP Issuer'
+    real_issuer = build_valid_certificate(
+      key: real_issuer_key,
+      uri_san: 'https://issuer.example.com',
+      subject: issuer_subject,
+      serial: 2
+    )
+    issued_leaf = build_valid_certificate(
+      key: rsa_key,
+      uri_san: client_uri,
+      issuer_cert: real_issuer,
+      issuer_key: real_issuer_key,
+      serial: 3
+    )
+    spoofed_issuer = build_valid_certificate(
+      key: OpenSSL::PKey::RSA.generate(2048),
+      uri_san: 'https://issuer.example.com',
+      subject: issuer_subject,
+      serial: 4
+    )
+
+    [issued_leaf, spoofed_issuer]
+  end
+
   describe '#to_jwt' do
     it 'builds the minimal JOSE header with a leaf-first x5c chain' do
       issuer_key = OpenSSL::PKey::RSA.generate(2048)
@@ -140,6 +166,14 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
       payload, = decode_statement(build_statement(client_uri: did_uri, certificate_chain: [cert]), cert:)
 
       expect(payload['iss']).to eq(did_uri)
+    end
+
+    it 'allows URI SANs containing literal commas' do
+      comma_uri = 'https://client.example.com/app?groups=a,b'
+      cert = build_valid_certificate(key: rsa_key, uri_san: comma_uri, structural_san: true)
+      payload, = decode_statement(build_statement(client_uri: comma_uri, certificate_chain: [cert]), cert:)
+
+      expect(payload['iss']).to eq(comma_uri)
     end
 
     it 'allows HTTP localhost registration endpoints only with an explicit development opt-in' do
@@ -293,6 +327,14 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
         .to raise_error(Safire::Errors::CertificateError, /expired/)
     end
 
+    it 'allows a certificate whose not_after equals the signing time' do
+      boundary = build_udap_certificate(key: rsa_key, uri_san: client_uri, not_before: now - 3600, not_after: now)
+      statement = build_statement(certificate_chain: [boundary])
+      payload, = decode_statement(statement, cert: boundary)
+
+      expect(payload['iat']).to eq(now.to_i)
+    end
+
     it 'rejects a not-yet-valid chain certificate' do
       future = build_udap_certificate(key: rsa_key, uri_san: 'https://issuer.example.com', not_before: now + 60)
 
@@ -310,6 +352,11 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
       )
 
       expect { build_statement(certificate_chain: [leaf_cert, unrelated]) }
+        .to raise_error(Safire::Errors::CertificateError, /issuer-ordered/)
+    end
+
+    it 'rejects an issuer-spoofed certificate chain whose signature does not verify' do
+      expect { build_statement(certificate_chain: build_issuer_spoofed_chain) }
         .to raise_error(Safire::Errors::CertificateError, /issuer-ordered/)
     end
 

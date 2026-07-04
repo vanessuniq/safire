@@ -13,9 +13,10 @@ description: "How Safire builds UDAP Security STU2 X.509-backed software stateme
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-**Current status:** Safire can validate registration metadata and construct a
-conformant X.509-backed UDAP Security STU2 software statement. Submitting the
-registration request to the server is not implemented yet.
+**Current status:** Safire can validate registration metadata and has the
+internal signing foundation needed to construct conformant X.509-backed UDAP
+Security STU2 software statements. A supported public registration API that
+submits the request to the server is not implemented yet.
 </div>
 
 ## What Safire Builds

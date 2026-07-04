@@ -3,7 +3,7 @@ layout: default
 title: UDAP
 nav_order: 5
 permalink: /udap/
-description: "UDAP Security STU2 discovery and registration-metadata validation in Safire, with community scoping and planned signing, authentication, and authorization flows."
+description: "UDAP Security STU2 discovery, registration metadata validation, and software-statement signing foundations in Safire."
 has_children: true
 ---
 
@@ -15,9 +15,9 @@ has_children: true
 **Implemented now:** UDAP Security STU2 discovery (`/.well-known/udap`),
 including signed metadata validation and optional community scoping. The
 [Dynamic Client Registration guide]({% link udap/dynamic-client-registration/index.md %})
-also covers the implemented registration-metadata validation foundation.
-Software-statement signing, registration submission, JWT client authentication,
-and Tiered OAuth remain planned. See
+also covers implemented registration metadata validation and software-statement
+signing foundations. Registration submission, JWT client authentication, and
+Tiered OAuth remain planned. See
 [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md).
 </div>
 
@@ -125,8 +125,9 @@ metadata.signed_metadata_valid?(
 Support helpers expose advertised profiles and usable discovery capabilities.
 Capability helpers combine profile or grant signals with the endpoint
 preconditions Safire can verify during discovery. These describe what the
-server advertises; Safire's DCR metadata validator is available, while DCR
-signing/submission, JWT client authentication, and Tiered OAuth remain planned.
+server advertises; Safire's DCR metadata validator and software-statement
+signing foundation are available, while DCR submission, JWT client
+authentication, and Tiered OAuth remain planned.
 
 | Helper | Checks |
 |--------|--------|
@@ -175,9 +176,10 @@ metadata.tiered_oauth_profile?
 
 ### Client Flows
 
-- **Dynamic Client Registration (DCR)** — metadata validation is implemented;
-  software-statement signing and submission remain planned for the one-time
-  registration that obtains a `client_id`
+- **Dynamic Client Registration (DCR)** — metadata validation and
+  software-statement signing foundations are implemented; registration
+  submission remains planned for the one-time registration that obtains a
+  `client_id`
 - **JWT Client Authentication** — authenticate on every request using a signed JWT assertion (Authentication Token, AnT) with an X.509 certificate chain in the `x5c` header; the registered `client_id` is reused as `iss` and `sub` in each assertion
 - **Tiered OAuth** — delegated authorization for multi-system access per the UDAP Security IG
 - **Pushed Authorization Requests (RFC 9126)** — PAR support for pre-registering authorization requests

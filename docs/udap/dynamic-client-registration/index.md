@@ -4,7 +4,8 @@ title: Dynamic Client Registration
 parent: UDAP
 nav_order: 1
 permalink: /udap/dynamic-client-registration/
-description: "Validate and normalize UDAP Security STU2 Dynamic Client Registration metadata before software-statement signing."
+description: "Validate UDAP Security STU2 registration metadata and prepare X.509-backed software statements."
+has_children: true
 ---
 
 # Dynamic Client Registration
@@ -13,15 +14,15 @@ description: "Validate and normalize UDAP Security STU2 Dynamic Client Registrat
 
 <div class="code-example" markdown="1">
 **Current status:** Safire can validate and normalize UDAP Security STU2
-registration metadata. Software-statement signing and submission to the
-registration endpoint are not implemented yet, so this is a foundation API
-rather than an end-to-end registration workflow.
+registration metadata and construct X.509-backed software statements.
+Submission to the registration endpoint is not implemented yet, so this remains
+a foundation API rather than an end-to-end registration workflow.
 </div>
 
 ## Validate Metadata
 
-Build a `UdapRegistrationMetadata` value object before passing metadata to a
-future software-statement builder:
+Build a `UdapRegistrationMetadata` value object before signing registration
+metadata:
 
 ```ruby
 metadata = Safire::Protocols::UdapRegistrationMetadata.new(
@@ -132,7 +133,11 @@ claims (`iss`, `sub`, `aud`, `iat`, `exp`, `jti`) and request-envelope fields
 (`software_statement`, `certifications`, `udap`). Those values belong to the
 software-statement and registration request builders.
 
+See [Software Statements]({% link udap/dynamic-client-registration/software-statement.md %})
+for the implemented signing foundation, including `x5c`, exact URI comparison,
+algorithm selection, and certificate/key checks.
+
 See the
 [UDAP Security STU2 registration profile](https://hl7.org/fhir/us/udap-security/STU2/registration.html)
 for the normative requirements. End-to-end registration will become available
-after Safire adds software-statement signing and registration submission.
+after Safire adds registration submission.

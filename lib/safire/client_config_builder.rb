@@ -50,7 +50,7 @@ module Safire
       self
     end
 
-    # Sets the leaf-first X.509 certificate chain used for UDAP signing.
+    # Sets the leaf-first, issuer-ordered X.509 certificate chain used for UDAP signing.
     #
     # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>, nil]
     # @return [self]

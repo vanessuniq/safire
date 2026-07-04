@@ -25,3 +25,4 @@ Architecture Decision Records (ADRs) document significant design decisions made 
 | [ADR-011]({% link adr/ADR-011-udap-stu2-discovery-conformance.md %}) | `UdapMetadata` entity — structural validation separate from cryptographic validation | Accepted |
 | [ADR-012]({% link adr/ADR-012-udap-signed-metadata-validation.md %}) | `signed_metadata` JWT validation — design and chain verification defaults | Accepted |
 | [ADR-013]({% link adr/ADR-013-udap-registration-request-model.md %}) | UDAP registration metadata as an immutable value object | Accepted |
+| [ADR-014]({% link adr/ADR-014-udap-software-statement-signing.md %}) | UDAP software-statement signing | Accepted |

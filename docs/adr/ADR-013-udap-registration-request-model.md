@@ -100,6 +100,6 @@ regular expression.
   boolean opt-in and produces a warning.
 - Extension metadata remains forward-compatible without permitting arbitrary
   Ruby objects into a JWT payload.
-- Metadata validation is available before the software-statement builder and
-  network registration flow are implemented; this ADR does not make UDAP DCR
-  end to end available.
+- Metadata validation remains independent of software-statement signing and the
+  network registration flow; this ADR by itself does not make UDAP DCR end to
+  end available.

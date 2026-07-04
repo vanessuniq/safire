@@ -26,18 +26,18 @@ module Safire
   #   =>  Optional, will be retrieved from the well-known smart-configuration if not provided
   # @!attribute [r] private_key
   #   @return [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil] the private key for signing
-  #     SMART JWT assertions or planned UDAP software statements. Can be an OpenSSL key object or PEM string.
+  #     SMART JWT assertions or UDAP software statements. Can be an OpenSSL key object or PEM string.
   # @!attribute [r] certificate_chain
-  #   @return [Array<String, OpenSSL::X509::Certificate>, nil] leaf-first X.509 certificate chain
-  #     for planned UDAP software-statement signing. Entries may be PEM strings or certificate objects.
-  #     Certificate objects are stored as DER snapshots and returned as fresh copies. Parsing PEM
-  #     strings and identity validation occur when the software statement is built.
+  #   @return [Array<String, OpenSSL::X509::Certificate>, nil] leaf-first, issuer-ordered X.509
+  #     certificate chain for UDAP software-statement signing. Entries may be PEM strings or
+  #     certificate objects. Certificate objects are stored as DER snapshots and returned as fresh
+  #     copies. Parsing PEM strings and identity validation occur when the software statement is built.
   # @!attribute [r] kid
   #   @return [String, nil] the key ID matching the public key registered with the authorization server.
   #     Required for confidential asymmetric authentication.
   # @!attribute [r] jwt_algorithm
   #   @return [String, nil] the JWT signing algorithm. SMART supports RS384 or ES384;
-  #     planned UDAP registration supports RS256, RS384, ES256, or ES384 subject to key
+  #     UDAP software-statement signing supports RS256, RS384, ES256, or ES384 subject to key
   #     compatibility and server discovery. Optional; selected from the key and protocol
   #     requirements when omitted.
   # @!attribute [r] jwks_uri

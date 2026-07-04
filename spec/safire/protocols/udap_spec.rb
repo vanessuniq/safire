@@ -9,9 +9,15 @@ RSpec.describe Safire::Protocols::Udap do
     instance_double(
       Safire::ClientConfig,
       base_url:,
-      allow_insecure_localhost:
+      allow_insecure_localhost:,
+      private_key: configured_private_key,
+      certificate_chain: configured_certificate_chain,
+      jwt_algorithm: configured_jwt_algorithm
     )
   end
+  let(:configured_private_key) { 'configured-private-key' }
+  let(:configured_certificate_chain) { ['configured-certificate'] }
+  let(:configured_jwt_algorithm) { nil }
   let(:well_known_url) { "#{base_url}/.well-known/udap" }
 
   let(:valid_metadata) do
@@ -448,8 +454,326 @@ RSpec.describe Safire::Protocols::Udap do
   end
 
   describe '#register_client' do
-    it 'raises NotImplementedError' do
-      expect { udap.register_client({}) }.to raise_error(NotImplementedError)
+    let(:registration_endpoint) { 'https://fhir.example.com/signed-register' }
+    let(:client_uri) { 'https://client.example.com/app' }
+    let(:client_metadata) do
+      {
+        client_name: 'Example Backend Service',
+        contacts: ['mailto:security@example.com'],
+        grant_types: ['client_credentials'],
+        scope: 'system/Patient.rs'
+      }
+    end
+    let(:registration_response) do
+      {
+        'client_id' => 'udap-client-123',
+        'client_name' => 'Example Backend Service'
+      }
+    end
+    let(:registration_discovery_body) do
+      valid_metadata.merge(
+        'udap_profiles_supported' => %w[udap_dcr udap_authn udap_authz],
+        'registration_endpoint' => 'https://fhir.example.com/unsigned-register',
+        'registration_endpoint_jwt_signing_alg_values_supported' => %w[RS256 RS384]
+      )
+    end
+    let(:registration_signed_claims) do
+      {
+        'token_endpoint' => valid_metadata['token_endpoint'],
+        'registration_endpoint' => registration_endpoint
+      }
+    end
+    let(:registration_validator) do
+      instance_double(
+        Safire::Protocols::UdapSignedMetadataValidator,
+        signed_endpoint_claims: registration_signed_claims
+      )
+    end
+    let(:registration_metadata) { instance_double(Safire::Protocols::UdapRegistrationMetadata) }
+    let(:software_statement) { instance_double(Safire::Protocols::UdapSoftwareStatement, to_jwt: 'header.payload.sig') }
+
+    def stub_registration_discovery_for_community(community)
+      stub_request(:get, well_known_url)
+        .with(query: { 'community' => community })
+        .to_return(
+          status: 200,
+          body: registration_discovery_body.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+    end
+
+    before do
+      stub_udap(body: registration_discovery_body)
+      allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(registration_validator)
+      allow(Safire::Protocols::UdapRegistrationMetadata).to receive(:new).and_return(registration_metadata)
+      allow(Safire::Protocols::UdapSoftwareStatement).to receive(:new).and_return(software_statement)
+      stub_request(:post, registration_endpoint)
+        .to_return(status: 201, body: registration_response.to_json, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    it 'returns the parsed registration response' do
+      expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+    end
+
+    it 'scopes discovery by community' do
+      community = 'https://community.example.com/udap'
+
+      stub_registration_discovery_for_community(community)
+      udap.register_client(client_metadata, client_uri:, community:)
+
+      expect(WebMock).to have_requested(:get, well_known_url).with(query: { 'community' => community })
+    end
+
+    it 'passes the server trust policy to signed metadata validation' do
+      anchor = instance_double(OpenSSL::X509::Certificate, to_der: 'anchor')
+      crl = instance_double(OpenSSL::X509::CRL, to_der: 'crl')
+      checker = ->(**_kwargs) { true }
+
+      udap.register_client(
+        client_metadata,
+        client_uri:,
+        trusted_anchors: [anchor],
+        crls: [crl],
+        revocation_checker: checker,
+        verify_chain: false
+      )
+
+      expect(registration_validator).to have_received(:signed_endpoint_claims).with(
+        base_url: base_url,
+        trusted_anchors: [anchor],
+        crls: [crl],
+        revocation_checker: checker,
+        verify_chain: false,
+        allow_insecure_localhost: false
+      )
+    end
+
+    it 'builds validated registration metadata with the configured localhost policy' do
+      udap.register_client(client_metadata, client_uri:)
+
+      expect(Safire::Protocols::UdapRegistrationMetadata).to have_received(:new).with(
+        client_metadata,
+        allow_insecure_localhost: false
+      )
+    end
+
+    context 'when insecure localhost is enabled in config' do
+      let(:allow_insecure_localhost) { true }
+
+      it 'passes the development policy to the registration metadata builder' do
+        udap.register_client(client_metadata, client_uri:)
+
+        expect(Safire::Protocols::UdapRegistrationMetadata).to have_received(:new).with(
+          client_metadata,
+          allow_insecure_localhost: true
+        )
+      end
+    end
+
+    it 'builds a software statement from configured signing defaults and discovered algorithms' do
+      udap.register_client(client_metadata, client_uri:)
+
+      expect(Safire::Protocols::UdapSoftwareStatement).to have_received(:new).with(
+        metadata: registration_metadata,
+        client_uri:,
+        registration_endpoint:,
+        private_key: configured_private_key,
+        certificate_chain: configured_certificate_chain,
+        supported_algorithms: %w[RS256 RS384],
+        algorithm: nil,
+        allow_insecure_localhost: false
+      )
+    end
+
+    it 'allows per-call signing credential overrides' do
+      udap.register_client(
+        client_metadata,
+        client_uri:,
+        private_key: 'override-key',
+        certificate_chain: ['override-cert'],
+        jwt_algorithm: 'RS384'
+      )
+
+      expect(Safire::Protocols::UdapSoftwareStatement).to have_received(:new).with(
+        hash_including(
+          private_key: 'override-key',
+          certificate_chain: ['override-cert'],
+          algorithm: 'RS384'
+        )
+      )
+    end
+
+    it 'POSTs the UDAP registration envelope as JSON without certifications when omitted' do
+      udap.register_client(client_metadata, client_uri:)
+
+      expect(WebMock).to(have_requested(:post, registration_endpoint).with do |request|
+        body = JSON.parse(request.body)
+        request.headers['Content-Type'].start_with?('application/json') &&
+          body == {
+            'software_statement' => 'header.payload.sig',
+            'udap' => '1'
+          }
+      end)
+    end
+
+    it 'preserves an explicit empty certifications array in the request envelope' do
+      udap.register_client(client_metadata, client_uri:, certifications: [])
+
+      expect(WebMock).to(have_requested(:post, registration_endpoint).with do |request|
+        JSON.parse(request.body)['certifications'] == []
+      end)
+    end
+
+    it 'includes caller-supplied certification JWTs without decoding or verifying them' do
+      certifications = ['eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJjZXJ0In0.c2ln']
+
+      udap.register_client(client_metadata, client_uri:, certifications:)
+
+      expect(WebMock).to(have_requested(:post, registration_endpoint).with do |request|
+        JSON.parse(request.body)['certifications'] == certifications
+      end)
+    end
+
+    it 'raises DiscoveryError when discovered metadata is structurally non-conformant' do
+      stub_udap(
+        body: registration_discovery_body.merge(
+          'registration_endpoint_jwt_signing_alg_values_supported' => []
+        )
+      )
+
+      expect { udap.register_client(client_metadata, client_uri:) }
+        .to raise_error(Safire::Errors::DiscoveryError, /structurally conformant/)
+      expect(WebMock).not_to have_requested(:post, registration_endpoint)
+    end
+
+    it 'raises DiscoveryError when the server does not advertise UDAP DCR capability' do
+      stub_udap(
+        body: registration_discovery_body.merge(
+          'udap_profiles_supported' => %w[udap_authn udap_authz]
+        )
+      )
+
+      expect { udap.register_client(client_metadata, client_uri:) }
+        .to raise_error(Safire::Errors::DiscoveryError, /Dynamic Client Registration/)
+      expect(WebMock).not_to have_requested(:post, registration_endpoint)
+    end
+
+    context 'when the community requires certifications' do
+      let(:registration_discovery_body) do
+        super().merge(
+          'udap_certifications_supported' => ['https://policy.example/cert'],
+          'udap_certifications_required' => ['https://policy.example/cert']
+        )
+      end
+
+      it 'raises ValidationError when certifications are omitted' do
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::ValidationError, /certifications/)
+        expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+      end
+
+      it 'raises ValidationError when certifications are explicitly empty' do
+        expect { udap.register_client(client_metadata, client_uri:, certifications: []) }
+          .to raise_error(Safire::Errors::ValidationError, /certifications/)
+        expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+      end
+
+      it 'accepts a compact-JWS certification value' do
+        udap.register_client(
+          client_metadata,
+          client_uri:,
+          certifications: ['eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJjZXJ0In0.c2ln']
+        )
+
+        expect(Safire::Protocols::UdapSoftwareStatement).to have_received(:new)
+      end
+    end
+
+    it 'raises ValidationError for malformed certification collections' do
+      expect { udap.register_client(client_metadata, client_uri:, certifications: ['not-a-jwt']) }
+        .to raise_error(Safire::Errors::ValidationError, /compact JWS/)
+      expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+    end
+
+    context 'when the server returns an update-style 200 response' do
+      before do
+        stub_request(:post, registration_endpoint)
+          .to_return(
+            status: 200,
+            body: registration_response.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+      end
+
+      it 'accepts the response when client_id is present' do
+        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+      end
+    end
+
+    context 'when the server returns a UDAP registration error' do
+      before do
+        stub_request(:post, registration_endpoint).to_return(
+          status: 400,
+          body: {
+            'error' => 'invalid_software_statement',
+            'error_description' => 'signature failed'
+          }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'raises RegistrationError with the UDAP error code' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          udap.register_client(client_metadata, client_uri:)
+        end
+
+        expect(error.error_code).to eq('invalid_software_statement')
+        expect(error.error_description).to eq('signature failed')
+      end
+    end
+
+    context 'when the server returns unapproved_software_statement' do
+      before do
+        stub_request(:post, registration_endpoint).to_return(
+          status: 401,
+          body: { 'error' => 'unapproved_software_statement' }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'preserves the UDAP error code' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          udap.register_client(client_metadata, client_uri:)
+        end
+
+        expect(error.error_code).to eq('unapproved_software_statement')
+      end
+    end
+
+    context 'when the success response is malformed' do
+      before do
+        stub_request(:post, registration_endpoint)
+          .to_return(status: 201, body: { 'client_name' => 'Example' }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'raises RegistrationError before returning the response' do
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::RegistrationError, /missing client_id/)
+      end
+    end
+
+    context 'when a network error occurs during registration' do
+      before { stub_request(:post, registration_endpoint).to_raise(Faraday::ConnectionFailed) }
+
+      it 'raises NetworkError' do
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::NetworkError)
+      end
+    end
+
+    it 'does not accept a client_type keyword' do
+      expect { described_class.new(config, client_type: nil) }.to raise_error(ArgumentError)
     end
   end
 end

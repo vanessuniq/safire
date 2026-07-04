@@ -3,11 +3,13 @@ module Safire
     # UDAP Security STU2 protocol implementation.
     #
     # Handles server metadata discovery from the UDAP well-known endpoint
-    # (per {https://hl7.org/fhir/us/udap-security/STU2/discovery.html STU2 §2}).
-    # Results are cached per community within each instance.
+    # (per {https://hl7.org/fhir/us/udap-security/STU2/discovery.html STU2 §2})
+    # and Dynamic Client Registration (per
+    # {https://hl7.org/fhir/us/udap-security/STU2/registration.html STU2 §3}).
+    # Discovery results are cached per community within each instance.
     #
-    # All other UDAP flows (B2B client credentials, B2C authorization code,
-    # Tiered OAuth, Dynamic Client Registration) raise {NotImplementedError}
+    # Other UDAP flows (B2B client credentials token acquisition, B2C authorization
+    # code, Tiered OAuth, and registration cancellation) raise +NotImplementedError+
     # and are planned for future PRs.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
@@ -17,12 +19,18 @@ module Safire
     # @api private
     class Udap
       include Behaviours
+      include OAuthResponseHandling
 
       WELL_KNOWN_PATH = '/.well-known/udap'.freeze
+      REGISTRATION_HEADERS = { content_type: 'application/json' }.freeze
+      private_constant :REGISTRATION_HEADERS
 
       def initialize(config)
         @base_url = config.base_url
         @allow_insecure_localhost = config.allow_insecure_localhost
+        @private_key = config.private_key
+        @certificate_chain = config.certificate_chain
+        @jwt_algorithm = config.jwt_algorithm
         @http_client = Safire::HTTPClient.new(allow_insecure_localhost: @allow_insecure_localhost)
         @metadata_cache = {}
       end
@@ -75,7 +83,184 @@ module Safire
         entry.fetch(:metadata)
       end
 
+      # Dynamically registers or modifies a UDAP client using STU2 Dynamic Client Registration.
+      #
+      # UDAP registration is discovery-bound: Safire first discovers and validates
+      # UDAP metadata, then posts a fixed request envelope to the discovered
+      # +registration_endpoint+. The caller-provided metadata is validated and signed
+      # into the +software_statement+ JWT; it is not duplicated at the top level.
+      #
+      # Calling this method again with the same +client_uri+ and community requests
+      # modification of the existing registration. Safire accepts both 201 Created
+      # and update-style 200 responses as long as the response is a JSON object with
+      # a non-blank string +client_id+.
+      #
+      # @param metadata [Hash] caller-controlled UDAP registration metadata
+      # @param client_uri [String] exact URI used as +iss+ and +sub+ and required
+      #   to appear as a URI SAN in the leaf certificate
+      # @param community [String, nil] optional UDAP community URI for discovery
+      # @param certifications [Array<String>, nil] optional third-party certification
+      #   JWTs; +nil+ omits the field and +[]+ sends an explicit empty collection
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
+      #   for signed metadata validation
+      # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation
+      # @param revocation_checker [#call, nil] custom server certificate revocation policy
+      # @param verify_chain [Boolean] whether discovery signed_metadata chain validation is required
+      # @param private_key [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil]
+      #   client signing private key; defaults to configuration
+      # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>, nil]
+      #   leaf-first client signing certificate chain; defaults to configuration
+      # @param jwt_algorithm [String, nil] optional explicit registration signing algorithm
+      # @return [Hash] registration response from the authorization server
+      # @raise [Safire::Errors::DiscoveryError] when UDAP discovery is unavailable,
+      #   structurally non-conformant for registration, or does not advertise UDAP DCR
+      # @raise [Safire::Errors::ValidationError] when caller metadata or certifications are invalid
+      # @raise [Safire::Errors::ConfigurationError] when signing configuration is missing or incompatible
+      # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
+      # @raise [Safire::Errors::RegistrationError] when the server rejects registration or returns malformed success
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
+      #   or a redirect to a non-HTTPS URL
+      def register_client(metadata, client_uri:, community: nil, certifications: nil, trusted_anchors: [],
+                          crls: [], revocation_checker: nil, verify_chain: true,
+                          private_key: @private_key, certificate_chain: @certificate_chain,
+                          jwt_algorithm: @jwt_algorithm)
+        community = normalize_community(community)
+        discovered = registration_server_metadata(
+          community:,
+          trusted_anchors:,
+          crls:,
+          revocation_checker:,
+          verify_chain:
+        )
+        certifications = validate_certifications!(certifications, discovered)
+        software_statement = registration_software_statement(
+          metadata,
+          discovered,
+          client_uri:,
+          private_key:,
+          certificate_chain:,
+          jwt_algorithm:
+        )
+        post_registration(discovered.registration_endpoint, software_statement, certifications)
+      rescue Faraday::Error => e
+        raise registration_error_from(e)
+      end
+
       private
+
+      def registration_server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
+        discovered = server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
+        validate_registration_discovery!(discovered, community:)
+        discovered
+      end
+
+      def validate_registration_discovery!(metadata, community:)
+        unless metadata.valid?
+          registration_discovery_error!(
+            'UDAP metadata is not structurally conformant for Dynamic Client Registration',
+            community
+          )
+        end
+
+        return if metadata.supports_dynamic_registration?
+
+        registration_discovery_error!(
+          'server does not advertise UDAP Dynamic Client Registration support',
+          community
+        )
+      end
+
+      def registration_discovery_error!(description, community)
+        raise Errors::DiscoveryError.new(
+          endpoint: well_known_endpoint(community:),
+          error_description: description,
+          label: 'UDAP metadata'
+        )
+      end
+
+      def validate_certifications!(certifications, metadata)
+        normalized = normalize_certifications!(certifications)
+        required = Array(metadata.udap_certifications_required)
+        return normalized if required.empty? || normalized.present?
+
+        raise Errors::ValidationError.new(
+          attribute: :certifications,
+          reason: 'must include certifications required by the UDAP community'
+        )
+      end
+
+      def normalize_certifications!(certifications)
+        return if certifications.nil?
+
+        unless certifications.is_a?(Array) && certifications.all? { |entry| compact_jws?(entry) }
+          raise Errors::ValidationError.new(
+            attribute: :certifications,
+            reason: 'must be nil or an array of compact JWS strings'
+          )
+        end
+
+        certifications.map { |entry| entry.dup.freeze }.freeze
+      end
+
+      def compact_jws?(value)
+        return false unless value.is_a?(String) && value.present?
+
+        parts = value.split('.', -1)
+        parts.length == 3 && parts.all? { |part| Safire::Protocols::COMPACT_JWS_SEGMENT.match?(part) }
+      end
+
+      def registration_software_statement(metadata, discovered, client_uri:, private_key:, certificate_chain:,
+                                          jwt_algorithm:)
+        registration_metadata = UdapRegistrationMetadata.new(
+          metadata,
+          allow_insecure_localhost: @allow_insecure_localhost
+        )
+        build_software_statement(
+          registration_metadata,
+          discovered,
+          client_uri:,
+          private_key:,
+          certificate_chain:,
+          jwt_algorithm:
+        )
+      end
+
+      def build_software_statement(metadata, discovered, client_uri:, private_key:, certificate_chain:, jwt_algorithm:)
+        UdapSoftwareStatement.new(
+          metadata:,
+          client_uri:,
+          registration_endpoint: discovered.registration_endpoint,
+          private_key:,
+          certificate_chain:,
+          supported_algorithms: discovered.registration_endpoint_jwt_signing_alg_values_supported,
+          algorithm: jwt_algorithm,
+          allow_insecure_localhost: @allow_insecure_localhost
+        )
+      end
+
+      def post_registration(endpoint, software_statement, certifications)
+        Safire.logger.info('Registering client via UDAP Dynamic Client Registration...')
+
+        response = @http_client.post(
+          endpoint,
+          body: registration_request_body(software_statement.to_jwt, certifications),
+          headers: REGISTRATION_HEADERS
+        )
+        parse_registration_response(response.body)
+      end
+
+      def registration_request_body(software_statement, certifications)
+        body = {
+          software_statement:,
+          udap: '1'
+        }
+        body[:certifications] = certifications unless certifications.nil?
+        body.to_json
+      end
+
+      def registration_error_from(faraday_error)
+        oauth_error_from(faraday_error, Errors::RegistrationError)
+      end
 
       def fetch_metadata(community:, trust_policy:)
         endpoint = well_known_endpoint(community:)

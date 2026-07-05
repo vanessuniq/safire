@@ -15,7 +15,7 @@ class FhirServer
     'udap' => 'UDAP Security'
   }.freeze
 
-  ATTRIBUTES = %i[id name base_url client_id client_secret scopes protocols].freeze
+  ATTRIBUTES = %i[id name base_url client_id udap_client_id client_secret scopes protocols].freeze
 
   attr_accessor(*(ATTRIBUTES - %i[protocols]))
   attr_reader :errors, :protocols

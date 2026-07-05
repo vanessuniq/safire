@@ -8,6 +8,7 @@ RSpec.describe FhirServer do
       name: 'Example FHIR',
       base_url: 'https://fhir.example.com',
       client_id: 'client-123',
+      udap_client_id: 'udap-client-456',
       scopes: %w[openid profile]
     }
   end
@@ -18,9 +19,10 @@ RSpec.describe FhirServer do
 
   describe '#protocols' do
     it 'defaults existing records to SMART' do
-      server = described_class.new(base_attrs.except(:protocols))
+      server = described_class.new(base_attrs.except(:protocols, :udap_client_id))
 
       expect(server.protocols).to eq(['smart'])
+      expect(server.udap_client_id).to be_nil
       expect(server).to be_supports_smart
       expect(server).not_to be_supports_udap
     end
@@ -63,6 +65,12 @@ RSpec.describe FhirServer do
       expect(server).to be_valid
     end
 
+    it 'does not require udap_client_id for UDAP servers' do
+      server = described_class.new(base_attrs.merge(udap_client_id: nil, protocols: ['udap']))
+
+      expect(server).to be_valid
+    end
+
     it 'requires at least one supported protocol' do
       server = described_class.new(base_attrs.merge(protocols: []))
 
@@ -75,6 +83,17 @@ RSpec.describe FhirServer do
 
       expect(server).not_to be_valid
       expect(server.errors).to include('Protocols must be one or more of: smart, udap')
+    end
+  end
+
+  describe '#to_hash' do
+    it 'persists SMART and UDAP client identifiers separately' do
+      server = described_class.new(base_attrs.merge(protocols: %w[smart udap]))
+
+      expect(server.to_hash).to include(
+        'client_id' => 'client-123',
+        'udap_client_id' => 'udap-client-456'
+      )
     end
   end
 end

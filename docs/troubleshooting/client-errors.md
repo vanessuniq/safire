@@ -137,8 +137,9 @@ Safire::Errors::RegistrationError: Client registration failed — HTTP 202 — c
 ```
 
 UDAP registration cancellation is confirmed by the response body, not by a
-specific 2xx status code. Safire accepts a cancellation response only when it
-contains a non-blank string `client_id` and an empty `grant_types` array:
+specific success status such as `200` or `201`. Safire accepts a cancellation
+response only when the final status is `2xx` and the body contains a non-blank
+string `client_id` plus an empty `grant_types` array:
 
 ```ruby
 cancellation = udap_client.cancel_registration(
@@ -151,9 +152,9 @@ cancellation = udap_client.cancel_registration(
 cancellation['grant_types'] # => []
 ```
 
-If the response omits `grant_types`, returns a non-array value, or returns a
-non-empty array, treat it as a failed cancellation and investigate the
-authorization server response.
+If the response status is not `2xx`, or if the body omits `grant_types`, returns
+a non-array value, or returns a non-empty array, treat it as a failed
+cancellation and investigate the authorization server response.
 
 ---
 

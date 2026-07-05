@@ -77,6 +77,15 @@ discovery is fetched again.
 hold a metadata object and want to explicitly re-validate (for example, with a different trust
 anchor set). Instances returned by `Udap#server_metadata` are already pre-validated.
 
+### DCR consumes authoritative signed endpoint claims
+
+UDAP Dynamic Client Registration is the first Safire flow that acts on
+discovered UDAP endpoints after discovery. `Protocols::Udap#register_client`
+uses the `registration_endpoint` from the `UdapMetadata` instance returned by
+`server_metadata`. Because `server_metadata` merges signed endpoint claims over
+unsigned JSON before constructing the entity, registration posts to the
+authoritative signed endpoint when signed and unsigned values differ.
+
 ---
 
 ## Consequences
@@ -88,3 +97,5 @@ anchor set). Instances returned by `Udap#server_metadata` are already pre-valida
 - `CertificateError` is reserved for unrecoverable DER parse failures. All other validation
   decisions use the warn-and-return-nil pattern.
 - `UdapMetadata#valid?` remains a structural check only; it does not invoke the JWT validator.
+- Downstream UDAP flows must consume endpoints from `UdapMetadata` returned by
+  `server_metadata`; they must not read unsigned discovery JSON directly.

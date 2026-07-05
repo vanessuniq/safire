@@ -13,17 +13,17 @@ description: "How Safire builds UDAP Security STU2 X.509-backed software stateme
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-**Current status:** Safire can validate registration metadata and has the
-internal signing foundation needed to construct conformant X.509-backed UDAP
-Security STU2 software statements. A supported public registration API that
-submits the request to the server is not implemented yet.
+**Current status:** Safire uses this signing layer internally when
+`Safire::Client#register_client` submits UDAP Security STU2 registration
+requests. Most applications should use `register_client` rather than construct
+software statements directly.
 </div>
 
 ## What Safire Builds
 
-UDAP registration metadata is signed into a compact JWS software statement. The
-software statement carries the client registration parameters plus the required
-security claims:
+UDAP registration metadata is signed into a compact JWS software statement
+inside `register_client`. The software statement carries the client
+registration parameters plus the required security claims:
 
 | Claim | Safire behavior |
 |-------|-----------------|
@@ -81,7 +81,9 @@ that list with the configured private key:
 
 When `jwt_algorithm` is omitted, Safire selects the first compatible advertised
 algorithm. RSA keys prefer `RS256` because it is the STU2 baseline. An explicit
-algorithm must be advertised by the server and compatible with the key.
+algorithm must be advertised by the server and compatible with the key. Safire
+raises `DiscoveryError` before signing if the server metadata omits mandatory
+`RS256` registration signing support.
 
 ## Validation Boundaries
 

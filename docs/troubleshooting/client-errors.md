@@ -34,6 +34,52 @@ registration = client.register_client(
 )
 ```
 
+For UDAP, the registration endpoint is always discovery-bound. Safire raises
+`DiscoveryError` before POSTing when discovery fails, `signed_metadata` cannot
+be validated, `UdapMetadata#valid?` reports structural non-conformance, the
+server does not advertise `udap_dcr`, or the server does not publish
+registration signing algorithms:
+
+```ruby
+registration = udap_client.register_client(
+  metadata,
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+```
+
+### `ValidationError`: UDAP registration metadata or certifications are invalid
+
+```
+Safire::Errors::ValidationError: Validation failed for certifications: must be nil or an array of compact JWS strings
+```
+
+UDAP registration signs caller-controlled metadata before sending it. Safire
+therefore validates the metadata and certification collection locally and raises
+`ValidationError` before building a software statement when input is malformed.
+
+Common causes:
+
+- missing required metadata such as `client_name`, `contacts`, `grant_types`, or `scope`
+- unsupported grant combinations
+- non-HTTPS redirect or logo URIs, except HTTP localhost when explicitly enabled for development
+- reserved claims such as `iss`, `sub`, `aud`, `exp`, `jti`, `software_statement`, `certifications`, or `udap`
+- `certifications:` is not `nil` or an array of compact JWS strings
+- discovery declares required certifications, but `certifications:` is omitted or empty
+
+### `CertificateError`: UDAP client signing identity cannot support registration
+
+```
+Safire::Errors::CertificateError: Certificate error — client_uri does not match any URI SAN in the leaf certificate
+```
+
+UDAP registration requires a private key and leaf-first certificate chain. The
+private key must match the leaf certificate, every certificate must be currently
+valid, and the `client_uri:` must exactly match a URI Subject Alternative Name
+in the leaf certificate. Case, port, and trailing slash differences are
+significant.
+
 ### `RegistrationError`: Server rejected the registration request
 
 ```
@@ -48,6 +94,10 @@ rescue Safire::Errors::RegistrationError => e
   puts e.error_code        # "invalid_redirect_uri"
   puts e.error_description # "Redirect URI must use HTTPS"
 ```
+
+UDAP servers may return UDAP-specific error codes such as
+`invalid_software_statement` or `unapproved_software_statement`; Safire
+preserves them in `e.error_code`.
 
 ### `RegistrationError`: 2xx response has a missing or invalid `client_id`
 

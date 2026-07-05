@@ -11,6 +11,7 @@ require_relative 'safire/entity'
 require_relative 'safire/pkce'
 require_relative 'safire/jwt_assertion'
 require_relative 'safire/uri_validation'
+require_relative 'safire/protocols'
 
 root = File.expand_path '.', File.dirname(File.absolute_path(__FILE__))
 Dir.glob(File.join(root, 'safire', 'protocols', '**', '*.rb')).each do |file|

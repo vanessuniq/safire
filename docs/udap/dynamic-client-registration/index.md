@@ -4,7 +4,7 @@ title: Dynamic Client Registration
 parent: UDAP
 nav_order: 1
 permalink: /udap/dynamic-client-registration/
-description: "Validate UDAP Security STU2 registration metadata and prepare X.509-backed software statements."
+description: "Register UDAP Security STU2 clients with certificate-backed software statements."
 has_children: true
 ---
 
@@ -13,16 +13,140 @@ has_children: true
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-**Current status:** Safire can validate and normalize UDAP Security STU2
-registration metadata and construct X.509-backed software statements.
-Submission to the registration endpoint is not implemented yet, so this remains
-a foundation API rather than an end-to-end registration workflow.
+**Current status:** Safire implements UDAP Security STU2 new registration and
+registration modification through `Safire::Client#register_client`.
+Registration cancellation is planned separately.
 </div>
+
+## Register a Client
+
+Create a temporary UDAP client with the FHIR server base URL plus the client
+signing identity. Then call `register_client` with registration metadata and
+the exact `client_uri` that appears as a URI Subject Alternative Name in the
+leaf certificate.
+
+```ruby
+client = Safire::Client.new(
+  {
+    base_url: 'https://fhir.example.com',
+    private_key: File.read('client-key.pem'),
+    certificate_chain: [
+      File.read('client-cert.pem'),
+      File.read('issuing-ca.pem')
+    ]
+  },
+  protocol: :udap
+)
+
+registration = client.register_client(
+  {
+    client_name: 'Example Backend Service',
+    contacts: ['mailto:security@example.com'],
+    grant_types: ['client_credentials'],
+    scope: 'system/Patient.rs system/Observation.rs'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+
+client_id = registration['client_id']
+```
+
+Safire performs these steps:
+
+1. Discovers UDAP metadata from `/.well-known/udap`, optionally scoped by
+   `community:`.
+2. Validates `signed_metadata` using the supplied server trust policy.
+3. Runs `UdapMetadata#valid?` because registration is about to trust and act on
+   the discovered registration endpoint.
+4. Verifies that the server advertises the `udap_dcr` profile and a usable
+   `registration_endpoint`.
+5. Validates caller registration metadata.
+6. Signs a fresh `software_statement` JWT using the configured or per-call
+   client signing identity.
+7. POSTs the UDAP request envelope and returns the parsed registration response.
+
+Calling `register_client` again with the same `client_uri` and community
+requests modification of the existing registration. Safire returns the server
+response without assuming the `client_id` is unchanged.
+
+### Authorization-code registration
+
+Authorization-code clients include redirect and logo metadata. Safire generates
+`response_types: ["code"]` and `token_endpoint_auth_method: "private_key_jwt"`
+inside the signed software statement.
+
+```ruby
+registration = client.register_client(
+  {
+    client_name: 'Example Provider App',
+    contacts: ['mailto:security@example.com'],
+    grant_types: %w[authorization_code refresh_token],
+    scope: 'openid fhirUser patient/*.rs',
+    redirect_uris: ['https://client.example.com/callback'],
+    logo_uri: 'https://client.example.com/logo.png'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+```
+
+### Community, trust policy, and certifications
+
+Use `community:` when registering against a specific UDAP trust community:
+
+```ruby
+registration = client.register_client(
+  metadata,
+  client_uri:      'https://client.example.com',
+  community:       'https://udap.example.org/community1',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+```
+
+`trusted_anchors:`, `crls:`, `revocation_checker:`, and `verify_chain:` apply
+to server `signed_metadata` validation during discovery. They are not the
+client signing certificate chain.
+
+Pass `certifications:` when the discovered community requires or accepts
+third-party certification JWTs:
+
+```ruby
+registration = client.register_client(
+  metadata,
+  client_uri:      'https://client.example.com',
+  certifications: [certification_jwt],
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+```
+
+`certifications: nil` omits the envelope field. `certifications: []` sends an
+explicit empty array, which is useful for modification requests that clear
+optional certifications. If discovery advertises required certifications,
+Safire rejects `nil` and `[]` locally. Safire shape-checks certification values
+as compact JWS strings but does not create, decode, verify, or interpret their
+contents.
+
+### Errors
+
+| Error | When raised |
+|-------|-------------|
+| `Safire::Errors::DiscoveryError` | Discovery fails, `signed_metadata` cannot be validated, discovered metadata is structurally non-conformant, or the server does not advertise usable UDAP DCR capability |
+| `Safire::Errors::ValidationError` | Caller metadata or the `certifications:` collection is invalid before signing |
+| `Safire::Errors::ConfigurationError` | Signing configuration is missing or incompatible, such as an unsupported explicit `jwt_algorithm` |
+| `Safire::Errors::CertificateError` | The configured client certificate chain cannot support signing or does not match `client_uri:` |
+| `Safire::Errors::RegistrationError` | The registration server returns an OAuth error response, a response status other than `200` or `201`, or a successful response without a non-blank string `client_id` |
+| `Safire::Errors::NetworkError` | Connection failure, timeout, SSL error, or blocked non-HTTPS redirect |
 
 ## Validate Metadata
 
-Build a `UdapRegistrationMetadata` value object before signing registration
-metadata:
+`register_client` builds `UdapRegistrationMetadata` internally. You can also
+construct it directly when you want to validate metadata before invoking the
+network flow:
 
 ```ruby
 metadata = Safire::Protocols::UdapRegistrationMetadata.new(
@@ -110,8 +234,10 @@ Exactly one primary grant is allowed. Unknown grant types, duplicate values,
 `refresh_token` without `authorization_code`, and combining
 `authorization_code` with `client_credentials` raise `ValidationError`.
 
-Cancellation uses `operation: :cancel`. Omit `grant_types`; Safire injects an
-empty array and excludes authorization-only metadata:
+The metadata value object also has `operation: :cancel` as a foundation for the
+future cancellation workflow. Omit `grant_types`; Safire injects an empty array
+and excludes authorization-only metadata. The public `cancel_registration`
+method is not implemented yet.
 
 ```ruby
 cancellation = Safire::Protocols::UdapRegistrationMetadata.new(
@@ -139,5 +265,4 @@ algorithm selection, and certificate/key checks.
 
 See the
 [UDAP Security STU2 registration profile](https://hl7.org/fhir/us/udap-security/STU2/registration.html)
-for the normative requirements. End-to-end registration will become available
-after Safire adds registration submission.
+for the normative requirements.

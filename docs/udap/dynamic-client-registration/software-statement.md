@@ -14,16 +14,17 @@ description: "How Safire builds UDAP Security STU2 X.509-backed software stateme
 
 <div class="code-example" markdown="1">
 **Current status:** Safire uses this signing layer internally when
-`Safire::Client#register_client` submits UDAP Security STU2 registration
-requests. Most applications should use `register_client` rather than construct
-software statements directly.
+`Safire::Client#register_client` and `Safire::Client#cancel_registration`
+submit UDAP Security STU2 registration lifecycle requests. Most applications
+should use those facade methods rather than construct software statements
+directly.
 </div>
 
 ## What Safire Builds
 
 UDAP registration metadata is signed into a compact JWS software statement
-inside `register_client`. The software statement carries the client
-registration parameters plus the required security claims:
+inside `register_client` and `cancel_registration`. The software statement
+carries the client registration parameters plus the required security claims:
 
 | Claim | Safire behavior |
 |-------|-----------------|

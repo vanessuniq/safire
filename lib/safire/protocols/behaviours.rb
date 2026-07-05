@@ -55,6 +55,16 @@ module Safire
       def register_client(...)
         raise NotImplementedError, "#{self.class}#register_client is not implemented"
       end
+
+      # Cancels an existing dynamic client registration.
+      #
+      # Implementations should override this method when the protocol supports a
+      # cancellation lifecycle operation.
+      #
+      # @abstract
+      def cancel_registration(...)
+        raise NotImplementedError, "#{self.class}#cancel_registration is not implemented"
+      end
     end
   end
 end

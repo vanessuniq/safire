@@ -553,6 +553,7 @@ RSpec.describe Safire::Protocols::Udap do
 
       expect(Safire::Protocols::UdapRegistrationMetadata).to have_received(:new).with(
         client_metadata,
+        operation: :register,
         allow_insecure_localhost: false
       )
     end
@@ -565,6 +566,7 @@ RSpec.describe Safire::Protocols::Udap do
 
         expect(Safire::Protocols::UdapRegistrationMetadata).to have_received(:new).with(
           client_metadata,
+          operation: :register,
           allow_insecure_localhost: true
         )
       end
@@ -803,6 +805,208 @@ RSpec.describe Safire::Protocols::Udap do
 
     it 'does not accept a client_type keyword' do
       expect { described_class.new(config, client_type: nil) }.to raise_error(ArgumentError)
+    end
+  end
+
+  describe '#cancel_registration' do
+    let(:registration_endpoint) { 'https://fhir.example.com/signed-register' }
+    let(:client_uri) { 'https://client.example.com/app' }
+    let(:client_metadata) do
+      {
+        client_name: 'Example Backend Service',
+        contacts: ['mailto:security@example.com'],
+        scope: 'system/Patient.rs'
+      }
+    end
+    let(:cancellation_response) do
+      {
+        'client_id' => 'udap-client-123',
+        'grant_types' => []
+      }
+    end
+    let(:registration_discovery_body) do
+      valid_metadata.merge(
+        'udap_profiles_supported' => %w[udap_dcr udap_authn udap_authz],
+        'registration_endpoint' => 'https://fhir.example.com/unsigned-register',
+        'registration_endpoint_jwt_signing_alg_values_supported' => %w[RS256 RS384]
+      )
+    end
+    let(:registration_signed_claims) do
+      {
+        'token_endpoint' => valid_metadata['token_endpoint'],
+        'registration_endpoint' => registration_endpoint
+      }
+    end
+    let(:registration_validator) do
+      instance_double(
+        Safire::Protocols::UdapSignedMetadataValidator,
+        signed_endpoint_claims: registration_signed_claims
+      )
+    end
+    let(:registration_metadata) { instance_double(Safire::Protocols::UdapRegistrationMetadata) }
+    let(:software_statement) { instance_double(Safire::Protocols::UdapSoftwareStatement, to_jwt: 'header.payload.sig') }
+
+    before do
+      stub_udap(body: registration_discovery_body)
+      allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(registration_validator)
+      allow(Safire::Protocols::UdapRegistrationMetadata).to receive(:new).and_return(registration_metadata)
+      allow(Safire::Protocols::UdapSoftwareStatement).to receive(:new).and_return(software_statement)
+      stub_request(:post, registration_endpoint)
+        .to_return(status: 202, body: cancellation_response.to_json, headers: { 'Content-Type' => 'application/json' })
+    end
+
+    it 'returns a body-confirmed cancellation response without requiring status 200' do
+      expect(udap.cancel_registration(client_metadata, client_uri:)).to eq(cancellation_response)
+    end
+
+    it 'builds cancellation metadata with an empty grant set' do
+      udap.cancel_registration(client_metadata, client_uri:)
+
+      expect(Safire::Protocols::UdapRegistrationMetadata).to have_received(:new).with(
+        client_metadata,
+        operation: :cancel,
+        allow_insecure_localhost: false
+      )
+    end
+
+    it 'uses the same discovered registration endpoint and UDAP request envelope' do
+      udap.cancel_registration(client_metadata, client_uri:)
+
+      expect(WebMock).to(have_requested(:post, registration_endpoint).with do |request|
+        body = JSON.parse(request.body)
+        request.headers['Content-Type'].start_with?('application/json') &&
+          body == {
+            'software_statement' => 'header.payload.sig',
+            'udap' => '1'
+          }
+      end)
+    end
+
+    it 'scopes cancellation discovery by community' do
+      community = 'https://community.example.com/udap'
+      stub_request(:get, well_known_url)
+        .with(query: { 'community' => community })
+        .to_return(
+          status: 200,
+          body: registration_discovery_body.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+
+      udap.cancel_registration(
+        client_metadata,
+        client_uri:,
+        community:
+      )
+
+      expect(WebMock).to have_requested(:get, well_known_url).with(query: { 'community' => community })
+    end
+
+    it 'passes trust policy through discovery' do
+      anchor = instance_double(OpenSSL::X509::Certificate, to_der: 'anchor')
+      crl = instance_double(OpenSSL::X509::CRL, to_der: 'crl')
+      checker = ->(**_kwargs) { true }
+
+      udap.cancel_registration(
+        client_metadata,
+        client_uri:,
+        trusted_anchors: [anchor],
+        crls: [crl],
+        revocation_checker: checker,
+        verify_chain: false
+      )
+
+      expect(registration_validator).to have_received(:signed_endpoint_claims).with(
+        base_url: base_url,
+        trusted_anchors: [anchor],
+        crls: [crl],
+        revocation_checker: checker,
+        verify_chain: false,
+        allow_insecure_localhost: false
+      )
+    end
+
+    it 'preserves cancellation certifications in the UDAP request envelope' do
+      certifications = ['eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJjZXJ0In0.c2ln']
+
+      udap.cancel_registration(client_metadata, client_uri:, certifications:)
+
+      expect(WebMock).to(have_requested(:post, registration_endpoint).with do |request|
+        JSON.parse(request.body)['certifications'] == certifications
+      end)
+    end
+
+    [
+      ['missing grant_types', { 'client_id' => 'udap-client-123' }],
+      ['non-array grant_types', { 'client_id' => 'udap-client-123', 'grant_types' => 'client_credentials' }],
+      ['non-empty grant_types', { 'client_id' => 'udap-client-123', 'grant_types' => ['client_credentials'] }]
+    ].each do |description, response_body|
+      context "when the cancellation response has #{description}" do
+        before do
+          stub_request(:post, registration_endpoint)
+            .to_return(
+              status: 200,
+              body: response_body.to_json,
+              headers: { 'Content-Type' => 'application/json' }
+            )
+        end
+
+        it 'raises RegistrationError' do
+          expect { udap.cancel_registration(client_metadata, client_uri:) }
+            .to raise_error(Safire::Errors::RegistrationError, /empty grant_types/)
+        end
+      end
+    end
+
+    context 'when the cancellation response is missing client_id' do
+      before do
+        stub_request(:post, registration_endpoint)
+          .to_return(status: 200, body: { 'grant_types' => [] }.to_json,
+                     headers: { 'Content-Type' => 'application/json' })
+      end
+
+      it 'raises RegistrationError through the RFC 7591 response parser' do
+        expect { udap.cancel_registration(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::RegistrationError, /missing client_id/)
+      end
+    end
+
+    context 'when the cancellation response has a final non-2xx status' do
+      before do
+        stub_request(:post, registration_endpoint)
+          .to_return(
+            status: 304,
+            body: cancellation_response.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+      end
+
+      it 'raises RegistrationError even when the body confirms cancellation' do
+        expect { udap.cancel_registration(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::RegistrationError, /unexpected cancellation response status/)
+      end
+    end
+
+    context 'when the server rejects the cancellation request' do
+      before do
+        stub_request(:post, registration_endpoint).to_return(
+          status: 400,
+          body: {
+            'error' => 'invalid_software_statement',
+            'error_description' => 'signature failed'
+          }.to_json,
+          headers: { 'Content-Type' => 'application/json' }
+        )
+      end
+
+      it 'raises RegistrationError with the server error code' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          udap.cancel_registration(client_metadata, client_uri:)
+        end
+
+        expect(error.status).to eq(400)
+        expect(error.error_code).to eq('invalid_software_statement')
+        expect(error.error_description).to eq('signature failed')
+      end
     end
   end
 end

@@ -14,9 +14,8 @@ has_children: true
 <div class="code-example" markdown="1">
 **Implemented now:** UDAP Security STU2 discovery (`/.well-known/udap`)
 including signed metadata validation and optional community scoping, plus
-certificate-backed Dynamic Client Registration for new registrations and
-modifications. Registration cancellation, JWT client authentication, and
-Tiered OAuth remain planned. See
+certificate-backed Dynamic Client Registration for registration, modification,
+and cancellation. JWT client authentication and Tiered OAuth remain planned. See
 [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md).
 </div>
 
@@ -164,7 +163,8 @@ UDAP Dynamic Client Registration is available through the same facade method as
 SMART registration, selected by `protocol: :udap`. Safire discovers and
 validates UDAP metadata, signs your registration metadata into a
 `software_statement`, posts the fixed UDAP request envelope, and returns the
-server's registration response.
+server's registration response. Use `register_client` for new registration and
+modification, and `cancel_registration` for cancellation.
 
 ```ruby
 client = Safire::Client.new(
@@ -194,7 +194,25 @@ registration = client.register_client(
 registration['client_id']
 ```
 
-Pass `community:` when registering within a specific UDAP trust community.
+Cancel an existing registration with the same discovery and trust policy:
+
+```ruby
+cancellation = client.cancel_registration(
+  {
+    client_name: 'Example Backend Service',
+    contacts: ['mailto:security@example.com'],
+    scope: 'system/Patient.rs system/Observation.rs'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+
+cancellation['grant_types'] # => []
+```
+
+Pass `community:` when registering, modifying, or cancelling within a specific
+UDAP trust community.
 Pass `certifications:` when the community requires third-party certification
 JWTs. Safire shape-checks those JWT strings and sends them to the authorization
 server; it does not create, verify, or interpret certification contents.
@@ -221,8 +239,6 @@ certification handling, and error boundaries.
 
 ### Client Flows
 
-- **Registration cancellation** — cancel an existing UDAP registration by
-  submitting a signed cancellation request with an empty `grant_types` array
 - **JWT Client Authentication** — authenticate on every request using a signed JWT assertion (Authentication Token, AnT) with an X.509 certificate chain in the `x5c` header; the registered `client_id` is reused as `iss` and `sub` in each assertion
 - **Tiered OAuth** — delegated authorization for multi-system access per the UDAP Security IG
 - **Pushed Authorization Requests (RFC 9126)** — PAR support for pre-registering authorization requests

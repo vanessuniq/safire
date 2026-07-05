@@ -65,7 +65,7 @@ Selects the authorization protocol. Defaults to `:smart`.
 | Value | Status | Description |
 |-------|--------|-------------|
 | `:smart` | Implemented | SMART App Launch 2.2.0 |
-| `:udap` | Partial | UDAP Security STU2 discovery and Dynamic Client Registration — `server_metadata` validates `signed_metadata`, supports optional `community:`, and accepts trust policy keywords (`trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:`); `register_client` submits certificate-backed UDAP registration requests; auth/token flows raise `NotImplementedError` |
+| `:udap` | Partial | UDAP Security STU2 discovery and Dynamic Client Registration — `server_metadata` validates `signed_metadata`, supports optional `community:`, and accepts trust policy keywords (`trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:`); `register_client` and `cancel_registration` submit certificate-backed UDAP registration lifecycle requests; auth/token flows raise `NotImplementedError` |
 
 For UDAP, `client_type:` is not applicable. Passing any explicit value, either at initialization or through `client.client_type=`, raises `Safire::Errors::ConfigurationError`. Future UDAP authentication flows will use signed JWT assertions rather than SMART client types.
 

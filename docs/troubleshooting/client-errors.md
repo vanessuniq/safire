@@ -130,6 +130,31 @@ end
 Either response is a server-side protocol error and should not be treated as a
 successful registration.
 
+### `RegistrationError`: UDAP cancellation response does not confirm cancellation
+
+```
+Safire::Errors::RegistrationError: Client registration failed — HTTP 202 — cancellation response must include an empty grant_types array
+```
+
+UDAP registration cancellation is confirmed by the response body, not by a
+specific 2xx status code. Safire accepts a cancellation response only when it
+contains a non-blank string `client_id` and an empty `grant_types` array:
+
+```ruby
+cancellation = udap_client.cancel_registration(
+  metadata,
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+
+cancellation['grant_types'] # => []
+```
+
+If the response omits `grant_types`, returns a non-array value, or returns a
+non-empty array, treat it as a failed cancellation and investigate the
+authorization server response.
+
 ---
 
 ## Confidential Symmetric Client Errors

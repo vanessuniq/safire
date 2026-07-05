@@ -111,6 +111,7 @@ stubbing global randomness.
 - The generated JWT is short-lived: `exp` is always `iat + 300`.
 - Private keys, compact JWTs, and certificate contents are not included in
   validation error messages.
-- End-to-end UDAP registration uses this builder through
-  `Protocols::Udap#register_client`; applications should prefer the facade
-  method over direct software-statement construction.
+- End-to-end UDAP registration lifecycle operations use this builder through
+  `Protocols::Udap#register_client` and `Protocols::Udap#cancel_registration`;
+  applications should prefer the facade methods over direct software-statement
+  construction.

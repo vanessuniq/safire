@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Safire::Client#register_client` now supports UDAP Security STU2 Dynamic
+  Client Registration when initialized with `protocol: :udap`. Safire performs
+  discovery-bound registration, validates `signed_metadata`, checks
+  `UdapMetadata#valid?`, signs a fresh X.509-backed `software_statement`, posts
+  the fixed UDAP envelope with optional `certifications`, accepts new-registration
+  `201` and update-style `200` responses with a valid `client_id`, and preserves
+  UDAP registration error codes such as `invalid_software_statement` and
+  `unapproved_software_statement`.
 - `Safire::Protocols::UdapRegistrationMetadata` validates and normalizes
   caller-controlled UDAP Security STU2 registration and cancellation metadata
   before software-statement signing. It enforces exact grant shapes, HTTPS
@@ -21,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   values with minimal `alg`/`x5c` headers, exact `iss`/`sub`/`aud` claims, a
   five-minute lifetime, fresh `jti`, RSA/EC algorithm negotiation constrained
   by discovery and key type, and local certificate/key/SAN consistency checks.
-  End-to-end UDAP registration remains planned.
+  The UDAP registration protocol flow now uses this signing foundation internally.
 - `Safire::ClientConfig` accepts a leaf-first, issuer-ordered
   `certificate_chain` of PEM strings or `OpenSSL::X509::Certificate` instances
   as the client signing identity foundation for UDAP Dynamic Client

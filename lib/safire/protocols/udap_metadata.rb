@@ -70,7 +70,6 @@ module Safire
 
       ATTRIBUTES = (REQUIRED_ATTRIBUTES | OPTIONAL_ATTRIBUTES).freeze
       STRING_URL_ATTRIBUTES = %i[token_endpoint registration_endpoint].freeze
-      BASE64URL_SEGMENT = /\A[A-Za-z0-9\-_]+\z/
       ARRAY_ATTRIBUTES = %i[
         udap_versions_supported
         udap_profiles_supported
@@ -328,7 +327,7 @@ module Safire
 
       def compact_jws_format?(value)
         parts = value.split('.', -1)
-        parts.length == 3 && parts.all? { |p| BASE64URL_SEGMENT.match?(p) }
+        parts.length == 3 && parts.all? { |part| Safire::Protocols::COMPACT_JWS_SEGMENT.match?(part) }
       end
 
       def valid_endpoint_url?(value)

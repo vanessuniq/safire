@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) server metadata discovery plus UDAP registration metadata and software-statement foundations. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
+Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) discovery plus certificate-backed Dynamic Client Registration. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
 
 ---
 
@@ -41,24 +41,32 @@ metadata = client.server_metadata(community: 'https://udap.example.org/community
 Production UDAP discovery requires trust anchors plus an explicit certificate revocation policy
 (`crls:` or `revocation_checker:`). Use `verify_chain: false` only for development or tests.
 
-Dynamic Client Registration metadata validation is also implemented:
+Dynamic Client Registration is also implemented for certificate-backed UDAP clients:
 
 ```ruby
-registration_metadata = Safire::Protocols::UdapRegistrationMetadata.new(
+udap_client = Safire::Client.new(
   {
-    client_name: 'Example Health App',
-    contacts: ['mailto:security@example.com'],
-    grant_types: %w[authorization_code refresh_token],
-    scope: 'openid system/Patient.rs',
-    redirect_uris: ['https://app.example.com/callback'],
-    logo_uri: 'https://app.example.com/logo.png'
-  }
+    base_url: 'https://fhir.example.com',
+    private_key: File.read('client-key.pem'),
+    certificate_chain: [File.read('client-cert.pem')]
+  },
+  protocol: :udap
 )
 
-registration_metadata.to_h
+registration = udap_client.register_client(
+  {
+    client_name: 'Example Backend Service',
+    contacts: ['mailto:security@example.com'],
+    grant_types: ['client_credentials'],
+    scope: 'system/Patient.rs'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
 ```
 
-UDAP registration submission, JWT client authentication, and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
+UDAP registration cancellation, JWT client authentication, and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ---
 

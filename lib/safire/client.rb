@@ -1,10 +1,11 @@
 module Safire
   # Unified facade client for SMART and UDAP protocol support.
   #
-  # This class is the main entry point for integrating SMART authorization via Safire.
-  # It supports discovery of server metadata and provides a unified interface for building
-  # authorization URLs, exchanging authorization codes, refreshing tokens, and requesting
-  # backend services access tokens (client_credentials grant).
+  # This class is the main entry point for integrating SMART authorization and UDAP discovery
+  # or registration via Safire. It supports discovery of server metadata and provides a unified
+  # interface for building authorization URLs, exchanging authorization codes, refreshing tokens,
+  # requesting backend services access tokens, and registering clients when the selected protocol
+  # implements Dynamic Client Registration.
   #
   # Configuration is provided via {Safire::ClientConfig} or a Hash. Key attributes:
   #
@@ -109,7 +110,7 @@ module Safire
   #   client = Safire::Client.new(config, client_type: :confidential_asymmetric)
   #   token_data = client.request_backend_token
   #
-  # @example Dynamic Client Registration – obtain a client_id before authorization flows
+  # @example SMART Dynamic Client Registration – obtain a client_id before authorization flows
   #   # Step 1 – create a temporary client (no client_id required)
   #   temp_client = Safire::Client.new({ base_url: 'https://fhir.example.com' })
   #
@@ -135,6 +136,31 @@ module Safire
   #       redirect_uri: 'https://myapp.example.com/callback',
   #       scopes:       ['openid', 'profile', 'patient/*.read']
   #     }
+  #   )
+  #
+  # @example UDAP Dynamic Client Registration – signed STU2 registration
+  #   temp_client = Safire::Client.new(
+  #     {
+  #       base_url: 'https://fhir.example.com',
+  #       private_key: File.read('client-key.pem'),
+  #       certificate_chain: [
+  #         File.read('client-cert.pem'),
+  #         File.read('issuing-ca.pem')
+  #       ]
+  #     },
+  #     protocol: :udap
+  #   )
+  #
+  #   registration = temp_client.register_client(
+  #     {
+  #       client_name: 'Example Backend Service',
+  #       contacts: ['mailto:security@example.com'],
+  #       grant_types: ['client_credentials'],
+  #       scope: 'system/Patient.rs system/Observation.rs'
+  #     },
+  #     client_uri: 'https://client.example.com',
+  #     trusted_anchors: [udap_ca],
+  #     crls: [udap_crl]
   #   )
   class Client
     extend Forwardable

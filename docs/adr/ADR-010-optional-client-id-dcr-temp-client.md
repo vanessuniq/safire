@@ -46,6 +46,34 @@ client = Safire::Client.new({
 
 Flow methods that require `client_id` (`authorization_url`, `request_access_token`, `request_backend_token`) validate its presence at call time and raise `ConfigurationError` if absent.
 
+### 2026-07-04 amendment: UDAP certificate-backed temp clients
+
+UDAP Dynamic Client Registration uses the same temp-client pattern, but the
+temporary client is identified by a private key and X.509 certificate chain
+rather than by SMART client type credentials:
+
+```ruby
+temp_client = Safire::Client.new(
+  {
+    base_url: 'https://fhir.example.com',
+    private_key: File.read('client-key.pem'),
+    certificate_chain: [File.read('client-cert.pem')]
+  },
+  protocol: :udap
+)
+
+registration = temp_client.register_client(
+  metadata,
+  client_uri: 'https://client.example.com',
+  trusted_anchors: [udap_ca],
+  crls: [udap_crl]
+)
+```
+
+`client_id` remains optional at construction. UDAP `register_client` discovers
+the registration endpoint, signs a software statement using the configured or
+per-call signing identity, and returns the server-assigned `client_id`.
+
 ---
 
 ## Consequences

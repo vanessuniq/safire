@@ -9,8 +9,8 @@ module Safire
     # Discovery results are cached per community within each instance.
     #
     # Other UDAP flows (B2B client credentials token acquisition, B2C authorization
-    # code, Tiered OAuth, and registration cancellation) raise +NotImplementedError+
-    # and are planned for future PRs.
+    # code, and Tiered OAuth) raise +NotImplementedError+ and are planned for
+    # future PRs.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
     # instantiate it directly — use {Safire::Client} instead.
@@ -25,7 +25,10 @@ module Safire
       REGISTRATION_HEADERS = { content_type: 'application/json' }.freeze
       SUCCESSFUL_REGISTRATION_STATUSES = [200, 201].freeze
       MANDATORY_REGISTRATION_ALGORITHM = 'RS256'.freeze
-      private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :MANDATORY_REGISTRATION_ALGORITHM
+      REGISTER_ACTION = 'Registering client via UDAP Dynamic Client Registration...'.freeze
+      CANCEL_ACTION = 'Cancelling client registration via UDAP Dynamic Client Registration...'.freeze
+      private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES,
+                       :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION
 
       def initialize(config)
         @base_url = config.base_url
@@ -126,6 +129,102 @@ module Safire
                           crls: [], revocation_checker: nil, verify_chain: true,
                           private_key: @private_key, certificate_chain: @certificate_chain,
                           jwt_algorithm: @jwt_algorithm)
+        response = submit_registration_request(
+          metadata,
+          operation: :register,
+          action: REGISTER_ACTION,
+          client_uri:,
+          community:,
+          trusted_anchors:,
+          crls:,
+          revocation_checker:,
+          verify_chain:,
+          certifications:,
+          private_key:,
+          certificate_chain:,
+          jwt_algorithm:
+        )
+        validate_registration_response_status!(response)
+        parse_registration_response(response.body)
+      rescue Faraday::Error => e
+        raise registration_error_from(e)
+      end
+
+      # Cancels an existing UDAP Dynamic Client Registration.
+      #
+      # Cancellation uses the same discovery-bound endpoint, trust policy,
+      # certifications, and X.509-backed software-statement signing as
+      # {#register_client}. Safire builds the software statement in cancellation
+      # mode, which injects an empty +grant_types+ array and rejects any
+      # caller-supplied +grant_types+ value.
+      #
+      # STU2 defines cancellation confirmation by the successful response body:
+      # +client_id+ must be present and +grant_types+ must be an empty array.
+      #
+      # @param metadata [Hash] identifying UDAP client metadata; omit +grant_types+
+      # @param client_uri [String] exact URI used as +iss+ and +sub+ and required
+      #   to appear as a URI SAN in the leaf certificate
+      # @param community [String, nil] optional UDAP community URI for discovery
+      # @param certifications [Array<String>, nil] optional third-party certification
+      #   JWTs; +nil+ omits the field and +[]+ sends an explicit empty collection
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
+      #   for signed metadata validation
+      # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation
+      # @param revocation_checker [#call, nil] custom server certificate revocation policy
+      # @param verify_chain [Boolean] whether discovery signed_metadata chain validation is required
+      # @param private_key [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil]
+      #   client signing private key; defaults to configuration
+      # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>, nil]
+      #   leaf-first client signing certificate chain; defaults to configuration
+      # @param jwt_algorithm [String, nil] optional explicit registration signing algorithm
+      # @return [Hash] cancellation response from the authorization server
+      # @raise [Safire::Errors::DiscoveryError] when UDAP discovery is unavailable,
+      #   structurally non-conformant for registration, or does not advertise UDAP DCR
+      # @raise [Safire::Errors::ValidationError] when caller metadata or certifications are invalid
+      # @raise [Safire::Errors::ConfigurationError] when signing configuration is missing or incompatible
+      # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
+      # @raise [Safire::Errors::RegistrationError] when the server rejects cancellation or fails to confirm it
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
+      #   or a redirect to a non-HTTPS URL
+      def cancel_registration(metadata, client_uri:, community: nil, certifications: nil, trusted_anchors: [],
+                              crls: [], revocation_checker: nil, verify_chain: true,
+                              private_key: @private_key, certificate_chain: @certificate_chain,
+                              jwt_algorithm: @jwt_algorithm)
+        response = submit_registration_request(
+          metadata,
+          operation: :cancel,
+          action: CANCEL_ACTION,
+          client_uri:,
+          community:,
+          trusted_anchors:,
+          crls:,
+          revocation_checker:,
+          verify_chain:,
+          certifications:,
+          private_key:,
+          certificate_chain:,
+          jwt_algorithm:
+        )
+        parse_cancellation_response(response)
+      rescue Faraday::Error => e
+        raise registration_error_from(e)
+      end
+
+      private
+
+      # Shared request preparation and POST for both :register and :cancel operations.
+      def submit_registration_request(metadata, operation:, action:, **)
+        endpoint, software_statement, certifications = prepare_registration_request(
+          metadata,
+          operation:,
+          **
+        )
+        post_registration_request(endpoint, software_statement, certifications, action:)
+      end
+
+      def prepare_registration_request(metadata, operation:, client_uri:, community:, trusted_anchors:, crls:,
+                                       revocation_checker:, verify_chain:, certifications:, private_key:,
+                                       certificate_chain:, jwt_algorithm:)
         community = normalize_community(community)
         discovered = registration_server_metadata(
           community:,
@@ -138,17 +237,14 @@ module Safire
         software_statement = registration_software_statement(
           metadata,
           discovered,
+          operation:,
           client_uri:,
           private_key:,
           certificate_chain:,
           jwt_algorithm:
         )
-        post_registration(discovered.registration_endpoint, software_statement, certifications)
-      rescue Faraday::Error => e
-        raise registration_error_from(e)
+        [discovered.registration_endpoint, software_statement, certifications]
       end
-
-      private
 
       def registration_server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
         discovered = server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
@@ -222,10 +318,11 @@ module Safire
         parts.length == 3 && parts.all? { |part| Safire::Protocols::COMPACT_JWS_SEGMENT.match?(part) }
       end
 
-      def registration_software_statement(metadata, discovered, client_uri:, private_key:, certificate_chain:,
-                                          jwt_algorithm:)
+      def registration_software_statement(metadata, discovered, operation:, client_uri:,
+                                          private_key:, certificate_chain:, jwt_algorithm:)
         registration_metadata = UdapRegistrationMetadata.new(
           metadata,
+          operation:,
           allow_insecure_localhost: @allow_insecure_localhost
         )
         build_software_statement(
@@ -251,16 +348,14 @@ module Safire
         )
       end
 
-      def post_registration(endpoint, software_statement, certifications)
-        Safire.logger.info('Registering client via UDAP Dynamic Client Registration...')
+      def post_registration_request(endpoint, software_statement, certifications, action:)
+        Safire.logger.info(action)
 
-        response = @http_client.post(
+        @http_client.post(
           endpoint,
           body: registration_request_body(software_statement.to_jwt, certifications),
           headers: REGISTRATION_HEADERS
         )
-        validate_registration_response_status!(response)
-        parse_registration_response(response.body)
       end
 
       def validate_registration_response_status!(response)
@@ -269,6 +364,16 @@ module Safire
         raise Errors::RegistrationError.new(
           status: response.status,
           error_description: 'unexpected registration response status'
+        )
+      end
+
+      def parse_cancellation_response(response)
+        parsed = parse_registration_response(response.body)
+        return parsed if parsed['grant_types'].is_a?(Array) && parsed['grant_types'].empty?
+
+        raise Errors::RegistrationError.new(
+          status: response.status,
+          error_description: 'cancellation response must include an empty grant_types array'
         )
       end
 

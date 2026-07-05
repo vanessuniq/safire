@@ -162,6 +162,19 @@ module Safire
   #     trusted_anchors: [udap_ca],
   #     crls: [udap_crl]
   #   )
+  #
+  # @example UDAP registration cancellation – signed STU2 cancellation
+  #   cancellation = temp_client.cancel_registration(
+  #     {
+  #       client_name: 'Example Backend Service',
+  #       contacts: ['mailto:security@example.com'],
+  #       scope: 'system/Patient.rs system/Observation.rs'
+  #     },
+  #     client_uri: 'https://client.example.com',
+  #     trusted_anchors: [udap_ca],
+  #     crls: [udap_crl]
+  #   )
+  #   cancellation['grant_types'] # => []
   class Client
     extend Forwardable
 
@@ -178,7 +191,8 @@ module Safire
                    :server_metadata, :authorization_url,
                    :request_access_token, :refresh_token,
                    :request_backend_token,
-                   :token_response_valid?, :register_client
+                   :token_response_valid?, :register_client,
+                   :cancel_registration
 
     attr_reader :config, :protocol, :client_type
 

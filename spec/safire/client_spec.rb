@@ -194,6 +194,27 @@ RSpec.describe Safire::Client do
     it 'raises NotImplementedError for unimplemented UDAP flows' do
       expect { udap_client.authorization_url }.to raise_error(NotImplementedError)
     end
+
+    it 'delegates cancel_registration to Protocols::Udap' do
+      response = { 'client_id' => 'udap-client-123', 'grant_types' => [] }
+      protocol_client = instance_double(Safire::Protocols::Udap, cancel_registration: response)
+      metadata = { client_name: 'Example', contacts: ['mailto:security@example.com'], scope: 'system/*.rs' }
+
+      allow(Safire::Protocols::Udap).to receive(:new).and_return(protocol_client)
+
+      result = described_class.new(config, protocol: :udap)
+                              .cancel_registration(metadata, client_uri: 'https://client.example.com')
+
+      expect(result).to eq(response)
+      expect(protocol_client).to have_received(:cancel_registration)
+        .with(metadata, client_uri: 'https://client.example.com')
+    end
+  end
+
+  describe '#cancel_registration' do
+    it 'raises NotImplementedError for SMART clients' do
+      expect { described_class.new(config).cancel_registration({}) }.to raise_error(NotImplementedError)
+    end
   end
 
   # ---------- Authorization URL ----------

@@ -29,6 +29,7 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
       scope: 'system/Patient.rs'
     }
   end
+  let(:cancellation_metadata) { registration_metadata.except(:grant_types) }
   let(:udap_metadata) do
     {
       'udap_versions_supported' => ['1'],
@@ -126,6 +127,54 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
     stub_registration_response(status: 200)
 
     expect(client.register_client(registration_metadata, client_uri:)['client_id']).to eq('udap-client-123')
+  end
+
+  it 'cancels registration with a signed empty grant_types claim' do
+    stub_udap_discovery
+    stub_registration_response(
+      status: 202,
+      body: { 'client_id' => 'udap-client-123', 'grant_types' => [] }
+    )
+
+    result = client.cancel_registration(cancellation_metadata, client_uri:)
+
+    expect(result).to include('client_id' => 'udap-client-123', 'grant_types' => [])
+    expect(decoded_software_statement).to include(
+      'iss' => client_uri,
+      'sub' => client_uri,
+      'aud' => registration_endpoint,
+      'grant_types' => []
+    )
+  end
+
+  it 'uses a fresh software statement for each cancellation request' do
+    stub_udap_discovery
+    stub_registration_response(body: { 'client_id' => 'udap-client-123', 'grant_types' => [] })
+
+    2.times { client.cancel_registration(cancellation_metadata, client_uri:) }
+
+    payloads = registration_requests.map do |body|
+      jwt = JSON.parse(body)['software_statement']
+      JWT.decode(jwt, certificate.public_key, true, algorithms: ['RS256'], verify_expiration: false).first
+    end
+    expect(payloads.map { |payload| payload['jti'] }.uniq.length).to eq(2)
+    expect(payloads).to all(satisfy { |payload| payload['exp'] == payload['iat'] + 300 })
+  end
+
+  it 'rejects caller-supplied cancellation grant_types before POSTing' do
+    stub_udap_discovery
+
+    expect { client.cancel_registration(registration_metadata, client_uri:) }
+      .to raise_error(Safire::Errors::ValidationError, /grant_types/)
+    expect(WebMock).not_to have_requested(:post, registration_endpoint)
+  end
+
+  it 'raises RegistrationError when cancellation response leaves grants active' do
+    stub_udap_discovery
+    stub_registration_response(body: { 'client_id' => 'udap-client-123', 'grant_types' => ['client_credentials'] })
+
+    expect { client.cancel_registration(cancellation_metadata, client_uri:) }
+      .to raise_error(Safire::Errors::RegistrationError, /empty grant_types/)
   end
 
   it 'raises DiscoveryError before POST when the server does not advertise UDAP DCR' do

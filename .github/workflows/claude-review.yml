@@ -208,19 +208,20 @@ jobs:
               "required":["decision","summary","findings"],
               "properties":{
                 "decision":{"type":"string","enum":["APPROVE","REQUEST_CHANGES"]},
-                "summary":{"type":"string"},
+                "summary":{"type":"string","minLength":1},
                 "findings":{
                   "type":"array",
                   "items":{
                     "type":"object",
-                    "required":["severity","title","body","anchor"],
+                    "additionalProperties":false,
+                    "required":["severity","anchor","title","body","path","line"],
                     "properties":{
                       "severity":{"type":"string","enum":["must-fix","should-fix","nit","question"]},
                       "anchor":{"type":"string","enum":["inline","context"]},
-                      "title":{"type":"string"},
-                      "body":{"type":"string"},
+                      "title":{"type":"string","minLength":1},
+                      "body":{"type":"string","minLength":1},
                       "path":{"type":["string","null"]},
-                      "line":{"type":["integer","null"]}
+                      "line":{"type":["integer","null"],"minimum":1}
                     }
                   }
                 }
@@ -479,7 +480,7 @@ jobs:
 
             const summarySuffix = [];
             if (baseChanged) {
-              summarySuffix.push(`The GitHub review was posted as a non-blocking comment, and inline comments were summarized, because the PR base changed during review: reviewed ${prBaseSha}, cu[...]`);
+              summarySuffix.push(`The GitHub review was posted as a non-blocking comment, and inline comments were summarized, because the PR base changed during review: reviewed ${prBaseSha}, current ${currentPr.base.sha}.`);
             }
             if (summaryFindings.length > 0) {
               summarySuffix.push('Additional findings and fallback items:\n');

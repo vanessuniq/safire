@@ -81,7 +81,9 @@ that list with the configured private key:
 
 When `jwt_algorithm` is omitted, Safire selects the first compatible advertised
 algorithm. RSA keys prefer `RS256` because it is the STU2 baseline. An explicit
-algorithm must be advertised by the server and compatible with the key.
+algorithm must be advertised by the server and compatible with the key. Safire
+raises `DiscoveryError` before signing if the server metadata omits mandatory
+`RS256` registration signing support.
 
 ## Validation Boundaries
 

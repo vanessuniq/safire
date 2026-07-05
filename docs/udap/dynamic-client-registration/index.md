@@ -139,7 +139,7 @@ contents.
 | `Safire::Errors::ValidationError` | Caller metadata or the `certifications:` collection is invalid before signing |
 | `Safire::Errors::ConfigurationError` | Signing configuration is missing or incompatible, such as an unsupported explicit `jwt_algorithm` |
 | `Safire::Errors::CertificateError` | The configured client certificate chain cannot support signing or does not match `client_uri:` |
-| `Safire::Errors::RegistrationError` | The registration server returns an OAuth error response or a 2xx response without a non-blank string `client_id` |
+| `Safire::Errors::RegistrationError` | The registration server returns an OAuth error response, a response status other than `200` or `201`, or a successful response without a non-blank string `client_id` |
 | `Safire::Errors::NetworkError` | Connection failure, timeout, SSL error, or blocked non-HTTPS redirect |
 
 ## Validate Metadata

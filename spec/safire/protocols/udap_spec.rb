@@ -658,6 +658,19 @@ RSpec.describe Safire::Protocols::Udap do
       expect(WebMock).not_to have_requested(:post, registration_endpoint)
     end
 
+    it 'raises DiscoveryError when the server omits mandatory RS256 registration signing support' do
+      stub_udap(
+        body: registration_discovery_body.merge(
+          'registration_endpoint_jwt_signing_alg_values_supported' => ['ES384']
+        )
+      )
+
+      expect { udap.register_client(client_metadata, client_uri:) }
+        .to raise_error(Safire::Errors::DiscoveryError, /RS256/)
+      expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+      expect(WebMock).not_to have_requested(:post, registration_endpoint)
+    end
+
     context 'when the community requires certifications' do
       let(:registration_discovery_body) do
         super().merge(
@@ -707,6 +720,22 @@ RSpec.describe Safire::Protocols::Udap do
 
       it 'accepts the response when client_id is present' do
         expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+      end
+    end
+
+    context 'when the server returns an unsupported 2xx response' do
+      before do
+        stub_request(:post, registration_endpoint)
+          .to_return(
+            status: 202,
+            body: registration_response.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+      end
+
+      it 'raises RegistrationError before parsing the body as a successful registration' do
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::RegistrationError, /unexpected registration response status/)
       end
     end
 

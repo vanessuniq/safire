@@ -23,7 +23,9 @@ module Safire
 
       WELL_KNOWN_PATH = '/.well-known/udap'.freeze
       REGISTRATION_HEADERS = { content_type: 'application/json' }.freeze
-      private_constant :REGISTRATION_HEADERS
+      SUCCESSFUL_REGISTRATION_STATUSES = [200, 201].freeze
+      MANDATORY_REGISTRATION_ALGORITHM = 'RS256'.freeze
+      private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :MANDATORY_REGISTRATION_ALGORITHM
 
       def initialize(config)
         @base_url = config.base_url
@@ -151,6 +153,7 @@ module Safire
       def registration_server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
         discovered = server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
         validate_registration_discovery!(discovered, community:)
+        validate_registration_signing_algorithms!(discovered, community:)
         discovered
       end
 
@@ -166,6 +169,16 @@ module Safire
 
         registration_discovery_error!(
           'server does not advertise UDAP Dynamic Client Registration support',
+          community
+        )
+      end
+
+      def validate_registration_signing_algorithms!(metadata, community:)
+        algorithms = metadata.registration_endpoint_jwt_signing_alg_values_supported
+        return if algorithms.include?(MANDATORY_REGISTRATION_ALGORITHM)
+
+        registration_discovery_error!(
+          "server does not advertise mandatory #{MANDATORY_REGISTRATION_ALGORITHM} registration signing support",
           community
         )
       end
@@ -246,7 +259,17 @@ module Safire
           body: registration_request_body(software_statement.to_jwt, certifications),
           headers: REGISTRATION_HEADERS
         )
+        validate_registration_response_status!(response)
         parse_registration_response(response.body)
+      end
+
+      def validate_registration_response_status!(response)
+        return if SUCCESSFUL_REGISTRATION_STATUSES.include?(response.status)
+
+        raise Errors::RegistrationError.new(
+          status: response.status,
+          error_description: 'unexpected registration response status'
+        )
       end
 
       def registration_request_body(software_statement, certifications)

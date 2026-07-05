@@ -185,6 +185,8 @@ jobs:
             - `APPROVE` if there are no must-fix issues
             Report `should-fix` findings as advisory items; they should not block approval.
 
+            If decision is REQUEST_CHANGES you MUST include at least one finding with severity 'must-fix'.
+
             Put the overall review in `summary` as GitHub-flavored Markdown.
             If there are findings, list them first in severity order with brief file/line references when known.
             If there are no findings, say that explicitly and briefly note any residual risk or testing gap.
@@ -200,7 +202,41 @@ jobs:
             - Keep each `body` concise, specific, and actionable
           claude_args: |
             --allowedTools "Read,Grep,Glob"
-            --json-schema '{"type":"object","additionalProperties":false,"required":["decision","summary","findings"],"properties":{"decision":{"type":"string","enum":["APPROVE","REQUEST_CHANGES"]},"summary":{"type":"string","minLength":1},"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["severity","anchor","title","body","path","line"],"properties":{"severity":{"type":"string","enum":["must-fix","should-fix","nit","question"]},"anchor":{"type":"string","enum":["inline","context"]},"title":{"type":"string","minLength":1},"body":{"type":"string","minLength":1},"path":{"type":["string","null"]},"line":{"type":["integer","null"],"minimum":1}}}}}}'
+            --json-schema '{
+              "type":"object",
+              "additionalProperties":false,
+              "required":["decision","summary","findings"],
+              "properties":{
+                "decision":{"type":"string","enum":["APPROVE","REQUEST_CHANGES"]},
+                "summary":{"type":"string"},
+                "findings":{
+                  "type":"array",
+                  "items":{
+                    "type":"object",
+                    "required":["severity","title","body","anchor"],
+                    "properties":{
+                      "severity":{"type":"string","enum":["must-fix","should-fix","nit","question"]},
+                      "anchor":{"type":"string","enum":["inline","context"]},
+                      "title":{"type":"string"},
+                      "body":{"type":"string"},
+                      "path":{"type":["string","null"]},
+                      "line":{"type":["integer","null"]}
+                    }
+                  }
+                }
+              },
+              "if":{"properties":{"decision":{"const":"REQUEST_CHANGES"}}},
+              "then":{
+                "properties":{
+                  "findings":{
+                    "type":"array",
+                    "contains":{"type":"object","properties":{"severity":{"const":"must-fix"}}},
+                    "minContains":1
+                  }
+                },
+                "required":["findings"]
+              }
+            }'
 
       - name: Fail if Claude produced no review output
         if: steps.pr_metadata.outputs.same_repo == 'true' && steps.run_claude.outputs.structured_output == ''
@@ -443,7 +479,7 @@ jobs:
 
             const summarySuffix = [];
             if (baseChanged) {
-              summarySuffix.push(`The GitHub review was posted as a non-blocking comment, and inline comments were summarized, because the PR base changed during review: reviewed ${prBaseSha}, current ${currentPr.base.sha}.`);
+              summarySuffix.push(`The GitHub review was posted as a non-blocking comment, and inline comments were summarized, because the PR base changed during review: reviewed ${prBaseSha}, cu[...]`);
             }
             if (summaryFindings.length > 0) {
               summarySuffix.push('Additional findings and fallback items:\n');

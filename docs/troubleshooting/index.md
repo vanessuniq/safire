@@ -32,7 +32,7 @@ Safire raises typed errors so you can handle each failure category separately:
 | `Safire::Errors::DiscoveryError` | SMART or UDAP metadata discovery failed (HTTP error, invalid JSON, missing SMART `token_endpoint` when required, or UDAP `signed_metadata` validation failure) |
 | `Safire::Errors::ValidationError` | Caller-controlled input is invalid before a request is sent, such as UDAP registration metadata or certification JWT shape |
 | `Safire::Errors::CertificateError` | UDAP `x5c` certificate data could not be parsed or the configured UDAP client certificate chain cannot support signing |
-| `Safire::Errors::RegistrationError` | Dynamic Client Registration failed (server error, or 2xx response with a missing or invalid `client_id`) |
+| `Safire::Errors::RegistrationError` | Dynamic Client Registration failed (server error, 2xx response with a missing or invalid `client_id`, or UDAP cancellation response without an empty `grant_types` array) |
 | `Safire::Errors::TokenError` | Token exchange or refresh failed (OAuth error, missing fields) |
 | `Safire::Errors::NetworkError` | Transport-level failure (connection refused, timeout, blocked redirect) |
 

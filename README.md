@@ -41,7 +41,7 @@ metadata = client.server_metadata(community: 'https://udap.example.org/community
 Production UDAP discovery requires trust anchors plus an explicit certificate revocation policy
 (`crls:` or `revocation_checker:`). Use `verify_chain: false` only for development or tests.
 
-Dynamic Client Registration is also implemented for certificate-backed UDAP clients:
+Dynamic Client Registration is implemented for certificate-backed UDAP clients:
 
 ```ruby
 udap_client = Safire::Client.new(
@@ -64,9 +64,20 @@ registration = udap_client.register_client(
   trusted_anchors: [ca_cert],
   crls:            [ca_crl]
 )
+
+cancellation = udap_client.cancel_registration(
+  {
+    client_name: 'Example Backend Service',
+    contacts: ['mailto:security@example.com'],
+    scope: 'system/Patient.rs'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
 ```
 
-UDAP registration cancellation, JWT client authentication, and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
+UDAP JWT client authentication and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 
 ---
 

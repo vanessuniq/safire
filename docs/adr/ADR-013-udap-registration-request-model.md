@@ -101,5 +101,6 @@ regular expression.
 - Extension metadata remains forward-compatible without permitting arbitrary
   Ruby objects into a JWT payload.
 - Metadata validation remains independent of software-statement signing and the
-  network registration flow. `Protocols::Udap#register_client` consumes this
-  value object when performing end-to-end UDAP registration.
+  network registration lifecycle. `Protocols::Udap#register_client` and
+  `Protocols::Udap#cancel_registration` consume this value object when
+  performing end-to-end UDAP registration operations.

@@ -41,11 +41,11 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 
 - Discovery (`/.well-known/udap`) with optional community scoping
 - Dynamic Client Registration metadata validation and normalization
-- X.509-backed software-statement signing and registration submission
+- X.509-backed software-statement signing for registration, modification, and cancellation
 
-Registration cancellation, JWT assertion authentication, and Tiered OAuth remain
-planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md)
-for details.
+JWT assertion authentication and Tiered OAuth remain planned. See
+[ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
+details.
 
 ## Demo Application
 

@@ -14,8 +14,8 @@ has_children: true
 
 <div class="code-example" markdown="1">
 **Current status:** Safire implements UDAP Security STU2 new registration and
-registration modification through `Safire::Client#register_client`.
-Registration cancellation is planned separately.
+registration modification through `Safire::Client#register_client`, and
+registration cancellation through `Safire::Client#cancel_registration`.
 </div>
 
 ## Register a Client
@@ -70,6 +70,29 @@ Safire performs these steps:
 Calling `register_client` again with the same `client_uri` and community
 requests modification of the existing registration. Safire returns the server
 response without assuming the `client_id` is unchanged.
+
+Use `cancel_registration` to cancel an existing registration. Cancellation
+uses the same discovery, trust policy, certifications, and signing identity as
+registration, but Safire signs the metadata in cancellation mode and injects an
+empty `grant_types` array:
+
+```ruby
+cancellation = client.cancel_registration(
+  {
+    client_name: 'Example Backend Service',
+    contacts: ['mailto:security@example.com'],
+    scope: 'system/Patient.rs system/Observation.rs'
+  },
+  client_uri:      'https://client.example.com',
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+
+cancellation['grant_types'] # => []
+```
+
+See [Registration Lifecycle]({% link udap/dynamic-client-registration/lifecycle.md %})
+for modification and cancellation behavior.
 
 ### Authorization-code registration
 
@@ -139,7 +162,7 @@ contents.
 | `Safire::Errors::ValidationError` | Caller metadata or the `certifications:` collection is invalid before signing |
 | `Safire::Errors::ConfigurationError` | Signing configuration is missing or incompatible, such as an unsupported explicit `jwt_algorithm` |
 | `Safire::Errors::CertificateError` | The configured client certificate chain cannot support signing or does not match `client_uri:` |
-| `Safire::Errors::RegistrationError` | The registration server returns an OAuth error response, a response status other than `200` or `201`, or a successful response without a non-blank string `client_id` |
+| `Safire::Errors::RegistrationError` | The registration server returns an OAuth error response, a registration response status other than `200` or `201`, any successful response lacks a non-blank string `client_id`, or a cancellation response does not confirm cancellation with an empty `grant_types` array |
 | `Safire::Errors::NetworkError` | Connection failure, timeout, SSL error, or blocked non-HTTPS redirect |
 
 ## Validate Metadata
@@ -234,10 +257,9 @@ Exactly one primary grant is allowed. Unknown grant types, duplicate values,
 `refresh_token` without `authorization_code`, and combining
 `authorization_code` with `client_credentials` raise `ValidationError`.
 
-The metadata value object also has `operation: :cancel` as a foundation for the
-future cancellation workflow. Omit `grant_types`; Safire injects an empty array
-and excludes authorization-only metadata. The public `cancel_registration`
-method is not implemented yet.
+Cancellation uses the same value object with `operation: :cancel`. Omit
+`grant_types`; Safire injects an empty array and excludes authorization-only
+metadata.
 
 ```ruby
 cancellation = Safire::Protocols::UdapRegistrationMetadata.new(

@@ -81,9 +81,10 @@ anchor set). Instances returned by `Udap#server_metadata` are already pre-valida
 
 UDAP Dynamic Client Registration is the first Safire flow that acts on
 discovered UDAP endpoints after discovery. `Protocols::Udap#register_client`
-uses the `registration_endpoint` from the `UdapMetadata` instance returned by
-`server_metadata`. Because `server_metadata` merges signed endpoint claims over
-unsigned JSON before constructing the entity, registration posts to the
+and `Protocols::Udap#cancel_registration` use the `registration_endpoint` from
+the `UdapMetadata` instance returned by `server_metadata`. Because
+`server_metadata` merges signed endpoint claims over unsigned JSON before
+constructing the entity, registration lifecycle requests post to the
 authoritative signed endpoint when signed and unsigned values differ.
 
 ---

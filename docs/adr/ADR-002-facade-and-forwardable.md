@@ -43,7 +43,8 @@ class Client
                  :server_metadata, :authorization_url,
                  :request_access_token, :refresh_token,
                  :request_backend_token,
-                 :token_response_valid?, :register_client
+                 :token_response_valid?, :register_client,
+                 :cancel_registration
 
   private
 

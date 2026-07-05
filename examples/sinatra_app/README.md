@@ -41,6 +41,11 @@ bundle exec puma config.ru -p 4567
 
 Then visit http://localhost:4567
 
+When the demo runs on local HTTP loopback, it opts Safire clients into
+`allow_insecure_localhost: true` only for localhost/127.0.0.1 URLs. This keeps
+the local SMART callback and local test servers usable while preserving
+Safire's HTTPS-only default for remote hosts.
+
 ## Configuration
 
 ### Environment Variables
@@ -53,9 +58,12 @@ Copy `.env.example` to `.env` and configure:
 | `SESSION_SECRET` | No | Session encryption key (auto-generated if not set) |
 | `ASYMMETRIC_PRIVATE_KEY_PEM` | No | Private key in PEM format for asymmetric auth |
 | `ASYMMETRIC_KID` | No | Key ID matching your registered JWKS |
-| `UDAP_TRUST_ANCHORS_PEM` | No | PEM-encoded UDAP signing certificate trust anchors |
-| `UDAP_CRLS_PEM` | No | PEM-encoded CRLs for UDAP signing certificate revocation checks |
+| `UDAP_TRUST_ANCHORS_PEM` | No | PEM-encoded UDAP server signing certificate trust anchors |
+| `UDAP_CRLS_PEM` | No | PEM-encoded CRLs for UDAP server signing certificate revocation checks |
 | `UDAP_VERIFY_CHAIN` | No | Optional override for UDAP signed metadata chain validation (`1/true/yes/on` or `0/false/no/off`; unknown values raise a configuration error) |
+| `UDAP_CLIENT_PRIVATE_KEY_PEM` | No | PEM-encoded client private key for UDAP software-statement signing |
+| `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` | No | Leaf-first PEM certificate chain for UDAP software-statement signing |
+| `UDAP_REGISTRATION_SIGNING_ALGORITHM` | No | Optional explicit UDAP registration signing algorithm (`RS256`, `RS384`, `ES256`, or `ES384`) |
 
 ### Setting Up Asymmetric Authentication
 
@@ -109,6 +117,36 @@ UDAP_CRLS_PEM="-----BEGIN X509 CRL-----
 ```
 
 When both values are present, the demo enables chain and revocation validation by default. Set `UDAP_VERIFY_CHAIN=false` only for local development or test scenarios. Unknown `UDAP_VERIFY_CHAIN` values raise a configuration error instead of silently disabling validation.
+
+### Setting Up UDAP Client Signing Credentials
+
+UDAP Dynamic Client Registration uses a client signing identity in the
+`software_statement` JWT. This is the opposite trust direction from
+`UDAP_TRUST_ANCHORS_PEM`: trust anchors validate the **server** metadata JWT,
+while the client private key and certificate chain identify **this demo app**
+to a UDAP registration endpoint.
+
+Configure the signing credentials when testing UDAP registration:
+
+```bash
+UDAP_CLIENT_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----
+...client private key...
+-----END PRIVATE KEY-----"
+
+UDAP_CLIENT_CERTIFICATE_CHAIN_PEM="-----BEGIN CERTIFICATE-----
+...leaf certificate whose URI SAN matches the client URI...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...optional issuing certificate...
+-----END CERTIFICATE-----"
+
+UDAP_REGISTRATION_SIGNING_ALGORITHM="RS256"
+```
+
+Leave `UDAP_REGISTRATION_SIGNING_ALGORITHM` blank to let Safire select a
+compatible algorithm from UDAP discovery and the configured key type. The
+registration UI workflow will use this foundation in the next UDAP DCR demo
+PR; the current UDAP screen remains discovery-focused.
 
 ### Adding a FHIR Server
 
@@ -217,7 +255,10 @@ examples/sinatra_app/
 │   └── servers.yml     # Server configurations (YAML storage)
 ├── models/
 │   ├── fhir_server.rb                # Server model with YAML persistence
-│   └── udap_discovery_presenter.rb   # UDAP demo presentation and trust policy
+│   ├── udap_client_credentials.rb    # UDAP demo client signing credential loader
+│   ├── udap_discovery_presenter.rb   # UDAP discovery presentation model
+│   ├── udap_pem_parsing.rb           # Shared UDAP demo PEM parsing helper
+│   └── udap_trust_policy.rb          # UDAP signed_metadata server trust policy
 ├── public/
 │   ├── css/
 │   │   └── style.css   # Application styles

@@ -67,11 +67,12 @@ Cancellation uses the same discovery-bound registration endpoint, community
 scoping, trust policy, `certifications:`, and X.509 signing configuration as
 `register_client`.
 
-Unlike registration, Safire does not require a specific 2xx status code for
-cancellation. UDAP Security STU2 confirms cancellation through the response
+Unlike registration, Safire does not require a specific success status such as
+`200` or `201` for cancellation, but the final HTTP response must still be a
+successful `2xx`. UDAP Security STU2 confirms cancellation through the response
 body: the response must contain a non-blank string `client_id` and an empty
-`grant_types` array. A non-empty, missing, or non-array `grant_types` value
-raises `Safire::Errors::RegistrationError`.
+`grant_types` array. A final non-`2xx` status, or a non-empty, missing, or
+non-array `grant_types` value, raises `Safire::Errors::RegistrationError`.
 
 ## Error Boundaries
 

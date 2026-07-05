@@ -61,6 +61,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Sinatra demo includes a protocol-aware UDAP Discovery workflow with
   community-scoped discovery, signed metadata validation status, and configurable
   UDAP trust material.
+- The Sinatra demo now separates UDAP server trust policy from UDAP client
+  signing credential configuration, documents the signing environment variables
+  needed for upcoming UDAP registration workflows, stores SMART and UDAP client
+  identifiers separately, and opts local SMART demo callbacks into Safire's
+  loopback-only HTTP development policy.
 - `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default:
   `'SMART configuration'`) and exposes it as a readable attribute so callers can
   identify which protocol's discovery failed.

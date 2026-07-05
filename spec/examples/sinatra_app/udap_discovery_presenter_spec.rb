@@ -1,6 +1,6 @@
 require 'spec_helper'
-require 'openssl'
 
+require_relative '../../../examples/sinatra_app/models/udap_trust_policy'
 require_relative '../../../examples/sinatra_app/models/udap_discovery_presenter'
 
 RSpec.describe UdapDiscoveryPresenter do
@@ -30,7 +30,7 @@ RSpec.describe UdapDiscoveryPresenter do
     described_class.new(
       metadata,
       metadata_valid: metadata_valid,
-      trust_policy: instance_double(described_class::TrustPolicy, verify_chain?: verify_chain)
+      trust_policy: instance_double(UdapTrustPolicy, verify_chain?: verify_chain)
     )
   end
 
@@ -39,7 +39,7 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        trust_policy: described_class::TrustPolicy.new({})
+        trust_policy: UdapTrustPolicy.new({})
       )
 
       expect(presenter.metadata_fields.pluck(:key)).to eq(Safire::Protocols::UdapMetadata::ATTRIBUTES)
@@ -51,7 +51,7 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        trust_policy: described_class::TrustPolicy.new({})
+        trust_policy: UdapTrustPolicy.new({})
       )
 
       expect(presenter.profile_checks).to include(
@@ -67,7 +67,7 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        trust_policy: described_class::TrustPolicy.new({})
+        trust_policy: UdapTrustPolicy.new({})
       )
 
       expect(presenter.capability_checks).to include(
@@ -84,7 +84,7 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        trust_policy: described_class::TrustPolicy.new({})
+        trust_policy: UdapTrustPolicy.new({})
       )
 
       expect(presenter).to be_trust_warning
@@ -94,14 +94,14 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        trust_policy: described_class::TrustPolicy.new({})
+        trust_policy: UdapTrustPolicy.new({})
       )
 
       expect(presenter.trust_warning_reason).to include('complete UDAP trust anchors and CRLs are not configured')
     end
 
     it 'explains explicit override when chain verification is disabled by configuration' do
-      policy = described_class::TrustPolicy.new('UDAP_VERIFY_CHAIN' => 'false')
+      policy = UdapTrustPolicy.new('UDAP_VERIFY_CHAIN' => 'false')
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
@@ -133,109 +133,13 @@ RSpec.describe UdapDiscoveryPresenter do
       presenter = described_class.new(
         metadata,
         metadata_valid: true,
-        trust_policy: described_class::TrustPolicy.new({})
+        trust_policy: UdapTrustPolicy.new({})
       )
 
       expect(presenter.status_text(true)).to eq('Yes')
       expect(presenter.status_text(false)).to eq('No')
       expect(presenter.badge_class(true)).to eq('badge-added')
       expect(presenter.badge_class(false)).to eq('badge-info')
-    end
-  end
-
-  describe UdapDiscoveryPresenter::TrustPolicy do
-    let(:key) { OpenSSL::PKey::RSA.generate(2048) }
-    let(:cert) { build_cert(key) }
-    let(:crl) { build_crl(cert, key) }
-
-    def build_cert(key)
-      cert = OpenSSL::X509::Certificate.new
-      cert.version = 2
-      cert.serial = 1
-      cert.subject = OpenSSL::X509::Name.parse('/CN=Demo UDAP Anchor')
-      cert.issuer = cert.subject
-      cert.public_key = key.public_key
-      cert.not_before = Time.now - 60
-      cert.not_after = Time.now + 86_400
-      cert.sign(key, OpenSSL::Digest.new('SHA256'))
-      cert
-    end
-
-    def build_crl(cert, key)
-      crl = OpenSSL::X509::CRL.new
-      crl.version = 1
-      crl.issuer = cert.subject
-      crl.last_update = Time.now - 60
-      crl.next_update = Time.now + 86_400
-      crl.sign(key, OpenSSL::Digest.new('SHA256'))
-      crl
-    end
-
-    it 'uses development mode when no trust material is configured' do
-      policy = described_class.new({})
-
-      expect(policy.server_metadata_kwargs).to eq(
-        trusted_anchors: [],
-        crls: [],
-        verify_chain: false
-      )
-      expect(policy).to be_development_mode
-      expect(policy.chain_verification_disabled_reason).to eq(:missing_trust_material)
-    end
-
-    it 'enables chain verification when trust anchors and CRLs are configured' do
-      policy = described_class.new(
-        'UDAP_TRUST_ANCHORS_PEM' => cert.to_pem,
-        'UDAP_CRLS_PEM' => crl.to_pem
-      )
-
-      expect(policy.server_metadata_kwargs[:trusted_anchors]).to contain_exactly(be_a(OpenSSL::X509::Certificate))
-      expect(policy.server_metadata_kwargs[:crls]).to contain_exactly(be_a(OpenSSL::X509::CRL))
-      expect(policy.server_metadata_kwargs[:verify_chain]).to be(true)
-      expect(policy).not_to be_development_mode
-      expect(policy.chain_verification_disabled_reason).to be_nil
-    end
-
-    it 'honors an explicit verify_chain=false override' do
-      policy = described_class.new(
-        'UDAP_TRUST_ANCHORS_PEM' => cert.to_pem,
-        'UDAP_CRLS_PEM' => crl.to_pem,
-        'UDAP_VERIFY_CHAIN' => 'false'
-      )
-
-      expect(policy.server_metadata_kwargs[:verify_chain]).to be(false)
-      expect(policy.chain_verification_disabled_reason).to eq(:explicit_override)
-    end
-
-    it 'honors explicit true and false boolean values' do
-      expect(described_class.new('UDAP_VERIFY_CHAIN' => 'yes').server_metadata_kwargs[:verify_chain]).to be(true)
-      expect(described_class.new('UDAP_VERIFY_CHAIN' => '0').server_metadata_kwargs[:verify_chain]).to be(false)
-    end
-
-    it 'raises ConfigurationError for invalid verify_chain values' do
-      policy = described_class.new('UDAP_VERIFY_CHAIN' => 'treu')
-
-      expect { policy.server_metadata_kwargs }
-        .to raise_error(Safire::Errors::ConfigurationError, /UDAP_VERIFY_CHAIN/)
-    end
-
-    it 'raises CertificateError for malformed trust anchor PEM' do
-      malformed_cert = <<~PEM
-        -----BEGIN CERTIFICATE-----
-        not a certificate
-        -----END CERTIFICATE-----
-      PEM
-      policy = described_class.new('UDAP_TRUST_ANCHORS_PEM' => malformed_cert)
-
-      expect { policy.server_metadata_kwargs }
-        .to raise_error(Safire::Errors::CertificateError, /UDAP_TRUST_ANCHORS_PEM/)
-    end
-
-    it 'raises CertificateError for malformed CRL PEM' do
-      policy = described_class.new('UDAP_CRLS_PEM' => 'not pem')
-
-      expect { policy.server_metadata_kwargs }
-        .to raise_error(Safire::Errors::CertificateError, /UDAP_CRLS_PEM/)
     end
   end
 end

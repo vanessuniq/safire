@@ -7,8 +7,10 @@ require 'securerandom'
 require 'openssl'
 require 'json'
 require 'base64'
+require 'uri'
 require 'safire'
 require_relative 'models/fhir_server'
+require_relative 'models/udap_trust_policy'
 require_relative 'models/udap_discovery_presenter'
 
 # Sinatra demo application for Safire gem
@@ -81,6 +83,17 @@ class SafireDemo < Sinatra::Base
 
     def jwks_uri
       "#{request.scheme}://#{request.host_with_port}/.well-known/jwks.json"
+    end
+
+    def localhost_policy_for(*urls)
+      urls.any? { |url| http_loopback_url?(url) } ? { allow_insecure_localhost: true } : {}
+    end
+
+    def http_loopback_url?(value)
+      uri = URI.parse(value.to_s)
+      uri.scheme == 'http' && %w[localhost 127.0.0.1].include?(uri.host)
+    rescue URI::InvalidURIError
+      false
     end
   end
 
@@ -245,7 +258,7 @@ class SafireDemo < Sinatra::Base
   # UDAP Discovery
   get '/demo/:server_id/udap-discovery' do
     @community = normalize_optional_param(params[:community])
-    @udap_trust_policy = UdapDiscoveryPresenter::TrustPolicy.new
+    @udap_trust_policy = UdapTrustPolicy.new
     @udap_metadata = discover_udap_metadata(@server, community: @community, trust_policy: @udap_trust_policy)
     @udap_metadata_valid = @udap_metadata.valid?
     @udap_presenter = UdapDiscoveryPresenter.new(
@@ -503,7 +516,8 @@ class SafireDemo < Sinatra::Base
   end
 
   def perform_registration
-    temp_client   = Safire::Client.new({ base_url: params[:base_url].strip })
+    base_url = params[:base_url].strip
+    temp_client   = Safire::Client.new({ base_url:, **localhost_policy_for(base_url) })
     endpoint      = params[:registration_endpoint].presence
     authorization = build_authorization_header(params[:initial_access_token], params[:token_type])
     temp_client.register_client(
@@ -576,7 +590,9 @@ class SafireDemo < Sinatra::Base
   end
 
   def fetch_and_cache_metadata(server, client)
-    client ||= Safire::Client.new({ base_url: server.base_url, client_id: server.client_id })
+    client ||= Safire::Client.new(
+      { base_url: server.base_url, client_id: server.client_id, **localhost_policy_for(server.base_url) }
+    )
     metadata = client.server_metadata
     SafireDemo.metadata_cache[server.base_url] = { metadata: metadata, fetched_at: Time.now.to_i }
     metadata
@@ -609,18 +625,31 @@ class SafireDemo < Sinatra::Base
   end
 
   def discover_udap_metadata(server, community:, trust_policy:)
-    client = Safire::Client.new({ base_url: server.base_url }, protocol: :udap)
+    client = Safire::Client.new(
+      { base_url: server.base_url, **localhost_policy_for(server.base_url) },
+      protocol: :udap
+    )
     client.server_metadata(community: community, **trust_policy.server_metadata_kwargs)
   end
 
   def build_safire_client(server, client_type: :public)
-    config = {
+    config = base_safire_client_config(server)
+    add_client_type_credentials!(config, server, client_type)
+
+    Safire::Client.new(config, client_type: client_type)
+  end
+
+  def base_safire_client_config(server)
+    {
       base_url: server.base_url,
       client_id: server.client_id,
       redirect_uri: redirect_uri,
-      scopes: server.scopes
+      scopes: server.scopes,
+      **localhost_policy_for(server.base_url, redirect_uri)
     }
+  end
 
+  def add_client_type_credentials!(config, server, client_type)
     case client_type
     when :confidential_symmetric
       config[:client_secret] = server.client_secret
@@ -629,8 +658,6 @@ class SafireDemo < Sinatra::Base
       config[:kid] = ENV.fetch('ASYMMETRIC_KID', nil)
       config[:jwks_uri] = jwks_uri unless ENV['RACK_ENV'] == 'development'
     end
-
-    Safire::Client.new(config, client_type: client_type)
   end
 
   # Build a JWK from an OpenSSL key for the JWKS endpoint

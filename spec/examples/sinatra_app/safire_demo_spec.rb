@@ -29,7 +29,7 @@ RSpec.describe SafireDemo do
       'token_endpoint_auth_methods_supported' => ['none']
     }
   end
-  let(:udap_trust_policy) { UdapDiscoveryPresenter::TrustPolicy.new({}) }
+  let(:udap_trust_policy) { UdapTrustPolicy.new({}) }
   let(:udap_metadata) { Safire::Protocols::UdapMetadata.new(udap_metadata_hash) }
   let(:udap_metadata_hash) do
     {
@@ -69,7 +69,7 @@ RSpec.describe SafireDemo do
     allow(FhirServer).to receive(:find).with('udap-only').and_return(udap_server)
     allow(FhirServer).to receive(:find).with('evil-udap').and_return(malicious_udap_server)
     allow(FhirServer).to receive(:find_by_base_url).with(udap_server.base_url).and_return(udap_server)
-    allow(UdapDiscoveryPresenter::TrustPolicy).to receive(:new).and_return(udap_trust_policy)
+    allow(UdapTrustPolicy).to receive(:new).and_return(udap_trust_policy)
   end
 
   describe 'protocol guards' do
@@ -151,6 +151,17 @@ RSpec.describe SafireDemo do
       expect(response.status).to eq(200)
       expect(response.body).to include('Authorization Flow')
       expect(response.body).to include('Provider Standalone Launch')
+    end
+
+    it 'opts into insecure localhost only for local HTTP demo callbacks' do
+      client = instance_double(Safire::Client, server_metadata: smart_metadata)
+      allow(Safire::Client).to receive(:new).and_return(client)
+
+      response = request.get('/demo/smart-only/authorize', 'HTTP_HOST' => 'localhost:4567')
+
+      expect(response.status).to eq(200)
+      expect(Safire::Client).to have_received(:new)
+        .with(hash_including(allow_insecure_localhost: true), client_type: :public)
     end
   end
 

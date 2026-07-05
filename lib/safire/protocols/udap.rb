@@ -24,10 +24,11 @@ module Safire
       WELL_KNOWN_PATH = '/.well-known/udap'.freeze
       REGISTRATION_HEADERS = { content_type: 'application/json' }.freeze
       SUCCESSFUL_REGISTRATION_STATUSES = [200, 201].freeze
+      SUCCESSFUL_CANCELLATION_STATUSES = 200..299
       MANDATORY_REGISTRATION_ALGORITHM = 'RS256'.freeze
       REGISTER_ACTION = 'Registering client via UDAP Dynamic Client Registration...'.freeze
       CANCEL_ACTION = 'Cancelling client registration via UDAP Dynamic Client Registration...'.freeze
-      private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES,
+      private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :SUCCESSFUL_CANCELLATION_STATUSES,
                        :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION
 
       def initialize(config)
@@ -368,12 +369,22 @@ module Safire
       end
 
       def parse_cancellation_response(response)
+        validate_cancellation_response_status!(response)
         parsed = parse_registration_response(response.body)
         return parsed if parsed['grant_types'].is_a?(Array) && parsed['grant_types'].empty?
 
         raise Errors::RegistrationError.new(
           status: response.status,
           error_description: 'cancellation response must include an empty grant_types array'
+        )
+      end
+
+      def validate_cancellation_response_status!(response)
+        return if SUCCESSFUL_CANCELLATION_STATUSES.cover?(response.status)
+
+        raise Errors::RegistrationError.new(
+          status: response.status,
+          error_description: 'unexpected cancellation response status'
         )
       end
 

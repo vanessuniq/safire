@@ -970,6 +970,22 @@ RSpec.describe Safire::Protocols::Udap do
       end
     end
 
+    context 'when the cancellation response has a final non-2xx status' do
+      before do
+        stub_request(:post, registration_endpoint)
+          .to_return(
+            status: 304,
+            body: cancellation_response.to_json,
+            headers: { 'Content-Type' => 'application/json' }
+          )
+      end
+
+      it 'raises RegistrationError even when the body confirms cancellation' do
+        expect { udap.cancel_registration(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::RegistrationError, /unexpected cancellation response status/)
+      end
+    end
+
     context 'when the server rejects the cancellation request' do
       before do
         stub_request(:post, registration_endpoint).to_return(

@@ -26,6 +26,7 @@ class SafireDemoEnvSetup
     '...your UDAP client private key content here...',
     '...your UDAP client leaf certificate...'
   ].freeze
+  PLACEHOLDER_PATTERN = Regexp.union(PLACEHOLDER_SNIPPETS).freeze
 
   Assignment = Struct.new(:key, :raw)
 
@@ -207,7 +208,9 @@ class SafireDemoEnvSetup
   end
 
   def absent?(value)
-    value.to_s.strip.empty? || PLACEHOLDER_SNIPPETS.any? { |snippet| value.include?(snippet) }
+    string = value.to_s
+
+    string.strip.empty? || PLACEHOLDER_PATTERN.match?(string)
   end
 
   def generate_rsa_key

@@ -63,9 +63,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   UDAP trust material.
 - The Sinatra demo now separates UDAP server trust policy from UDAP client
   signing credential configuration, documents the signing environment variables
-  needed for upcoming UDAP registration workflows, stores SMART and UDAP client
+  used by UDAP registration workflows, stores SMART and UDAP client
   identifiers separately, and opts local SMART demo callbacks into Safire's
   loopback-only HTTP development policy.
+- The Sinatra demo includes a UDAP Dynamic Client Registration lifecycle screen
+  with prepopulated client metadata, certificate-backed software-statement
+  signing, community and certification inputs, optional certification JWT file
+  loading, filtered registration results, manual `udap_client_id` entry for
+  externally registered clients, `udap_client_id` persistence, duplicate
+  registration prevention, cancellation confirmation, home-page entry points for
+  unregistered UDAP servers, and a development-only HTTP loopback policy aligned
+  with SMART demo registration.
+- `bin/demo` now prepares the ignored Sinatra demo `.env` file before boot,
+  filling absent local-only session secrets, SMART asymmetric demo credentials,
+  UDAP client signing credentials, and a sample self-signed certification JWT
+  while preserving existing nonblank values.
 - `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default:
   `'SMART configuration'`) and exposes it as a readable attribute so callers can
   identify which protocol's discovery failed.

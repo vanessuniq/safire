@@ -6,7 +6,7 @@ on:
       ruby-version:
         description: 'Ruby version to use'
         type: string
-        default: '4.0.5'
+        default: '4.0.6'
       gemfile:
         description: 'Gemfile to use (relative path)'
         type: string

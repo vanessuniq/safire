@@ -174,6 +174,15 @@ certificate must contain a URI SAN that exactly matches the `client_uri` value
 submitted by the registration form. For local testing, run the demo at
 `http://localhost:4567` or edit the form's client URI to match your certificate.
 
+Generated UDAP demo credentials and the sample self-signed certification JWT
+expire after one year. `bin/demo` intentionally preserves non-empty `.env`
+values and certification files so it does not overwrite issued test
+credentials. To refresh only the generated local demo identity, blank both
+`UDAP_CLIENT_PRIVATE_KEY_PEM` and `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` together,
+blank `UDAP_REGISTRATION_SIGNING_ALGORITHM` unless it is still compatible with
+the regenerated key, remove or empty the file named by
+`UDAP_CLIENT_CERTIFICATIONS_FILE`, and rerun `bin/demo`.
+
 ### Adding a FHIR Server
 
 The home page offers dynamic SMART registration or manual server setup.

@@ -200,6 +200,9 @@ jobs:
             - For `inline` findings, only set `path` and `line` when you are confident the issue maps to a changed line on the RIGHT side of the diff
             - For `context` findings, you may set `path` and `line` to reference unchanged code affected by the PR, or use `null` when the issue is broader
             - Keep each `body` concise, specific, and actionable
+          # Claude's schema validator rejects newer JSON Schema keywords such
+          # as minContains. In draft-07 semantics, contains already requires at
+          # least one matching array item, which is all this guard needs.
           claude_args: |
             --allowedTools "Read,Grep,Glob"
             --json-schema '{
@@ -231,8 +234,7 @@ jobs:
                 "properties":{
                   "findings":{
                     "type":"array",
-                    "contains":{"type":"object","properties":{"severity":{"const":"must-fix"}}},
-                    "minContains":1
+                    "contains":{"type":"object","properties":{"severity":{"const":"must-fix"}}}
                   }
                 },
                 "required":["findings"]

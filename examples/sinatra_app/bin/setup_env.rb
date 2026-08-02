@@ -17,6 +17,9 @@ class SafireDemoEnvSetup
   DEFAULT_CLIENT_NAME = 'Safire Demo App'
   DEFAULT_CONTACTS = 'mailto:admin@example.com'
   DEFAULT_SIGNING_ALGORITHM = 'RS256'
+  PRIVATE_KEY_ENV = 'UDAP_CLIENT_PRIVATE_KEY_PEM'
+  CERTIFICATE_CHAIN_ENV = 'UDAP_CLIENT_CERTIFICATE_CHAIN_PEM'
+  SIGNING_ALGORITHM_ENV = 'UDAP_REGISTRATION_SIGNING_ALGORITHM'
   CERTIFICATION_URIS = ['https://www.example.com/udap/profiles/example-certification'].freeze
   PLACEHOLDER_SNIPPETS = [
     'your_session_secret_here',
@@ -27,8 +30,19 @@ class SafireDemoEnvSetup
     '...your UDAP client leaf certificate...'
   ].freeze
   PLACEHOLDER_PATTERN = Regexp.union(PLACEHOLDER_SNIPPETS).freeze
+  CERTIFICATE_PATTERN = /-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/m
+  DEFAULT_ALGORITHMS_BY_KEY = {
+    rsa: DEFAULT_SIGNING_ALGORITHM,
+    'prime256v1' => 'ES256',
+    'secp256r1' => 'ES256',
+    'secp384r1' => 'ES384'
+  }.freeze
+  COMPATIBLE_RSA_ALGORITHMS = %w[RS256 RS384].freeze
+  SECURE_FILE_MODE = 0o600
 
   Assignment = Struct.new(:key, :raw)
+
+  class SetupError < StandardError; end
 
   class DotenvDocument
     ASSIGNMENT_PATTERN = /\A\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=/
@@ -97,7 +111,7 @@ class SafireDemoEnvSetup
       value = value.encode(Encoding::UTF_8)
       return value if value.match?(%r{\A[A-Za-z0-9_.:/@-]+\z})
 
-      escaped = value.gsub('\\', '\\\\\\').gsub('"', '\"')
+      escaped = value.gsub(/[\\"]/) { |character| "\\#{character}" }
       "\"#{escaped}\""
     end
 
@@ -151,7 +165,8 @@ class SafireDemoEnvSetup
 
   def run
     @changed = []
-    @client_certificate = nil
+    @udap_private_key = nil
+    @udap_leaf_certificate = nil
     document = DotenvDocument.parse(seed_env_content)
     prepare_environment(document)
     write_env(document)
@@ -175,27 +190,56 @@ class SafireDemoEnvSetup
   end
 
   def prepare_environment(document)
-    (generated_environment_defaults(document) + static_environment_defaults).each do |key, generator|
+    generated_environment_defaults.each do |key, generator|
       set_if_absent(document, key, &generator)
     end
+
+    prepare_udap_signing_identity(document)
+
+    static_environment_defaults(document).each do |key, generator|
+      set_if_absent(document, key, &generator)
+    end
+
+    validate_registration_signing_algorithm!(document)
   end
 
-  def generated_environment_defaults(document)
+  def generated_environment_defaults
     [
       ['SESSION_SECRET', -> { SecureRandom.hex(32) }],
       ['ASYMMETRIC_PRIVATE_KEY_PEM', -> { generate_rsa_key.to_pem }],
-      ['ASYMMETRIC_KID', -> { "safire-demo-#{SecureRandom.hex(8)}" }],
-      ['UDAP_CLIENT_PRIVATE_KEY_PEM', -> { generate_rsa_key.to_pem }],
-      ['UDAP_CLIENT_CERTIFICATE_CHAIN_PEM', -> { client_certificate(document).to_pem }]
+      ['ASYMMETRIC_KID', -> { "safire-demo-#{SecureRandom.hex(8)}" }]
     ]
   end
 
-  def static_environment_defaults
+  def prepare_udap_signing_identity(document)
+    key_absent = absent?(document.value(PRIVATE_KEY_ENV))
+    certificate_absent = absent?(document.value(CERTIFICATE_CHAIN_ENV))
+
+    if key_absent && certificate_absent
+      generate_udap_signing_pair(document)
+    elsif key_absent || certificate_absent
+      raise SetupError, "#{PRIVATE_KEY_ENV} and #{CERTIFICATE_CHAIN_ENV} must be configured together"
+    else
+      validate_udap_signing_pair!(document)
+    end
+  end
+
+  def generate_udap_signing_pair(document)
+    @udap_private_key = generate_rsa_key
+    @udap_leaf_certificate = build_client_certificate(@udap_private_key)
+
+    document.set(PRIVATE_KEY_ENV, @udap_private_key.to_pem)
+    document.set(CERTIFICATE_CHAIN_ENV, @udap_leaf_certificate.to_pem)
+    @changed << PRIVATE_KEY_ENV
+    @changed << CERTIFICATE_CHAIN_ENV
+  end
+
+  def static_environment_defaults(document)
     [
       ['UDAP_CLIENT_NAME', -> { DEFAULT_CLIENT_NAME }],
       ['UDAP_CLIENT_CONTACTS', -> { DEFAULT_CONTACTS }],
       ['UDAP_CLIENT_LOGO_URI', -> { "#{client_uri}/safire-demo-logo.png" }],
-      ['UDAP_REGISTRATION_SIGNING_ALGORITHM', -> { DEFAULT_SIGNING_ALGORITHM }],
+      [SIGNING_ALGORITHM_ENV, -> { default_algorithm_for_key(udap_private_key(document)) }],
       ['UDAP_CLIENT_CERTIFICATIONS_FILE', -> { DEFAULT_CERTIFICATIONS_FILE }]
     ]
   end
@@ -217,11 +261,38 @@ class SafireDemoEnvSetup
     OpenSSL::PKey::RSA.generate(2048)
   end
 
-  def client_certificate(document)
-    @client_certificate ||= begin
-      key = OpenSSL::PKey.read(document.value('UDAP_CLIENT_PRIVATE_KEY_PEM'))
-      build_client_certificate(key)
-    end
+  def validate_udap_signing_pair!(document)
+    key = udap_private_key(document)
+    cert = udap_leaf_certificate(document)
+    return if cert.check_private_key(key)
+
+    raise SetupError, "#{PRIVATE_KEY_ENV} does not match #{CERTIFICATE_CHAIN_ENV}"
+  end
+
+  def udap_private_key(document)
+    @udap_private_key ||= parse_private_key(document.value(PRIVATE_KEY_ENV))
+  end
+
+  def parse_private_key(pem)
+    key = OpenSSL::PKey.read(pem.to_s)
+    return key if key.private?
+
+    raise SetupError, "#{PRIVATE_KEY_ENV} must contain a PEM private key"
+  rescue OpenSSL::PKey::PKeyError
+    raise SetupError, "#{PRIVATE_KEY_ENV} must contain a valid PEM private key"
+  end
+
+  def udap_leaf_certificate(document)
+    @udap_leaf_certificate ||= parse_leaf_certificate(document.value(CERTIFICATE_CHAIN_ENV))
+  end
+
+  def parse_leaf_certificate(pem)
+    leaf_pem = pem.to_s[CERTIFICATE_PATTERN]
+    raise SetupError, "#{CERTIFICATE_CHAIN_ENV} must contain at least one PEM certificate" unless leaf_pem
+
+    OpenSSL::X509::Certificate.new(leaf_pem)
+  rescue OpenSSL::X509::CertificateError
+    raise SetupError, "#{CERTIFICATE_CHAIN_ENV} must contain a valid PEM certificate chain"
   end
 
   def build_client_certificate(key)
@@ -256,7 +327,7 @@ class SafireDemoEnvSetup
 
   def write_env(document)
     FileUtils.mkdir_p(File.dirname(env_path))
-    File.write(env_path, document.to_s)
+    secure_write(env_path, document.to_s)
   end
 
   def ensure_certification_file(document)
@@ -264,7 +335,7 @@ class SafireDemoEnvSetup
     return if File.exist?(path) && !File.read(path).strip.empty?
 
     FileUtils.mkdir_p(File.dirname(path))
-    File.write(path, "#{certification_jwt(document)}\n")
+    secure_write(path, "#{certification_jwt(document)}\n")
     @changed << document.value('UDAP_CLIENT_CERTIFICATIONS_FILE')
   end
 
@@ -276,16 +347,68 @@ class SafireDemoEnvSetup
   end
 
   def certification_jwt(document)
-    key = OpenSSL::PKey.read(document.value('UDAP_CLIENT_PRIVATE_KEY_PEM'))
-    cert = OpenSSL::X509::Certificate.new(document.value('UDAP_CLIENT_CERTIFICATE_CHAIN_PEM'))
-    JWT.encode(certification_payload, key, DEFAULT_SIGNING_ALGORITHM, certification_header(cert))
+    algorithm = registration_signing_algorithm(document)
+
+    JWT.encode(
+      certification_payload,
+      udap_private_key(document),
+      algorithm,
+      certification_header(udap_leaf_certificate(document), algorithm)
+    )
   end
 
-  def certification_header(cert)
+  def certification_header(cert, algorithm)
     {
-      'alg' => DEFAULT_SIGNING_ALGORITHM,
+      'alg' => algorithm,
       'x5c' => [Base64.strict_encode64(cert.to_der)]
     }
+  end
+
+  def registration_signing_algorithm(document)
+    document.value(SIGNING_ALGORITHM_ENV).to_s.strip
+  end
+
+  def validate_registration_signing_algorithm!(document)
+    algorithm = registration_signing_algorithm(document)
+    return if compatible_algorithms_for_key(udap_private_key(document)).include?(algorithm)
+
+    raise SetupError, "#{SIGNING_ALGORITHM_ENV}=#{algorithm} is not compatible with #{PRIVATE_KEY_ENV}"
+  end
+
+  def default_algorithm_for_key(key)
+    return DEFAULT_ALGORITHMS_BY_KEY.fetch(:rsa) if key.is_a?(OpenSSL::PKey::RSA)
+    return algorithm_for_ec_key(key) if key.is_a?(OpenSSL::PKey::EC)
+
+    raise SetupError, "#{PRIVATE_KEY_ENV} must be an RSA or NIST P-256/P-384 EC private key"
+  end
+
+  def compatible_algorithms_for_key(key)
+    return COMPATIBLE_RSA_ALGORITHMS if key.is_a?(OpenSSL::PKey::RSA)
+    return [algorithm_for_ec_key(key)] if key.is_a?(OpenSSL::PKey::EC)
+
+    raise SetupError, "#{PRIVATE_KEY_ENV} must be an RSA or NIST P-256/P-384 EC private key"
+  end
+
+  def algorithm_for_ec_key(key)
+    curve_name = key.group.curve_name
+    DEFAULT_ALGORITHMS_BY_KEY.fetch(curve_name) do
+      raise SetupError, "#{PRIVATE_KEY_ENV} uses unsupported EC curve #{curve_name.inspect}"
+    end
+  end
+
+  def secure_write(path, content)
+    directory = File.dirname(path)
+    temp_path = File.join(directory, ".#{File.basename(path)}.tmp-#{Process.pid}-#{SecureRandom.hex(8)}")
+
+    File.open(temp_path, File::WRONLY | File::CREAT | File::EXCL, SECURE_FILE_MODE) do |file|
+      file.write(content)
+      file.flush
+      file.fsync
+    end
+    File.rename(temp_path, path)
+    FileUtils.chmod(SECURE_FILE_MODE, path)
+  ensure
+    FileUtils.rm_f(temp_path) if temp_path && File.exist?(temp_path)
   end
 
   def certification_payload
@@ -313,4 +436,11 @@ class SafireDemoEnvSetup
   end
 end
 
-SafireDemoEnvSetup.new.run if $PROGRAM_NAME == __FILE__
+if $PROGRAM_NAME == __FILE__
+  begin
+    SafireDemoEnvSetup.new.run
+  rescue SafireDemoEnvSetup::SetupError => e
+    warn "Demo environment setup failed: #{e.message}"
+    exit 1
+  end
+end

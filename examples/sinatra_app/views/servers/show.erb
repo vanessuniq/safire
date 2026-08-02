@@ -117,7 +117,7 @@
         </div>
 
         <div class="action-cards workflow-grid">
-          <article class="action-card action-card-wide">
+          <article class="action-card <%= 'action-card-wide' if @server.udap_client_id.present? %>">
             <span class="action-kicker">Metadata</span>
             <h3>UDAP Discovery</h3>
             <form action="/demo/<%= @server.id %>/udap-discovery" method="get" class="compact-action-form">
@@ -131,6 +131,17 @@
               <button type="submit" class="btn btn-primary">Run UDAP Discovery</button>
             </form>
           </article>
+
+          <% unless @server.udap_client_id.present? %>
+            <article class="action-card">
+              <span class="action-kicker">Client Registration</span>
+              <h3>Dynamic Registration</h3>
+              <p>Register this demo client's certificate-backed software statement.</p>
+              <a href="/demo/<%= @server.id %>/udap-registration" class="btn btn-primary">
+                Open UDAP Registration
+              </a>
+            </article>
+          <% end %>
         </div>
       </section>
     <% end %>
@@ -146,7 +157,7 @@
 
       <% if @server.supports_smart? %>
         <div class="profile-row">
-          <dt>Client ID</dt>
+          <dt>SMART Client ID</dt>
           <dd><code><%= h(@server.client_id) %></code></dd>
         </div>
 
@@ -166,6 +177,19 @@
                   <span class="badge badge-scope"><%= h(scope) %></span>
                 <% end %>
               </div>
+            <% end %>
+          </dd>
+        </div>
+      <% end %>
+
+      <% if @server.supports_udap? %>
+        <div class="profile-row">
+          <dt>UDAP Client ID</dt>
+          <dd>
+            <% if @server.udap_client_id.present? %>
+              <code><%= h(@server.udap_client_id) %></code>
+            <% else %>
+              <em>Not registered</em>
             <% end %>
           </dd>
         </div>

@@ -9,6 +9,8 @@ RSpec.describe FhirServer do
       base_url: 'https://fhir.example.com',
       client_id: 'client-123',
       udap_client_id: 'udap-client-456',
+      udap_client_uri: 'https://client.example.com',
+      udap_community: 'https://community.example.org/udap',
       scopes: %w[openid profile]
     }
   end
@@ -71,6 +73,29 @@ RSpec.describe FhirServer do
       expect(server).to be_valid
     end
 
+    it 'requires the original client URI when a UDAP client id is configured' do
+      server = described_class.new(base_attrs.merge(udap_client_uri: nil, protocols: ['udap']))
+
+      expect(server).not_to be_valid
+      expect(server.errors).to include('UDAP Client URI is required when a UDAP Client ID is configured')
+    end
+
+    it 'rejects invalid persisted UDAP registration URIs' do
+      server = described_class.new(
+        base_attrs.merge(
+          protocols: ['udap'],
+          udap_client_uri: 'not a URI',
+          udap_community: 'also not a URI'
+        )
+      )
+
+      expect(server).not_to be_valid
+      expect(server.errors).to contain_exactly(
+        'UDAP Client URI must be a valid absolute URI',
+        'UDAP Community URI must be a valid absolute URI'
+      )
+    end
+
     it 'requires at least one supported protocol' do
       server = described_class.new(base_attrs.merge(protocols: []))
 
@@ -92,7 +117,9 @@ RSpec.describe FhirServer do
 
       expect(server.to_hash).to include(
         'client_id' => 'client-123',
-        'udap_client_id' => 'udap-client-456'
+        'udap_client_id' => 'udap-client-456',
+        'udap_client_uri' => 'https://client.example.com',
+        'udap_community' => 'https://community.example.org/udap'
       )
     end
   end

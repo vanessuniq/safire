@@ -62,11 +62,28 @@
   <div class="form-group">
     <label for="udap_client_id">UDAP Client ID</label>
     <input type="text" id="udap_client_id" name="udap_client_id" value="<%= h(@server.udap_client_id) %>"
-           placeholder="Client ID assigned by the UDAP registration endpoint">
+           placeholder="Client ID assigned by the UDAP registration endpoint" data-udap-client-id>
     <small>
       Optional. Use this when this demo client has already been registered with the UDAP server.
       Leave blank for discovery-only testing or to register through the demo.
     </small>
+  </div>
+
+  <div class="form-group">
+    <label for="udap_client_uri">UDAP Client URI</label>
+    <input type="text" id="udap_client_uri" name="udap_client_uri" value="<%= h(@server.udap_client_uri) %>"
+           placeholder="https://client.example.com" data-udap-client-uri>
+    <small>
+      The exact <code>iss</code> URI used to register this client. Required with a UDAP Client ID so
+      the demo can address the same registration during cancellation.
+    </small>
+  </div>
+
+  <div class="form-group">
+    <label for="udap_community">UDAP Community URI</label>
+    <input type="text" id="udap_community" name="udap_community" value="<%= h(@server.udap_community) %>"
+           placeholder="https://community.example.org/udap">
+    <small>Optional. Use the same community URI supplied during registration.</small>
   </div>
 </div>
 

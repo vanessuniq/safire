@@ -122,6 +122,10 @@ class UdapRegistrationPresenter
     cancellation_response.present?
   end
 
+  def cancellation_context_configured?
+    server.udap_client_uri.present?
+  end
+
   def cancellation_confirmed?
     cancellation_response&.fetch('grant_types', nil).is_a?(Array) &&
       cancellation_response['grant_types'].empty?

@@ -57,6 +57,7 @@
 
     <div class="form-actions">
       <form action="/demo/<%= @server.id %>/backend-token" method="post" style="display:inline;">
+        <%= csrf_field %>
         <button type="submit" class="btn btn-primary">Request New Token</button>
       </form>
       <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Back to Server</a>
@@ -69,6 +70,7 @@
     </p>
 
     <form action="/demo/<%= @server.id %>/backend-token" method="post" class="demo-form">
+      <%= csrf_field %>
       <div class="form-group">
         <label for="scopes">Scopes <span class="optional">(optional)</span></label>
         <input type="text" id="scopes" name="scopes"

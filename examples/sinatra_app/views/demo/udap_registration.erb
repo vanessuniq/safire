@@ -78,6 +78,7 @@
 
   <% unless @server.udap_client_id.present? %>
     <form action="/demo/<%= @server.id %>/udap-registration" method="post" class="demo-form udap-registration-form" data-udap-registration-form>
+      <%= csrf_field %>
       <div class="form-section">
         <h3>Client Identity</h3>
 
@@ -175,16 +176,17 @@
         <span class="eyebrow">Lifecycle</span>
         <h2>Cancel Registration</h2>
         <p class="server-url"><code><%= h(@server.udap_client_id) %></code></p>
+        <% unless presenter.cancellation_context_configured? %>
+          <p class="disabled-note">
+            <em>Add the original UDAP Client URI on the server edit page before cancelling.</em>
+          </p>
+        <% end %>
       </div>
       <form action="/demo/<%= @server.id %>/udap-registration/cancel" method="post"
             onsubmit="return confirm('Cancel this UDAP registration?');">
-        <input type="hidden" name="client_uri" value="<%= h(presenter.client_uri) %>">
-        <input type="hidden" name="client_name" value="<%= h(presenter.client_name) %>">
-        <input type="hidden" name="contacts" value="<%= h(presenter.contacts_value) %>">
-        <input type="hidden" name="scope" value="<%= h(presenter.scope) %>">
-        <input type="hidden" name="community" value="<%= h(presenter.community) %>">
-        <input type="hidden" name="certifications" value="<%= h(presenter.certifications_value) %>">
-        <button type="submit" class="btn btn-danger" <%= 'disabled' unless presenter.credentials_configured? %>>
+        <%= csrf_field %>
+        <button type="submit" class="btn btn-danger"
+                <%= 'disabled' unless presenter.credentials_configured? && presenter.cancellation_context_configured? %>>
           Cancel UDAP Registration
         </button>
       </form>

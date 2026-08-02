@@ -7,6 +7,7 @@
   <p class="server-url"><code><%= h(@server.base_url) %></code></p>
 
   <form action="/demo/<%= @server.id %>/authorize" method="post" class="auth-form">
+    <%= csrf_field %>
     <div class="form-section">
       <h3>Launch Type</h3>
       <p class="form-help">Select the type of SMART launch to demonstrate:</p>

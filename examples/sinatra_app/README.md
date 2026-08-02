@@ -204,6 +204,10 @@ The home page offers dynamic SMART registration or manual server setup.
    - **Client ID**: OAuth client ID registered with the server for SMART workflows
    - **UDAP Client ID**: (Optional) Client ID assigned by a UDAP registration endpoint
      when the demo client was registered outside this app
+   - **UDAP Client URI**: Exact client URI used as the registration software
+     statement issuer; required with a UDAP Client ID
+   - **UDAP Community URI**: (Optional) Community used for the original UDAP
+     registration
    - **Client Secret**: (Optional) For confidential symmetric clients only
    - **Scopes**: Space or comma-separated list of OAuth scopes
 
@@ -279,8 +283,9 @@ The registration screen supports:
 - `authorization_code` registration with the demo callback URI, logo URI, and
   Safire-generated `response_types: ["code"]`
 - optional `community` and certification or endorsement JWTs
-- cancellation of a stored UDAP registration when the server confirms the same
-  returned `client_id`
+- persistence of the returned `client_id`, exact client URI, and optional
+  community so cancellation uses the original registration identity
+- cancellation only when the server confirms the same returned `client_id`
 
 The page displays filtered registration metadata. It never renders the software
 statement, private key, certificate chain, or other signing material.

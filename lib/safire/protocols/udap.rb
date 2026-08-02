@@ -295,7 +295,8 @@ module Safire
 
         raise Errors::ValidationError.new(
           attribute: :certifications,
-          reason: "must include certification JWTs required by the UDAP community: #{required.join(', ')}"
+          reason: 'must not be nil or empty when UDAP metadata advertises required certification URIs: ' \
+                  "#{required.join(', ')}"
         )
       end
 

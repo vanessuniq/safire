@@ -30,6 +30,8 @@ class SafireDemo < Sinatra::Base
     attr_reader :metadata_cache
   end
 
+  use Rack::Protection::AuthenticityToken, reaction: :deny
+
   configure :development do
     require 'sinatra/reloader'
 
@@ -64,6 +66,11 @@ class SafireDemo < Sinatra::Base
 
     def h(text)
       Rack::Utils.escape_html(text.to_s)
+    end
+
+    def csrf_field
+      token = Rack::Protection::AuthenticityToken.token(session)
+      %(<input type="hidden" name="authenticity_token" value="#{h(token)}">)
     end
 
     def flash_error_message(context, error)
@@ -297,7 +304,9 @@ class SafireDemo < Sinatra::Base
 
   # UDAP Dynamic Client Registration
   get '/demo/:server_id/udap-registration' do
-    @udap_registration_presenter = build_udap_registration_presenter
+    @udap_registration_presenter = build_udap_registration_presenter(
+      form_params: stored_udap_registration_context || params
+    )
 
     erb :'demo/udap_registration'
   end
@@ -309,7 +318,7 @@ class SafireDemo < Sinatra::Base
       @udap_registration_presenter = build_udap_registration_presenter(error: duplicate_udap_registration_error)
     else
       registration = perform_udap_registration
-      persist_udap_client_id!(registration['client_id'])
+      persist_udap_registration!(registration['client_id'])
       @udap_registration_presenter = build_udap_registration_presenter(registration_response: registration)
     end
 
@@ -320,24 +329,14 @@ class SafireDemo < Sinatra::Base
   end
 
   post '/demo/:server_id/udap-registration/cancel' do
-    if @server.udap_client_id.blank?
-      @udap_registration_presenter = build_udap_registration_presenter(error: missing_udap_registration_error)
-    else
-      expected_client_id = @server.udap_client_id
-      @udap_registration_presenter = build_udap_registration_presenter(expected_client_id:)
-      cancellation = perform_udap_cancellation
-      clear_udap_client_id_if_confirmed!(expected_client_id, cancellation)
-      @udap_registration_presenter = build_udap_registration_presenter(
-        cancellation_response: cancellation,
-        expected_client_id:
-      )
-    end
+    @udap_registration_presenter = process_udap_cancellation
 
     erb :'demo/udap_registration'
   rescue Safire::Errors::Error => e
     @udap_registration_presenter = build_udap_registration_presenter(
       error: e,
-      expected_client_id: @server.udap_client_id
+      expected_client_id: @server.udap_client_id,
+      form_params: stored_udap_registration_context || {}
     )
     erb :'demo/udap_registration'
   end
@@ -569,9 +568,17 @@ class SafireDemo < Sinatra::Base
   def server_registration_params
     {
       client_id: normalize_optional_param(params[:client_id]),
-      udap_client_id: normalize_optional_param(params[:udap_client_id]),
       client_secret: normalize_optional_param(params[:client_secret]),
-      scopes: parse_scopes(params[:scopes])
+      scopes: parse_scopes(params[:scopes]),
+      **udap_server_registration_params
+    }
+  end
+
+  def udap_server_registration_params
+    {
+      udap_client_id: normalize_optional_param(params[:udap_client_id]),
+      udap_client_uri: normalize_optional_param(params[:udap_client_uri]),
+      udap_community: normalize_optional_param(params[:udap_community])
     }
   end
 
@@ -705,10 +712,10 @@ class SafireDemo < Sinatra::Base
   end
 
   def build_udap_registration_presenter(registration_response: nil, cancellation_response: nil,
-                                        expected_client_id: nil, error: nil)
+                                        expected_client_id: nil, error: nil, form_params: params)
     UdapRegistrationPresenter.new(
       server: @server,
-      params: params,
+      params: form_params,
       credentials: udap_client_credentials,
       trust_policy: udap_trust_policy,
       client_uri: client_uri,
@@ -739,6 +746,28 @@ class SafireDemo < Sinatra::Base
       community: udap_registration_community,
       certifications: udap_registration_certifications,
       **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  def process_udap_cancellation
+    return build_udap_registration_presenter(error: missing_udap_registration_error) if @server.udap_client_id.blank?
+
+    registration_context = stored_udap_registration_context
+    unless registration_context
+      return build_udap_registration_presenter(error: missing_udap_registration_context_error, form_params: {})
+    end
+
+    expected_client_id = @server.udap_client_id
+    @udap_registration_presenter = build_udap_registration_presenter(
+      expected_client_id:,
+      form_params: registration_context
+    )
+    cancellation = perform_udap_cancellation
+    clear_udap_registration_if_confirmed!(expected_client_id, cancellation)
+    build_udap_registration_presenter(
+      cancellation_response: cancellation,
+      expected_client_id:,
+      form_params: registration_context
     )
   end
 
@@ -808,20 +837,40 @@ class SafireDemo < Sinatra::Base
     )
   end
 
+  def missing_udap_registration_context_error
+    Safire::Errors::ValidationError.new(
+      attribute: :udap_client_uri,
+      reason: 'is not present; edit the server with the client URI used during registration before cancelling'
+    )
+  end
+
   def parse_list_param(value)
     value.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
   end
 
-  def persist_udap_client_id!(client_id)
+  def persist_udap_registration!(client_id)
     @server.udap_client_id = client_id
+    @server.udap_client_uri = udap_registration_client_uri
+    @server.udap_community = udap_registration_community
     @server.save
   end
 
-  def clear_udap_client_id_if_confirmed!(expected_client_id, response)
+  def clear_udap_registration_if_confirmed!(expected_client_id, response)
     return unless expected_client_id.present? && response['client_id'] == expected_client_id
 
     @server.udap_client_id = nil
+    @server.udap_client_uri = nil
+    @server.udap_community = nil
     @server.save
+  end
+
+  def stored_udap_registration_context
+    return unless @server.udap_client_id.present? && @server.udap_client_uri.present?
+
+    {
+      'client_uri' => @server.udap_client_uri,
+      'community' => @server.udap_community
+    }
   end
 
   def udap_client_credentials

@@ -15,7 +15,18 @@ class FhirServer
     'udap' => 'UDAP Security'
   }.freeze
 
-  ATTRIBUTES = %i[id name base_url client_id udap_client_id client_secret scopes protocols].freeze
+  ATTRIBUTES = %i[
+    id
+    name
+    base_url
+    client_id
+    udap_client_id
+    udap_client_uri
+    udap_community
+    client_secret
+    scopes
+    protocols
+  ].freeze
 
   attr_accessor(*(ATTRIBUTES - %i[protocols]))
   attr_reader :errors, :protocols
@@ -36,6 +47,7 @@ class FhirServer
     validate_presence
     validate_protocols
     validate_url_format
+    validate_udap_registration_context
     validate_url_uniqueness
     @errors.empty?
   end
@@ -188,6 +200,33 @@ class FhirServer
 
     existing = self.class.find_by_base_url(base_url)
     @errors << 'Base URL is already configured for another server' if existing && existing.id != @id
+  end
+
+  def validate_udap_registration_context
+    return unless supports_udap? && !blank?(udap_client_id)
+
+    validate_udap_client_uri
+    validate_udap_community
+  end
+
+  def validate_udap_client_uri
+    return @errors << 'UDAP Client URI is required when a UDAP Client ID is configured' if blank?(udap_client_uri)
+    return if absolute_uri?(udap_client_uri)
+
+    @errors << 'UDAP Client URI must be a valid absolute URI'
+  end
+
+  def validate_udap_community
+    return if blank?(udap_community) || absolute_uri?(udap_community)
+
+    @errors << 'UDAP Community URI must be a valid absolute URI'
+  end
+
+  def absolute_uri?(value)
+    uri = URI.parse(value.to_s)
+    uri.absolute? && [uri.host, uri.path, uri.opaque].any? { |component| !component.to_s.empty? }
+  rescue URI::InvalidURIError
+    false
   end
 
   def blank?(value)

@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const smartFields = form?.querySelector('[data-smart-fields]');
     const udapFields = form?.querySelector('[data-udap-fields]');
     const smartRequiredInputs = form?.querySelectorAll('[data-smart-required]') || [];
+    const udapClientId = form?.querySelector('[data-udap-client-id]');
+    const udapClientUri = form?.querySelector('[data-udap-client-uri]');
     const checkboxes = selector.querySelectorAll('input[name="protocols[]"]');
 
     const syncProtocolFields = () => {
@@ -15,11 +17,15 @@ document.addEventListener('DOMContentLoaded', () => {
       smartRequiredInputs.forEach((input) => {
         input.required = smartSelected;
       });
+      if (udapClientUri) {
+        udapClientUri.required = udapSelected && Boolean(udapClientId?.value.trim());
+      }
     };
 
     checkboxes.forEach((checkbox) => {
       checkbox.addEventListener('change', syncProtocolFields);
     });
+    udapClientId?.addEventListener('input', syncProtocolFields);
     syncProtocolFields();
   });
 

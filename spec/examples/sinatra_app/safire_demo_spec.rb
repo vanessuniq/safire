@@ -11,7 +11,14 @@ RSpec.describe SafireDemo do
   let(:smart_server) { build_server('smart-only', protocols: ['smart']) }
   let(:udap_server) { build_server('udap-only', protocols: ['udap'], client_id: nil) }
   let(:registered_udap_server) do
-    build_server('registered-udap', protocols: ['udap'], client_id: nil, udap_client_id: 'stored-udap-client')
+    build_server(
+      'registered-udap',
+      protocols: ['udap'],
+      client_id: nil,
+      udap_client_id: 'stored-udap-client',
+      udap_client_uri: 'http://localhost:4567',
+      udap_community: 'https://community.example.org/udap'
+    )
   end
   let(:malicious_udap_server) do
     build_server(
@@ -60,13 +67,16 @@ RSpec.describe SafireDemo do
     }
   end
 
-  def build_server(id, protocols:, client_id: 'client-123', udap_client_id: nil, name: nil)
+  def build_server(id, protocols:, client_id: 'client-123', udap_client_id: nil,
+                   udap_client_uri: nil, udap_community: nil, name: nil)
     FhirServer.new(
       id: id,
       name: name || id.tr('-', ' ').split.map(&:capitalize).join(' '),
       base_url: "https://#{id}.example.com/fhir",
       client_id: client_id,
       udap_client_id: udap_client_id,
+      udap_client_uri: udap_client_uri,
+      udap_community: udap_community,
       scopes: %w[openid profile],
       protocols: protocols
     )
@@ -77,12 +87,17 @@ RSpec.describe SafireDemo do
   end
 
   def form_response(method, path, params: {}, env: {})
+    csrf_response = request.get('/servers/new')
+    csrf_token = csrf_response.body[/name="authenticity_token" value="([^"]+)"/, 1]
+    session_cookie = csrf_response['set-cookie'].to_s.split(';', 2).first
+
     request.request(
       method.to_s.upcase,
       path,
       {
         'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
-        input: Rack::Utils.build_nested_query(params)
+        'HTTP_COOKIE' => session_cookie,
+        input: Rack::Utils.build_nested_query(params.merge(authenticity_token: csrf_token))
       }.merge(env)
     )
   end
@@ -119,6 +134,16 @@ RSpec.describe SafireDemo do
       client_uri: 'http://localhost:4567',
       community: 'https://community.example.org/udap',
       certifications: %w[aaa.bbb.ccc xxx.yyy.zzz],
+      **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  def expect_stored_context_cancellation_request
+    expect(udap_client).to have_received(:cancel_registration).with(
+      hash_including(client_name: 'Safire Demo App', contacts: ['mailto:admin@example.com'], scope: 'openid profile'),
+      client_uri: 'http://localhost:4567',
+      community: 'https://community.example.org/udap',
+      certifications: nil,
       **udap_trust_policy.server_metadata_kwargs
     )
   end
@@ -164,7 +189,8 @@ RSpec.describe SafireDemo do
       name: name,
       errors: []
     )
-    allow(FhirServer).to receive(:new).and_return(saved_server)
+    allow(FhirServer).to receive(:new).and_call_original
+    allow(FhirServer).to receive(:new).with(hash_including(name: name)).and_return(saved_server)
   end
 
   def manual_udap_server_params
@@ -172,7 +198,9 @@ RSpec.describe SafireDemo do
       name: 'HL7 Identity Match',
       base_url: 'https://identity-matching.fast.hl7.org/fhir',
       protocols: ['udap'],
-      udap_client_id: 'manual-udap-client'
+      udap_client_id: 'manual-udap-client',
+      udap_client_uri: 'https://client.example.com',
+      udap_community: 'https://community.example.org/udap'
     }
   end
 
@@ -243,13 +271,14 @@ RSpec.describe SafireDemo do
       expect(response.body).to include('/demo/udap-only/udap-registration')
     end
 
-    it 'hides the UDAP registration action when a UDAP client id is already stored' do
+    it 'shows the UDAP registration lifecycle action when a client id is already stored' do
       response = response_for(:get, '/servers/registered-udap')
 
       expect(response.status).to eq(200)
       expect(response.body).to include('stored-udap-client')
       expect(response.body).not_to include('Open UDAP Registration')
-      expect(response.body).not_to include('/demo/registered-udap/udap-registration')
+      expect(response.body).to include('Manage UDAP Registration')
+      expect(response.body).to include('/demo/registered-udap/udap-registration')
     end
   end
 
@@ -263,7 +292,7 @@ RSpec.describe SafireDemo do
       [:get, '/demo/udap-only/refresh']
     ].each do |method, path|
       it "redirects #{method.upcase} #{path} for a UDAP-only server" do
-        response = response_for(method, path)
+        response = method == :get ? response_for(method, path) : form_response(method, path)
 
         expect(response.status).to be_between(300, 399)
         expect(response.location).to end_with('/servers/udap-only')
@@ -360,6 +389,8 @@ RSpec.describe SafireDemo do
       expect(response.status).to eq(200)
       expect(response.body).to include('UDAP Client Registration')
       expect(response.body).to include('name="udap_client_id"')
+      expect(response.body).to include('name="udap_client_uri"')
+      expect(response.body).to include('name="udap_community"')
     end
 
     it 'persists a manually entered UDAP client id on create' do
@@ -372,6 +403,8 @@ RSpec.describe SafireDemo do
         hash_including(
           client_id: nil,
           udap_client_id: 'manual-udap-client',
+          udap_client_uri: 'https://client.example.com',
+          udap_community: 'https://community.example.org/udap',
           protocols: ['udap']
         )
       )
@@ -387,13 +420,17 @@ RSpec.describe SafireDemo do
           name: 'UDAP Only',
           base_url: udap_server.base_url,
           protocols: ['udap'],
-          udap_client_id: 'updated-udap-client'
+          udap_client_id: 'updated-udap-client',
+          udap_client_uri: 'https://updated-client.example.com',
+          udap_community: 'https://updated-community.example.com'
         }
       )
 
       expect(response.status).to be_between(300, 399)
       expect(udap_server.client_id).to be_nil
       expect(udap_server.udap_client_id).to eq('updated-udap-client')
+      expect(udap_server.udap_client_uri).to eq('https://updated-client.example.com')
+      expect(udap_server.udap_community).to eq('https://updated-community.example.com')
       expect(udap_server).to have_received(:save)
     end
   end
@@ -552,6 +589,8 @@ RSpec.describe SafireDemo do
       expect_local_udap_client_configuration
       expect_system_access_registration_request
       expect(udap_server.udap_client_id).to eq('new-udap-client')
+      expect(udap_server.udap_client_uri).to eq('http://localhost:4567')
+      expect(udap_server.udap_community).to eq('https://community.example.org/udap')
       expect(udap_server).to have_received(:save)
       expect(response.body).to include('new-udap-client')
       expect_response_to_hide_registration_artifacts(response)
@@ -626,19 +665,18 @@ RSpec.describe SafireDemo do
       response = form_response(
         :post,
         '/demo/registered-udap/udap-registration/cancel',
-        params: registration_params,
+        params: registration_params.merge(
+          client_uri: 'https://attacker.example.com',
+          community: 'https://attacker.example.com/community'
+        ),
         env: { 'HTTP_HOST' => 'localhost:4567' }
       )
 
       expect(response.status).to eq(200)
-      expect(udap_client).to have_received(:cancel_registration).with(
-        hash_including(client_name: 'Safire Demo App', contacts: ['mailto:admin@example.com'], scope: 'system/*.rs'),
-        client_uri: 'http://localhost:4567',
-        community: 'https://community.example.org/udap',
-        certifications: %w[aaa.bbb.ccc xxx.yyy.zzz],
-        **udap_trust_policy.server_metadata_kwargs
-      )
+      expect_stored_context_cancellation_request
       expect(registered_udap_server.udap_client_id).to be_nil
+      expect(registered_udap_server.udap_client_uri).to be_nil
+      expect(registered_udap_server.udap_community).to be_nil
       expect(registered_udap_server).to have_received(:save)
       expect(response.body).to include('Registration cancelled')
     end
@@ -656,6 +694,20 @@ RSpec.describe SafireDemo do
       expect(response.body).to include('register the client before cancelling registration')
     end
 
+    it 'does not submit cancellation without the stored registration identity context' do
+      registered_udap_server.udap_client_uri = nil
+
+      response = form_response(
+        :post,
+        '/demo/registered-udap/udap-registration/cancel',
+        params: registration_params
+      )
+
+      expect(response.status).to eq(200)
+      expect(udap_client).not_to have_received(:cancel_registration)
+      expect(response.body).to include('client URI used during registration')
+    end
+
     it 'preserves stored state when cancellation response confirms a different client id' do
       allow(udap_client).to receive(:cancel_registration)
         .and_return('client_id' => 'different-client', 'grant_types' => [])
@@ -669,7 +721,19 @@ RSpec.describe SafireDemo do
 
       expect(response.status).to eq(200)
       expect(registered_udap_server.udap_client_id).to eq('stored-udap-client')
+      expect(registered_udap_server.udap_client_uri).to eq('http://localhost:4567')
+      expect(registered_udap_server.udap_community).to eq('https://community.example.org/udap')
       expect(response.body).to include('different client id')
+    end
+
+    it 'rejects registration and cancellation posts without a CSRF token' do
+      registration = response_for(:post, '/demo/udap-only/udap-registration')
+      cancellation = response_for(:post, '/demo/registered-udap/udap-registration/cancel')
+
+      expect(registration.status).to eq(403)
+      expect(cancellation.status).to eq(403)
+      expect(udap_client).not_to have_received(:register_client)
+      expect(udap_client).not_to have_received(:cancel_registration)
     end
   end
 

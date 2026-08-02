@@ -70,8 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with prepopulated client metadata, certificate-backed software-statement
   signing, community and certification inputs, optional certification JWT file
   loading, filtered registration results, manual `udap_client_id` entry for
-  externally registered clients, `udap_client_id` persistence, duplicate
-  registration prevention, cancellation confirmation, home-page entry points for
+  externally registered clients, persistence of the UDAP client URI and community
+  needed for cancellation, duplicate registration prevention, CSRF-protected
+  lifecycle actions, cancellation confirmation, home-page entry points for
   unregistered UDAP servers, and a development-only HTTP loopback policy aligned
   with SMART demo registration.
 - `bin/demo` now prepares the ignored Sinatra demo `.env` file before boot,

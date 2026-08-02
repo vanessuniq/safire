@@ -683,7 +683,10 @@ RSpec.describe Safire::Protocols::Udap do
 
       it 'raises ValidationError when certifications are omitted' do
         expect { udap.register_client(client_metadata, client_uri:) }
-          .to raise_error(Safire::Errors::ValidationError, %r{https://policy\.example/cert})
+          .to raise_error(
+            Safire::Errors::ValidationError,
+            %r{metadata advertises required certification URIs: https://policy\.example/cert}
+          )
         expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
       end
 

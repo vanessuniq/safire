@@ -13,17 +13,17 @@
   <div class="token-meta">
     <dl class="details-list">
       <dt>Launch Type</dt>
-      <dd><span class="badge badge-info"><%= @launch_type.tr('_', ' ').capitalize %></span></dd>
+      <dd><span class="badge badge-info"><%= h(@launch_type.tr('_', ' ').capitalize) %></span></dd>
 
       <dt>Client Type</dt>
-      <dd><span class="badge badge-info"><%= @client_type.to_s.tr('_', ' ').capitalize %></span></dd>
+      <dd><span class="badge badge-info"><%= h(@client_type.to_s.tr('_', ' ').capitalize) %></span></dd>
     </dl>
   </div>
 
   <div class="token-section">
     <h3>Access Token</h3>
     <div class="token-display">
-      <code class="token-value"><%= @token_response['access_token'] %></code>
+      <code class="token-value"><%= h(@token_response['access_token']) %></code>
     </div>
   </div>
 
@@ -31,7 +31,7 @@
     <div class="token-section">
       <h3>Refresh Token</h3>
       <div class="token-display">
-        <code class="token-value"><%= @token_response['refresh_token'] %></code>
+        <code class="token-value"><%= h(@token_response['refresh_token']) %></code>
       </div>
     </div>
   <% end %>
@@ -40,7 +40,7 @@
     <div class="token-section">
       <h3>ID Token</h3>
       <div class="token-display">
-        <code class="token-value"><%= @token_response['id_token'] %></code>
+        <code class="token-value"><%= h(@token_response['id_token']) %></code>
       </div>
     </div>
   <% end %>
@@ -49,16 +49,16 @@
     <h3>Token Details</h3>
     <dl class="details-list">
       <dt>Token Type</dt>
-      <dd><%= @token_response['token_type'] || 'Not specified' %></dd>
+      <dd><%= h(@token_response['token_type'] || 'Not specified') %></dd>
 
       <dt>Expires In</dt>
-      <dd><%= @token_response['expires_in'] ? "#{@token_response['expires_in']} seconds" : 'Not specified' %></dd>
+      <dd><%= h(@token_response['expires_in'] ? "#{@token_response['expires_in']} seconds" : 'Not specified') %></dd>
 
       <dt>Scope</dt>
       <dd>
         <% if @token_response['scope'] %>
-          <% @token_response['scope'].split(' ').each do |scope| %>
-            <span class="badge badge-scope"><%= scope %></span>
+          <% @token_response['scope'].to_s.split.each do |scope| %>
+            <span class="badge badge-scope"><%= h(scope) %></span>
           <% end %>
         <% else %>
           <em>Not specified</em>
@@ -73,12 +73,12 @@
       <dl class="details-list">
         <% if @token_response['patient'] %>
           <dt>Patient ID</dt>
-          <dd><code><%= @token_response['patient'] %></code></dd>
+          <dd><code><%= h(@token_response['patient']) %></code></dd>
         <% end %>
 
         <% if @token_response['encounter'] %>
           <dt>Encounter ID</dt>
-          <dd><code><%= @token_response['encounter'] %></code></dd>
+          <dd><code><%= h(@token_response['encounter']) %></code></dd>
         <% end %>
       </dl>
     </div>
@@ -86,7 +86,7 @@
 
   <div class="token-section">
     <h3>Full Response</h3>
-    <pre class="json-display"><%= JSON.pretty_generate(@token_response) %></pre>
+    <pre class="json-display"><%= h(JSON.pretty_generate(@token_response)) %></pre>
   </div>
 
   <div class="form-actions">

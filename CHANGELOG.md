@@ -63,9 +63,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   UDAP trust material.
 - The Sinatra demo now separates UDAP server trust policy from UDAP client
   signing credential configuration, documents the signing environment variables
-  needed for upcoming UDAP registration workflows, stores SMART and UDAP client
+  used by UDAP registration workflows, stores SMART and UDAP client
   identifiers separately, and opts local SMART demo callbacks into Safire's
   loopback-only HTTP development policy.
+- The Sinatra demo includes a UDAP Dynamic Client Registration lifecycle screen
+  with prepopulated client metadata, certificate-backed software-statement
+  signing, community and certification inputs, opt-in grant-matched
+  certification JWT file loading, filtered registration results, manual
+  `udap_client_id` entry for externally registered clients, persistence of the
+  UDAP client URI and community needed for cancellation, duplicate registration
+  prevention, CSRF-protected lifecycle actions, cancellation confirmation,
+  home-page entry points for unregistered UDAP servers, and a development-only
+  HTTP loopback policy aligned with SMART demo registration.
+- The Sinatra demo HTML-escapes SMART metadata and token responses and redacts
+  signing material, client secrets, token fields, unknown response fields, and
+  structurally unexpected values from displayed UDAP registration and
+  cancellation responses.
+- `bin/demo` now prepares the ignored Sinatra demo `.env` file before boot,
+  filling absent local-only session secrets, SMART asymmetric demo credentials,
+  UDAP client signing credentials, and grant-specific sample self-signed
+  certification JWTs while preserving existing nonblank values. Generated
+  certifications are submitted only when explicitly selected in the demo, and
+  legacy, expired, malformed, or signing-key-mismatched managed samples are
+  regenerated without replacing caller-managed custom files.
 - `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default:
   `'SMART configuration'`) and exposes it as a readable attribute so callers can
   identify which protocol's discovery failed.

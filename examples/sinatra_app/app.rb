@@ -11,17 +11,26 @@ require 'uri'
 require 'safire'
 require_relative 'models/fhir_server'
 require_relative 'models/udap_trust_policy'
+require_relative 'models/udap_client_credentials'
 require_relative 'models/udap_discovery_presenter'
+require_relative 'models/udap_registration_presenter'
 
 # Sinatra demo application for Safire gem
 class SafireDemo < Sinatra::Base
   # In-memory metadata cache shared across requests (keyed by server base_url)
   METADATA_CACHE_TTL = 300 # seconds
+  DEMO_LOGO_PNG = Base64.decode64(
+    'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAJklEQVR4nGNgGAWjYBSMglEwCkbBKBgF' \
+    'o2AUjIJRMApGwSgYBQMAADe+ARH+ZraZAAAAAElFTkSuQmCC'
+  ).freeze
+  private_constant :DEMO_LOGO_PNG
 
   @metadata_cache = {}
   class << self
     attr_reader :metadata_cache
   end
+
+  use Rack::Protection::AuthenticityToken, reaction: :deny
 
   configure :development do
     require 'sinatra/reloader'
@@ -57,6 +66,11 @@ class SafireDemo < Sinatra::Base
 
     def h(text)
       Rack::Utils.escape_html(text.to_s)
+    end
+
+    def csrf_field
+      token = Rack::Protection::AuthenticityToken.token(session)
+      %(<input type="hidden" name="authenticity_token" value="#{h(token)}">)
     end
 
     def flash_error_message(context, error)
@@ -120,9 +134,15 @@ class SafireDemo < Sinatra::Base
     { keys: [jwk] }.to_json
   end
 
+  get '/safire-demo-logo.png' do
+    content_type 'image/png'
+    DEMO_LOGO_PNG
+  end
+
   # Home - list all servers
   get '/' do
     @servers = FhirServer.all
+    @udap_registration_servers = @servers.select { |server| server.supports_udap? && server.udap_client_id.blank? }
     erb :index
   end
 
@@ -250,6 +270,14 @@ class SafireDemo < Sinatra::Base
     require_udap_protocol!
   end
 
+  before '/demo/:server_id/udap-registration' do
+    require_udap_protocol!
+  end
+
+  before '/demo/:server_id/udap-registration/cancel' do
+    require_udap_protocol!
+  end
+
   # SMART Discovery
   get '/demo/:server_id/discovery' do
     erb :'demo/discovery'
@@ -272,6 +300,48 @@ class SafireDemo < Sinatra::Base
   rescue Safire::Errors::Error => e
     set_flash(:error, flash_error_message('UDAP Discovery failed', e))
     redirect "/servers/#{@server.id}"
+  end
+
+  # UDAP Dynamic Client Registration
+  get '/demo/:server_id/udap-registration' do
+    @udap_registration_presenter = build_udap_registration_presenter(
+      form_params: stored_udap_registration_context || params
+    )
+
+    erb :'demo/udap_registration'
+  end
+
+  post '/demo/:server_id/udap-registration' do
+    # The registration request is built from normalized form values on this presenter.
+    @udap_registration_presenter = build_udap_registration_presenter
+    if @server.udap_client_id.present?
+      @udap_registration_presenter = build_udap_registration_presenter(error: duplicate_udap_registration_error)
+    else
+      registration = perform_udap_registration
+      persist_udap_registration!(registration['client_id'])
+      @udap_registration_presenter = build_udap_registration_presenter(
+        registration_response: registration,
+        form_params: {}
+      )
+    end
+
+    erb :'demo/udap_registration'
+  rescue Safire::Errors::Error => e
+    @udap_registration_presenter = build_udap_registration_presenter(error: e)
+    erb :'demo/udap_registration'
+  end
+
+  post '/demo/:server_id/udap-registration/cancel' do
+    @udap_registration_presenter = process_udap_cancellation
+
+    erb :'demo/udap_registration'
+  rescue Safire::Errors::Error => e
+    @udap_registration_presenter = build_udap_registration_presenter(
+      error: e,
+      expected_client_id: @server.udap_client_id,
+      form_params: cancellation_form_params(stored_udap_registration_context || {})
+    )
+    erb :'demo/udap_registration'
   end
 
   # Authorization flow - configuration form
@@ -318,12 +388,9 @@ class SafireDemo < Sinatra::Base
 
     begin
       scopes = params[:scopes].to_s.strip.empty? ? ['system/*.rs'] : parse_scopes(params[:scopes])
-      @token_response = @safire_client.request_backend_token(
-        scopes: scopes,
-        private_key: asymmetric_private_key,
-        kid: ENV.fetch('ASYMMETRIC_KID', nil)
-      )
-      @valid = @safire_client.token_response_valid?(@token_response, flow: :backend_services)
+      backend_client = build_backend_services_client(@server)
+      @token_response = backend_client.request_backend_token(scopes: scopes)
+      @valid = backend_client.token_response_valid?(@token_response, flow: :backend_services)
       erb :'demo/backend_token'
     rescue Safire::Errors::Error => e
       set_flash(:error, flash_error_message('Backend Services token request failed', e))
@@ -496,10 +563,25 @@ class SafireDemo < Sinatra::Base
     {
       name: params[:name],
       base_url: params[:base_url],
-      client_id: params[:client_id],
+      protocols: Array(params[:protocols]),
+      **server_registration_params
+    }
+  end
+
+  def server_registration_params
+    {
+      client_id: normalize_optional_param(params[:client_id]),
       client_secret: normalize_optional_param(params[:client_secret]),
       scopes: parse_scopes(params[:scopes]),
-      protocols: Array(params[:protocols])
+      **udap_server_registration_params
+    }
+  end
+
+  def udap_server_registration_params
+    {
+      udap_client_id: normalize_optional_param(params[:udap_client_id]),
+      udap_client_uri: normalize_optional_param(params[:udap_client_uri]),
+      udap_community: normalize_optional_param(params[:udap_community])
     }
   end
 
@@ -517,8 +599,8 @@ class SafireDemo < Sinatra::Base
 
   def perform_registration
     base_url = params[:base_url].strip
-    temp_client   = Safire::Client.new({ base_url:, **localhost_policy_for(base_url) })
     endpoint      = params[:registration_endpoint].presence
+    temp_client   = Safire::Client.new({ base_url:, **localhost_policy_for(base_url, endpoint) })
     authorization = build_authorization_header(params[:initial_access_token], params[:token_type])
     temp_client.register_client(
       build_registration_metadata,
@@ -632,11 +714,193 @@ class SafireDemo < Sinatra::Base
     client.server_metadata(community: community, **trust_policy.server_metadata_kwargs)
   end
 
+  def build_udap_registration_presenter(registration_response: nil, cancellation_response: nil,
+                                        expected_client_id: nil, error: nil, form_params: params)
+    UdapRegistrationPresenter.new(
+      server: @server,
+      params: form_params,
+      credentials: udap_client_credentials,
+      trust_policy: udap_trust_policy,
+      client_uri: client_uri,
+      redirect_uri: redirect_uri,
+      registration_response:,
+      cancellation_response:,
+      expected_client_id:,
+      error:
+    )
+  end
+
+  def perform_udap_registration
+    client = build_udap_registration_client(policy_urls: udap_registration_policy_urls)
+    client.register_client(
+      udap_registration_metadata(operation: :register),
+      client_uri: udap_registration_client_uri,
+      community: udap_registration_community,
+      certifications: udap_registration_certifications,
+      **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  def perform_udap_cancellation
+    client = build_udap_registration_client(policy_urls: [udap_registration_client_uri])
+    client.cancel_registration(
+      udap_registration_metadata(operation: :cancel),
+      client_uri: udap_registration_client_uri,
+      community: udap_registration_community,
+      certifications: udap_registration_certifications,
+      **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  def process_udap_cancellation
+    return build_udap_registration_presenter(error: missing_udap_registration_error) if @server.udap_client_id.blank?
+
+    registration_context = stored_udap_registration_context
+    unless registration_context
+      return build_udap_registration_presenter(error: missing_udap_registration_context_error, form_params: {})
+    end
+
+    expected_client_id = @server.udap_client_id
+    cancellation_context = cancellation_form_params(registration_context)
+    @udap_registration_presenter = build_udap_registration_presenter(
+      expected_client_id:,
+      form_params: cancellation_context
+    )
+    cancellation = perform_udap_cancellation
+    clear_udap_registration_if_confirmed!(expected_client_id, cancellation)
+    build_udap_registration_presenter(
+      cancellation_response: cancellation,
+      expected_client_id:,
+      form_params: registration_context
+    )
+  end
+
+  def build_udap_registration_client(policy_urls:)
+    Safire::Client.new(
+      {
+        base_url: @server.base_url,
+        **udap_client_credentials.client_config_kwargs,
+        **localhost_policy_for(@server.base_url, *policy_urls)
+      },
+      protocol: :udap
+    )
+  end
+
+  def udap_registration_metadata(operation:)
+    metadata = {
+      client_name: @udap_registration_presenter.client_name,
+      contacts: parse_list_param(@udap_registration_presenter.contacts_value),
+      scope: @udap_registration_presenter.scope
+    }
+    return metadata if operation == :cancel
+
+    if @udap_registration_presenter.authorization_code?
+      metadata.merge(
+        grant_types: %w[authorization_code refresh_token],
+        redirect_uris: parse_list_param(@udap_registration_presenter.redirect_uris_value),
+        logo_uri: @udap_registration_presenter.logo_uri
+      )
+    else
+      metadata.merge(grant_types: ['client_credentials'])
+    end
+  end
+
+  def udap_registration_policy_urls
+    urls = [udap_registration_client_uri]
+    if @udap_registration_presenter.authorization_code?
+      urls.concat(parse_list_param(@udap_registration_presenter.redirect_uris_value))
+      urls << @udap_registration_presenter.logo_uri
+    end
+    urls
+  end
+
+  def udap_registration_client_uri
+    @udap_registration_presenter.client_uri
+  end
+
+  def udap_registration_community
+    normalize_optional_param(@udap_registration_presenter.community)
+  end
+
+  def udap_registration_certifications
+    certifications = parse_list_param(@udap_registration_presenter.certifications_value!)
+    certifications.empty? ? nil : certifications
+  end
+
+  def duplicate_udap_registration_error
+    Safire::Errors::ValidationError.new(
+      attribute: :udap_client_id,
+      reason: 'is already present; cancel the existing registration before registering again'
+    )
+  end
+
+  def missing_udap_registration_error
+    Safire::Errors::ValidationError.new(
+      attribute: :udap_client_id,
+      reason: 'is not present; register the client before cancelling registration'
+    )
+  end
+
+  def missing_udap_registration_context_error
+    Safire::Errors::ValidationError.new(
+      attribute: :udap_client_uri,
+      reason: 'is not present; edit the server with the client URI used during registration before cancelling'
+    )
+  end
+
+  def parse_list_param(value)
+    value.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
+  end
+
+  def persist_udap_registration!(client_id)
+    @server.udap_client_id = client_id
+    @server.udap_client_uri = udap_registration_client_uri
+    @server.udap_community = udap_registration_community
+    @server.save
+  end
+
+  def clear_udap_registration_if_confirmed!(expected_client_id, response)
+    return unless expected_client_id.present? && response['client_id'] == expected_client_id
+
+    @server.udap_client_id = nil
+    @server.udap_client_uri = nil
+    @server.udap_community = nil
+    @server.save
+  end
+
+  def stored_udap_registration_context
+    return unless @server.udap_client_id.present? && @server.udap_client_uri.present?
+
+    {
+      'client_uri' => @server.udap_client_uri,
+      'community' => @server.udap_community
+    }
+  end
+
+  def cancellation_form_params(registration_context)
+    registration_context.merge('certifications' => params['certifications'])
+  end
+
+  def udap_client_credentials
+    @udap_client_credentials ||= UdapClientCredentials.new
+  end
+
+  def udap_trust_policy
+    @udap_trust_policy ||= UdapTrustPolicy.new
+  end
+
   def build_safire_client(server, client_type: :public)
     config = base_safire_client_config(server)
     add_client_type_credentials!(config, server, client_type)
 
     Safire::Client.new(config, client_type: client_type)
+  end
+
+  def build_backend_services_client(server)
+    config = backend_services_client_config(server)
+    add_client_type_credentials!(config, server, :confidential_asymmetric)
+
+    Safire::Client.new(config, client_type: :confidential_asymmetric)
   end
 
   def base_safire_client_config(server)
@@ -646,6 +910,15 @@ class SafireDemo < Sinatra::Base
       redirect_uri: redirect_uri,
       scopes: server.scopes,
       **localhost_policy_for(server.base_url, redirect_uri)
+    }
+  end
+
+  def backend_services_client_config(server)
+    {
+      base_url: server.base_url,
+      client_id: server.client_id,
+      scopes: server.scopes,
+      **localhost_policy_for(server.base_url)
     }
   end
 

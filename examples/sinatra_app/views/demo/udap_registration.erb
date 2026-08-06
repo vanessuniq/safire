@@ -1,0 +1,209 @@
+<% presenter = @udap_registration_presenter %>
+
+<div class="page-header">
+  <div>
+    <h1>UDAP Client Registration</h1>
+    <p class="server-url"><%= h(@server.base_url) %></p>
+  </div>
+  <div class="page-actions">
+    <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Server</a>
+  </div>
+</div>
+
+<section class="registration-workspace">
+  <div class="status-grid">
+    <article class="status-tile <%= presenter.credentials_configured? ? 'status-ready' : 'status-warning' %>">
+      <span class="eyebrow">Client Signing</span>
+      <strong><%= presenter.credentials_configured? ? 'Ready' : 'Not configured' %></strong>
+      <% unless presenter.credentials_configured? %>
+        <p>UDAP client signing credentials are not configured.</p>
+      <% end %>
+    </article>
+
+    <article class="status-tile <%= presenter.development_trust_mode? ? 'status-warning' : 'status-ready' %>">
+      <span class="eyebrow">Server Trust</span>
+      <strong><%= presenter.development_trust_mode? ? 'Development mode' : 'Chain verification' %></strong>
+      <% if presenter.development_trust_mode? %>
+        <p>Signed metadata chain or revocation checks are disabled.</p>
+      <% end %>
+    </article>
+
+    <article class="status-tile">
+      <span class="eyebrow">Stored UDAP Client</span>
+      <strong><%= @server.udap_client_id.present? ? 'Registered' : 'None' %></strong>
+      <% if @server.udap_client_id.present? %>
+        <code><%= h(@server.udap_client_id) %></code>
+      <% end %>
+    </article>
+  </div>
+
+  <% if presenter.display_error %>
+    <div class="warning-box">
+      <strong>UDAP registration failed.</strong>
+      <span><%= h(presenter.display_error.message) %></span>
+    </div>
+  <% end %>
+
+  <% if presenter.registration_success? %>
+    <div class="success-box">
+      <strong>Client registered.</strong>
+      <span>The returned UDAP client id was saved on this server.</span>
+    </div>
+
+    <section class="result-panel">
+      <h2>Registration Result</h2>
+      <div class="client-id-display"><%= h(presenter.registered_client_id) %></div>
+      <pre class="json-display"><%= h(JSON.pretty_generate(presenter.safe_registration_response)) %></pre>
+    </section>
+  <% end %>
+
+  <% if presenter.cancellation_result? %>
+    <% if presenter.cancellation_mismatch? %>
+      <div class="warning-box">
+        <strong>Registration cancelled for a different client id.</strong>
+        <span>The stored UDAP client id was preserved.</span>
+      </div>
+    <% elsif presenter.cancellation_confirmed? %>
+      <div class="success-box">
+        <strong>Registration cancelled.</strong>
+        <span>The stored UDAP client id was cleared.</span>
+      </div>
+    <% end %>
+
+    <section class="result-panel">
+      <h2>Cancellation Result</h2>
+      <pre class="json-display"><%= h(JSON.pretty_generate(presenter.safe_cancellation_response)) %></pre>
+    </section>
+  <% end %>
+
+  <% unless @server.udap_client_id.present? %>
+    <form action="/demo/<%= @server.id %>/udap-registration" method="post" class="demo-form udap-registration-form" data-udap-registration-form>
+      <%= csrf_field %>
+      <div class="form-section">
+        <h3>Client Identity</h3>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="client_uri">Client URI</label>
+            <input type="text" id="client_uri" name="client_uri" value="<%= h(presenter.client_uri) %>" class="form-input" required>
+          </div>
+
+          <div class="form-group">
+            <label for="client_name">Client Name</label>
+            <input type="text" id="client_name" name="client_name" value="<%= h(presenter.client_name) %>" class="form-input" required>
+          </div>
+
+          <div class="form-group form-group-wide">
+            <label for="contacts">Contacts</label>
+            <textarea id="contacts" name="contacts" class="form-input" rows="2" required><%= h(presenter.contacts_value) %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Registration Shape</h3>
+
+        <div class="segmented-control" role="radiogroup" aria-label="Registration grant type">
+          <label class="segment-option">
+            <input type="radio" name="grant_type" value="client_credentials" <%= 'checked' unless presenter.authorization_code? %>>
+            <span>Client Credentials</span>
+          </label>
+          <label class="segment-option">
+            <input type="radio" name="grant_type" value="authorization_code" <%= 'checked' if presenter.authorization_code? %>>
+            <span>Authorization Code</span>
+          </label>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group form-group-wide">
+            <label for="scope">Scope</label>
+            <input type="text" id="scope" name="scope" value="<%= h(presenter.scope) %>" class="form-input" required>
+          </div>
+        </div>
+
+        <div data-grant-panel="authorization_code" <%= 'hidden' unless presenter.authorization_code? %>>
+          <div class="form-grid">
+            <div class="form-group form-group-wide">
+              <label for="redirect_uris">Redirect URIs</label>
+              <textarea id="redirect_uris" name="redirect_uris" class="form-input" rows="2"><%= h(presenter.redirect_uris_value) %></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="logo_uri">Logo URI</label>
+              <input type="text" id="logo_uri" name="logo_uri" value="<%= h(presenter.logo_uri) %>" class="form-input">
+            </div>
+
+            <div class="form-group">
+              <label for="response_types">Response Types</label>
+              <input type="text" id="response_types" value="<%= h(presenter.response_types_value) %>" class="form-input readonly-input" readonly>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Community</h3>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="community">Community URI</label>
+            <input type="text" id="community" name="community" value="<%= h(presenter.community) %>" class="form-input">
+          </div>
+
+          <div class="form-group form-group-wide">
+            <label for="certifications">Certification JWTs</label>
+            <textarea id="certifications" name="certifications" class="form-input" rows="3"><%= h(presenter.certifications_value) %></textarea>
+            <small>
+              Paste compact JWS certification or endorsement JWTs, one per line. When server metadata lists
+              required certification URIs, provide matching JWTs issued through that certification framework.
+            </small>
+            <% if presenter.configured_certifications? %>
+              <label class="checkbox-option">
+                <input type="checkbox" name="use_configured_certifications" value="1"
+                       <%= 'checked' if presenter.configured_certifications_selected? %>>
+                <span>
+                  <strong>Use configured certification file</strong><br>
+                  Selects only JWTs matching the chosen grant type. Pasted JWTs take precedence.
+                </span>
+              </label>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" <%= 'disabled' unless presenter.credentials_configured? %>>
+          Register UDAP Client
+        </button>
+        <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  <% end %>
+
+  <% if @server.udap_client_id.present? %>
+    <section class="danger-zone">
+      <div>
+        <span class="eyebrow">Lifecycle</span>
+        <h2>Cancel Registration</h2>
+        <p class="server-url"><code><%= h(@server.udap_client_id) %></code></p>
+        <% unless presenter.cancellation_context_configured? %>
+          <p class="disabled-note">
+            <em>Add the original UDAP Client URI on the server edit page before cancelling.</em>
+          </p>
+        <% end %>
+      </div>
+      <form action="/demo/<%= @server.id %>/udap-registration/cancel" method="post"
+            class="danger-zone-form" onsubmit="return confirm('Cancel this UDAP registration?');">
+        <%= csrf_field %>
+        <label for="cancellation_certifications">Certification JWTs</label>
+        <textarea id="cancellation_certifications" name="certifications"
+                  class="form-input" rows="2"><%= h(presenter.certifications_value) %></textarea>
+        <small>Provide matching certification JWTs when required by the server.</small>
+        <button type="submit" class="btn btn-danger"
+                <%= 'disabled' unless presenter.credentials_configured? && presenter.cancellation_context_configured? %>>
+          Cancel UDAP Registration
+        </button>
+      </form>
+    </section>
+  <% end %>
+</section>

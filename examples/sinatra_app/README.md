@@ -1,6 +1,6 @@
 # Safire Demo Application
 
-A Sinatra-based web application that demonstrates the Safire gem for SMART authorization and UDAP discovery.
+A Sinatra-based web application that demonstrates the Safire gem for SMART authorization, UDAP discovery, and UDAP Dynamic Client Registration.
 
 ## Features
 
@@ -8,6 +8,7 @@ A Sinatra-based web application that demonstrates the Safire gem for SMART autho
 - **Server Management**: Add, edit, and remove FHIR server configurations with protocol-aware SMART and UDAP sections
 - **SMART Discovery**: View server capabilities from `/.well-known/smart-configuration` including supported scopes, capabilities, and endpoints
 - **UDAP Discovery**: Fetch `/.well-known/udap`, validate `signed_metadata`, inspect STU2 fields, and run community-scoped discovery
+- **UDAP Dynamic Client Registration**: Register and cancel a certificate-backed UDAP client, store the returned UDAP client identifier separately from SMART credentials, and inspect filtered registration responses
 - **Authorization Flows**: Test multiple launch types:
   - Provider Standalone Launch
   - Patient Standalone Launch
@@ -30,12 +31,19 @@ From the project root:
 bin/demo
 ```
 
+`bin/demo` installs the demo bundle, creates `examples/sinatra_app/.env` when
+needed, and fills missing local-only secrets, SMART asymmetric demo credentials,
+UDAP client signing credentials, and grant-specific sample self-signed
+certification JWTs. The sample certifications are never submitted unless they
+are explicitly selected in the registration form.
+Existing nonblank `.env` values are preserved.
+
 Or from this directory:
 
 ```bash
-cp .env.example .env
-# Edit .env with your settings
 bundle install
+bundle exec ruby bin/setup_env.rb
+# Edit .env if you need production-style trust material or external credentials
 bundle exec puma config.ru -p 4567
 ```
 
@@ -50,20 +58,26 @@ Safire's HTTPS-only default for remote hosts.
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+`bin/demo` and `bundle exec ruby bin/setup_env.rb` both prepare `.env`
+idempotently. They fill the local demo defaults below when values are absent,
+but they do not generate production UDAP trust anchors or CRLs.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `PORT` | No | Server port (default: 4567) |
-| `SESSION_SECRET` | No | Session encryption key (auto-generated if not set) |
-| `ASYMMETRIC_PRIVATE_KEY_PEM` | No | Private key in PEM format for asymmetric auth |
-| `ASYMMETRIC_KID` | No | Key ID matching your registered JWKS |
+| `SESSION_SECRET` | No | Session encryption key (generated for local demo use when absent) |
+| `ASYMMETRIC_PRIVATE_KEY_PEM` | No | Private key in PEM format for asymmetric auth (generated for local demo use when absent) |
+| `ASYMMETRIC_KID` | No | Key ID matching your registered JWKS (generated for local demo use when absent) |
 | `UDAP_TRUST_ANCHORS_PEM` | No | PEM-encoded UDAP server signing certificate trust anchors |
 | `UDAP_CRLS_PEM` | No | PEM-encoded CRLs for UDAP server signing certificate revocation checks |
 | `UDAP_VERIFY_CHAIN` | No | Optional override for UDAP signed metadata chain validation (`1/true/yes/on` or `0/false/no/off`; unknown values raise a configuration error) |
-| `UDAP_CLIENT_PRIVATE_KEY_PEM` | No | PEM-encoded client private key for UDAP software-statement signing |
-| `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` | No | Leaf-first PEM certificate chain for UDAP software-statement signing |
-| `UDAP_REGISTRATION_SIGNING_ALGORITHM` | No | Optional explicit UDAP registration signing algorithm (`RS256`, `RS384`, `ES256`, or `ES384`) |
+| `UDAP_CLIENT_PRIVATE_KEY_PEM` | No | PEM-encoded client private key for UDAP software-statement signing (generated for local demo use when absent) |
+| `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` | No | Leaf-first PEM certificate chain for UDAP software-statement signing (generated for local demo use when absent) |
+| `UDAP_REGISTRATION_SIGNING_ALGORITHM` | No | Optional explicit UDAP registration signing algorithm (`RS256`, `RS384`, `ES256`, or `ES384`; defaults to generated `RS256`) |
+| `UDAP_CLIENT_NAME` | No | Client name prefilled in the UDAP registration form |
+| `UDAP_CLIENT_CONTACTS` | No | Comma, space, or newline-separated contact URIs prefilled in the UDAP registration form |
+| `UDAP_CLIENT_LOGO_URI` | No | Logo URI prefilled for authorization-code UDAP registration; generated as the demo logo endpoint when absent |
+| `UDAP_CLIENT_CERTIFICATIONS_FILE` | No | File containing compact JWS certification or endorsement JWTs, one per line; matching JWTs are submitted only when explicitly selected, the managed development sample is generated when absent, and custom paths must identify an existing non-empty file |
 
 ### Setting Up Asymmetric Authentication
 
@@ -126,9 +140,22 @@ UDAP Dynamic Client Registration uses a client signing identity in the
 while the client private key and certificate chain identify **this demo app**
 to a UDAP registration endpoint.
 
-Configure the signing credentials when testing UDAP registration:
+`bin/demo` generates local signing credentials suitable for development at
+`http://localhost:4567`. Configure your own signing credentials when testing
+with externally issued certificates or a different client URI:
+
+For interoperability testing against UDAP test tools or public/community
+servers, prefer an issued UDAP test certificate over the generated self-signed
+demo certificate. UDAP.org's Testing Resources section links to UDAP Developer
+account registration for obtaining test certificates and Test Tool access:
+https://www.udap.org/
 
 ```bash
+UDAP_CLIENT_NAME="Safire Demo App"
+UDAP_CLIENT_CONTACTS="mailto:admin@example.com"
+UDAP_CLIENT_LOGO_URI="http://localhost:4567/safire-demo-logo.png"
+UDAP_CLIENT_CERTIFICATIONS_FILE="data/udap_self_signed_certification.jwt"
+
 UDAP_CLIENT_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----
 ...client private key...
 -----END PRIVATE KEY-----"
@@ -144,9 +171,32 @@ UDAP_REGISTRATION_SIGNING_ALGORITHM="RS256"
 ```
 
 Leave `UDAP_REGISTRATION_SIGNING_ALGORITHM` blank to let Safire select a
-compatible algorithm from UDAP discovery and the configured key type. The
-registration UI workflow will use this foundation in the next UDAP DCR demo
-PR; the current UDAP screen remains discovery-focused.
+compatible algorithm from UDAP discovery and the configured key type. The leaf
+certificate must contain a URI SAN that exactly matches the `client_uri` value
+submitted by the registration form. For local testing, run the demo at
+`http://localhost:4567` or edit the form's client URI to match your certificate.
+
+Generated UDAP demo credentials and the sample self-signed certification JWTs
+expire after one year. `bin/demo` intentionally preserves non-empty `.env`
+values and caller-managed certification files so it does not overwrite issued
+test credentials. To refresh only the generated local demo identity, blank both
+`UDAP_CLIENT_PRIVATE_KEY_PEM` and `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` together,
+blank `UDAP_REGISTRATION_SIGNING_ALGORITHM` unless it is still compatible with
+the regenerated key, leave `UDAP_CLIENT_CERTIFICATIONS_FILE` blank or set to the
+managed default, and rerun `bin/demo`.
+
+The setup script generates certification JWTs only at its managed default
+path, `data/udap_self_signed_certification.jwt`. A custom
+`UDAP_CLIENT_CERTIFICATIONS_FILE` must already identify a non-empty file; the
+script never creates or replaces caller-managed certification files. The
+managed file contains separate STU2-shaped self-declarations for the
+`client_credentials` and `authorization_code` demo flows. Selecting the
+configured file in the registration form submits only the JWT matching the
+chosen flow. The sample uses the example certification URI and is not evidence
+that a server or trust community recognizes its framework or issuer. The setup
+script validates managed samples and regenerates legacy, expired, malformed, or
+signing-key-mismatched files. It never performs that replacement for a custom
+path.
 
 ### Adding a FHIR Server
 
@@ -167,6 +217,12 @@ The home page offers dynamic SMART registration or manual server setup.
    - **Base URL**: FHIR server base URL
    - **Protocols**: SMART App Launch, UDAP Security, or both
    - **Client ID**: OAuth client ID registered with the server for SMART workflows
+   - **UDAP Client ID**: (Optional) Client ID assigned by a UDAP registration endpoint
+     when the demo client was registered outside this app
+   - **UDAP Client URI**: Exact client URI used as the registration software
+     statement issuer; required with a UDAP Client ID
+   - **UDAP Community URI**: (Optional) Community used for the original UDAP
+     registration
    - **Client Secret**: (Optional) For confidential symmetric clients only
    - **Scopes**: Space or comma-separated list of OAuth scopes
 
@@ -227,6 +283,40 @@ The page displays:
 - Capability helpers such as `supports_dynamic_registration?`
 - An optional `community` query parameter for community-scoped discovery
 
+### UDAP Dynamic Client Registration
+
+Navigate to an unregistered UDAP-enabled server detail page and open
+**UDAP Registration**, or use the home page's Dynamic Registration section to
+choose an unregistered UDAP server. The demo prepopulates client-owned fields
+from the running app and `.env`, signs a UDAP `software_statement` with
+`UDAP_CLIENT_PRIVATE_KEY_PEM` and `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM`, and uses
+`UdapTrustPolicy` for community-scoped server discovery.
+
+The registration screen supports:
+
+- `client_credentials` registration for system access
+- `authorization_code` registration with the demo callback URI, logo URI, and
+  Safire-generated `response_types: ["code"]`
+- optional `community`, pasted certification or endorsement JWTs, and explicit
+  selection of grant-matched JWTs from the configured file
+- persistence of the returned `client_id`, exact client URI, and optional
+  community so cancellation uses the original registration identity
+- cancellation only when the server confirms the same returned `client_id`
+
+The page displays only allowlisted registration metadata fields. Unknown fields
+and structurally unexpected values are replaced with `[FILTERED]`; software
+statements, access tokens, private keys, certificate chains, assertions, and
+other credential or signing material are never rendered.
+
+If server metadata advertises `udap_certifications_required`, the registration
+request must include matching certification or endorsement JWTs in the
+`certifications` array. The metadata value is a required certification URI; it is
+not itself the JWT to submit. Point `UDAP_CLIENT_CERTIFICATIONS_FILE` at a local
+ignored file and explicitly select it, or paste JWTs into the form for one-off
+testing. For cancellation, paste any certifications required by the server into
+the cancellation form; certification JWTs are intentionally not persisted with
+the server record.
+
 ### Token Refresh
 
 After completing an authorization flow, if the server issued a refresh token:
@@ -251,6 +341,8 @@ examples/sinatra_app/
 ├── config.ru           # Rack configuration
 ├── Gemfile             # Demo app dependencies
 ├── .env.example        # Environment variable template
+├── bin/
+│   └── setup_env.rb    # Idempotent local environment bootstrap
 ├── data/
 │   └── servers.yml     # Server configurations (YAML storage)
 ├── models/
@@ -258,6 +350,7 @@ examples/sinatra_app/
 │   ├── udap_client_credentials.rb    # UDAP demo client signing credential loader
 │   ├── udap_discovery_presenter.rb   # UDAP discovery presentation model
 │   ├── udap_pem_parsing.rb           # Shared UDAP demo PEM parsing helper
+│   ├── udap_registration_presenter.rb # UDAP registration presentation model
 │   └── udap_trust_policy.rb          # UDAP signed_metadata server trust policy
 ├── public/
 │   ├── css/
@@ -278,6 +371,7 @@ examples/sinatra_app/
         ├── tokens.erb
         ├── refresh.erb
         ├── udap_discovery.erb
+        ├── udap_registration.erb
         └── backend_token.erb
 ```
 
@@ -286,12 +380,15 @@ examples/sinatra_app/
 | Path | Description |
 |------|-------------|
 | `/.well-known/jwks.json` | JWKS endpoint serving the app's public key |
-| `GET /register` | Dynamic Client Registration form |
-| `POST /register` | Submits the registration request and saves the new server entry |
+| `GET /register` | SMART Dynamic Client Registration form |
+| `POST /register` | Submits a SMART registration request and saves the new server entry |
 | `/launch` | EHR/Portal launch endpoint |
 | `/callback` | OAuth2 callback handler |
 | `GET /demo/:id/discovery` | SMART discovery result page |
 | `GET /demo/:id/udap-discovery` | UDAP discovery result page |
+| `GET /demo/:id/udap-registration` | UDAP Dynamic Client Registration form and result page |
+| `POST /demo/:id/udap-registration` | Submits a UDAP Dynamic Client Registration request |
+| `POST /demo/:id/udap-registration/cancel` | Submits a UDAP registration cancellation request |
 | `GET /demo/:id/backend-token` | Backend Services token request form |
 | `POST /demo/:id/backend-token` | Submits the backend services token request |
 | `POST /reset-session` | Clears all OAuth and token session data |

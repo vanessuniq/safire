@@ -17,6 +17,10 @@ echo "Installing demo app dependencies..."
 bundle install
 
 PORT="${PORT:-4567}"
+export PORT
+
+echo "Preparing local demo environment..."
+bundle exec ruby bin/setup_env.rb
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"

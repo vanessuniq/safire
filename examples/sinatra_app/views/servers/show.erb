@@ -7,6 +7,7 @@
     <a href="/servers/<%= @server.id %>/edit" class="btn btn-secondary">Edit</a>
     <form action="/servers/<%= @server.id %>" method="post" class="inline-form"
           onsubmit="return confirm('Are you sure you want to delete this server?');">
+      <%= csrf_field %>
       <input type="hidden" name="_method" value="delete">
       <button type="submit" class="btn btn-danger">Delete</button>
     </form>
@@ -117,7 +118,7 @@
         </div>
 
         <div class="action-cards workflow-grid">
-          <article class="action-card action-card-wide">
+          <article class="action-card">
             <span class="action-kicker">Metadata</span>
             <h3>UDAP Discovery</h3>
             <form action="/demo/<%= @server.id %>/udap-discovery" method="get" class="compact-action-form">
@@ -131,6 +132,26 @@
               <button type="submit" class="btn btn-primary">Run UDAP Discovery</button>
             </form>
           </article>
+
+          <% if @server.udap_client_id.present? %>
+            <article class="action-card">
+              <span class="action-kicker">Client Registration</span>
+              <h3>Registration Lifecycle</h3>
+              <p>Review the stored UDAP registration or request cancellation.</p>
+              <a href="/demo/<%= @server.id %>/udap-registration" class="btn btn-secondary">
+                Manage UDAP Registration
+              </a>
+            </article>
+          <% else %>
+            <article class="action-card">
+              <span class="action-kicker">Client Registration</span>
+              <h3>Dynamic Registration</h3>
+              <p>Register this demo client's certificate-backed software statement.</p>
+              <a href="/demo/<%= @server.id %>/udap-registration" class="btn btn-primary">
+                Open UDAP Registration
+              </a>
+            </article>
+          <% end %>
         </div>
       </section>
     <% end %>
@@ -146,7 +167,7 @@
 
       <% if @server.supports_smart? %>
         <div class="profile-row">
-          <dt>Client ID</dt>
+          <dt>SMART Client ID</dt>
           <dd><code><%= h(@server.client_id) %></code></dd>
         </div>
 
@@ -169,6 +190,31 @@
             <% end %>
           </dd>
         </div>
+      <% end %>
+
+      <% if @server.supports_udap? %>
+        <div class="profile-row">
+          <dt>UDAP Client ID</dt>
+          <dd>
+            <% if @server.udap_client_id.present? %>
+              <code><%= h(@server.udap_client_id) %></code>
+            <% else %>
+              <em>Not registered</em>
+            <% end %>
+          </dd>
+        </div>
+        <% if @server.udap_client_uri.present? %>
+          <div class="profile-row">
+            <dt>UDAP Client URI</dt>
+            <dd><code><%= h(@server.udap_client_uri) %></code></dd>
+          </div>
+        <% end %>
+        <% if @server.udap_community.present? %>
+          <div class="profile-row">
+            <dt>UDAP Community</dt>
+            <dd><code><%= h(@server.udap_community) %></code></dd>
+          </div>
+        <% end %>
       <% end %>
     </dl>
   </details>

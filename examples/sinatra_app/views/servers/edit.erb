@@ -1,6 +1,7 @@
 <h1>Edit Server: <%= h(@server.name) %></h1>
 
 <form action="/servers/<%= @server.id %>" method="post" class="server-form">
+  <%= csrf_field %>
   <input type="hidden" name="_method" value="put">
 
   <%= erb :'servers/_form' %>

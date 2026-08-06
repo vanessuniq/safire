@@ -319,7 +319,10 @@ class SafireDemo < Sinatra::Base
     else
       registration = perform_udap_registration
       persist_udap_registration!(registration['client_id'])
-      @udap_registration_presenter = build_udap_registration_presenter(registration_response: registration)
+      @udap_registration_presenter = build_udap_registration_presenter(
+        registration_response: registration,
+        form_params: {}
+      )
     end
 
     erb :'demo/udap_registration'
@@ -336,7 +339,7 @@ class SafireDemo < Sinatra::Base
     @udap_registration_presenter = build_udap_registration_presenter(
       error: e,
       expected_client_id: @server.udap_client_id,
-      form_params: stored_udap_registration_context || {}
+      form_params: cancellation_form_params(stored_udap_registration_context || {})
     )
     erb :'demo/udap_registration'
   end
@@ -758,9 +761,10 @@ class SafireDemo < Sinatra::Base
     end
 
     expected_client_id = @server.udap_client_id
+    cancellation_context = cancellation_form_params(registration_context)
     @udap_registration_presenter = build_udap_registration_presenter(
       expected_client_id:,
-      form_params: registration_context
+      form_params: cancellation_context
     )
     cancellation = perform_udap_cancellation
     clear_udap_registration_if_confirmed!(expected_client_id, cancellation)
@@ -871,6 +875,10 @@ class SafireDemo < Sinatra::Base
       'client_uri' => @server.udap_client_uri,
       'community' => @server.udap_community
     }
+  end
+
+  def cancellation_form_params(registration_context)
+    registration_context.merge('certifications' => params['certifications'])
   end
 
   def udap_client_credentials

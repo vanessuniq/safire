@@ -21,6 +21,15 @@ class SafireDemoEnvSetup
   SIGNING_ALGORITHM_ENV = 'UDAP_REGISTRATION_SIGNING_ALGORITHM'
   CERTIFICATIONS_FILE_ENV = 'UDAP_CLIENT_CERTIFICATIONS_FILE'
   CERTIFICATION_URIS = ['https://www.example.com/udap/profiles/example-certification'].freeze
+  CERTIFICATION_GRANT_CLAIMS = [
+    {
+      'grant_types' => ['client_credentials'].freeze
+    }.freeze,
+    {
+      'grant_types' => %w[authorization_code refresh_token].freeze,
+      'response_types' => ['code'].freeze
+    }.freeze
+  ].freeze
   PLACEHOLDER_SNIPPETS = [
     'your_session_secret_here',
     'my-app-key-001',
@@ -39,6 +48,7 @@ class SafireDemoEnvSetup
   }.freeze
   COMPATIBLE_RSA_ALGORITHMS = %w[RS256 RS384].freeze
   SECURE_FILE_MODE = 0o600
+  MAX_CERTIFICATION_VALIDITY_SECONDS = 3 * 365 * 24 * 60 * 60
 
   Assignment = Struct.new(:key, :raw)
 
@@ -328,16 +338,19 @@ class SafireDemoEnvSetup
 
   def ensure_certification_file(document)
     path = certification_file_path(document)
+    return ensure_managed_certification_file(path, document) if path == managed_certification_file_path
     return if populated_certification_file?(path)
 
-    unless path == managed_certification_file_path
-      raise SetupError,
-            "#{CERTIFICATIONS_FILE_ENV} must reference an existing non-empty file when set to a custom path; " \
-            "leave it blank to generate #{DEFAULT_CERTIFICATIONS_FILE}"
-    end
+    raise SetupError,
+          "#{CERTIFICATIONS_FILE_ENV} must reference an existing non-empty file when set to a custom path; " \
+          "leave it blank to generate #{DEFAULT_CERTIFICATIONS_FILE}"
+  end
+
+  def ensure_managed_certification_file(path, document)
+    return if managed_certification_file_current?(path, document)
 
     FileUtils.mkdir_p(File.dirname(path))
-    secure_write(path, "#{certification_jwt(document)}\n")
+    secure_write(path, "#{certification_jwts(document).join("\n")}\n")
     @changed << document.value(CERTIFICATIONS_FILE_ENV)
   end
 
@@ -358,11 +371,81 @@ class SafireDemoEnvSetup
     raise SetupError, "#{CERTIFICATIONS_FILE_ENV} must reference a readable file"
   end
 
-  def certification_jwt(document)
+  def managed_certification_file_current?(path, document)
+    return false unless populated_certification_file?(path)
+
+    payloads = decode_managed_certifications(path, document)
+    payloads.length == CERTIFICATION_GRANT_CLAIMS.length &&
+      payloads.all? { |payload| managed_certification_common_claims?(payload) } &&
+      certification_grant_profiles(payloads) == CERTIFICATION_GRANT_CLAIMS
+  rescue JWT::DecodeError, ArgumentError, TypeError
+    false
+  end
+
+  def decode_managed_certifications(path, document)
+    certificate = udap_leaf_certificate(document)
+    algorithm = registration_signing_algorithm(document)
+    expected_x5c = [Base64.strict_encode64(certificate.to_der)]
+
+    File.read(path).split.map do |certification|
+      payload, header = JWT.decode(
+        certification,
+        certificate.public_key,
+        true,
+        algorithms: [algorithm],
+        verify_expiration: true
+      )
+      raise JWT::DecodeError unless header['x5c'] == expected_x5c
+
+      payload
+    end
+  end
+
+  def managed_certification_common_claims?(payload)
+    managed_certification_identity_claims?(payload) &&
+      managed_certification_time_claims?(payload) &&
+      payload['jti'].is_a?(String) &&
+      !payload['jti'].empty?
+  end
+
+  def managed_certification_identity_claims?(payload)
+    payload['iss'] == client_uri &&
+      payload['sub'] == client_uri &&
+      payload['certification_name'] == 'Safire Demo Self-Declaration' &&
+      payload['certification_uris'] == CERTIFICATION_URIS
+  end
+
+  def managed_certification_time_claims?(payload)
+    issued_at = payload['iat']
+    expires_at = payload['exp']
+
+    issued_at.is_a?(Integer) &&
+      expires_at.is_a?(Integer) &&
+      expires_at <= issued_at + MAX_CERTIFICATION_VALIDITY_SECONDS
+  end
+
+  def certification_grant_profiles(payloads)
+    payloads.filter_map do |payload|
+      grant_types = payload['grant_types']
+      next unless grant_types.is_a?(Array) && grant_types.all?(String)
+
+      { 'grant_types' => grant_types }.tap do |profile|
+        profile['response_types'] = payload['response_types'] if payload.key?('response_types')
+      end.freeze
+    end
+  end
+
+  def certification_jwts(document)
+    CERTIFICATION_GRANT_CLAIMS.map do |claims|
+      certification_jwt(document, claims:)
+    end
+  end
+
+  def certification_jwt(document, claims:)
     algorithm = registration_signing_algorithm(document)
 
     JWT.encode(
-      certification_payload,
+      certification_payload.merge(claims),
       udap_private_key(document),
       algorithm,
       certification_header(udap_leaf_certificate(document), algorithm)
@@ -432,10 +515,7 @@ class SafireDemoEnvSetup
       'exp' => timestamp + (365 * 24 * 60 * 60),
       'jti' => SecureRandom.uuid,
       'certification_name' => 'Safire Demo Self-Declaration',
-      'certification_uris' => CERTIFICATION_URIS,
-      'client_name' => DEFAULT_CLIENT_NAME,
-      'client_uri' => client_uri,
-      'contacts' => [DEFAULT_CONTACTS]
+      'certification_uris' => CERTIFICATION_URIS
     }
   end
 

@@ -43,40 +43,44 @@ RSpec.describe UdapRegistrationPresenter do
   def registration_response_with_sensitive_values
     {
       'client_id' => 'client-123',
+      'client_name' => 'Visible Client',
+      'grant_types' => ['client_credentials'],
       'software_statement' => 'secret.jwt.value',
       'certifications' => ['cert.jwt.value'],
       'registration_access_token' => 'registration-access-token',
       'access_token' => 'access-token',
-      'refresh_token' => 'refresh-token',
-      'id_token' => 'id-token',
-      'nested' => {
-        'private_key' => 'private-key-value',
-        'x5c' => ['raw-cert-value'],
-        'client_name' => 'Visible Client'
-      }
+      'client_assertion' => 'client-assertion',
+      'private_key_pem' => 'private-key-value',
+      'vendor_credential' => 'vendor-secret',
+      'contacts' => { 'private_key_pem' => 'nested-secret' }
     }
   end
 
   def filtered_registration_response
     {
       'client_id' => 'client-123',
+      'client_name' => 'Visible Client',
+      'grant_types' => ['client_credentials'],
       'software_statement' => '[FILTERED]',
       'certifications' => '[FILTERED]',
       'registration_access_token' => '[FILTERED]',
       'access_token' => '[FILTERED]',
-      'refresh_token' => '[FILTERED]',
-      'id_token' => '[FILTERED]',
-      'nested' => {
-        'private_key' => '[FILTERED]',
-        'x5c' => '[FILTERED]',
-        'client_name' => 'Visible Client'
-      }
+      'client_assertion' => '[FILTERED]',
+      'private_key_pem' => '[FILTERED]',
+      'vendor_credential' => '[FILTERED]',
+      'contacts' => '[FILTERED]'
     }
   end
 
-  it 'prepopulates client-owned registration fields from demo configuration' do
+  def certification_jwt(grant_types:, response_types: nil)
+    payload = { 'grant_types' => grant_types }
+    payload['response_types'] = response_types if response_types
+    JWT.encode(payload, nil, 'none')
+  end
+
+  it 'prepopulates client-owned registration fields without automatically loading certifications' do
     Tempfile.create('udap-certifications') do |file|
-      file.write("aaa.bbb.ccc\nxxx.yyy.zzz\n")
+      file.write("#{certification_jwt(grant_types: ['client_credentials'])}\n")
       file.flush
 
       presenter = build_presenter(env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path))
@@ -84,7 +88,9 @@ RSpec.describe UdapRegistrationPresenter do
       expect(presenter.client_uri).to eq('https://client.example.com')
       expect(presenter.client_name).to eq('Configured UDAP Client')
       expect(presenter.contacts_value).to eq("mailto:admin@example.com\nmailto:security@example.com")
-      expect(presenter.certifications_value).to eq("aaa.bbb.ccc\nxxx.yyy.zzz")
+      expect(presenter.certifications_value).to eq('')
+      expect(presenter).to be_configured_certifications
+      expect(presenter).not_to be_configured_certifications_selected
       expect(presenter.redirect_uris_value).to eq('https://client.example.com/callback')
       expect(presenter.logo_uri).to eq('https://client.example.com/logo.png')
       expect(presenter.response_types_value).to eq('code')
@@ -122,29 +128,62 @@ RSpec.describe UdapRegistrationPresenter do
     expect(presenter.logo_uri).to eq('https://client.example.com/safire-demo-logo.png')
   end
 
-  it 'loads certification JWTs from a configured file' do
+  it 'loads only grant-matched JWTs when the configured file is explicitly selected' do
     Tempfile.create('udap-certifications') do |file|
-      file.write("file.jwt.value\n")
+      client_credentials = certification_jwt(grant_types: ['client_credentials'])
+      authorization_code = certification_jwt(
+        grant_types: %w[authorization_code refresh_token],
+        response_types: ['code']
+      )
+      file.write("#{client_credentials}\n#{authorization_code}\n")
       file.flush
 
-      presenter = build_presenter(env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path))
+      presenter = build_presenter(
+        params: { 'use_configured_certifications' => '1' },
+        env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path)
+      )
 
-      expect(presenter.certifications_value).to eq('file.jwt.value')
+      expect(presenter.certifications_value).to eq('')
+      expect(presenter.certifications_value!).to eq(client_credentials)
+    end
+  end
+
+  it 'loads the authorization-code certification for that grant flow' do
+    Tempfile.create('udap-certifications') do |file|
+      client_credentials = certification_jwt(grant_types: ['client_credentials'])
+      authorization_code = certification_jwt(
+        grant_types: %w[authorization_code refresh_token],
+        response_types: ['code']
+      )
+      file.write("#{client_credentials}\n#{authorization_code}\n")
+      file.flush
+
+      presenter = build_presenter(
+        params: { 'grant_type' => 'authorization_code', 'use_configured_certifications' => '1' },
+        env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path)
+      )
+
+      expect(presenter.certifications_value!).to eq(authorization_code)
     end
   end
 
   it 'resolves relative certification paths from the demo app root' do
     relative_path = 'data/relative-certifications.jwt'
     expanded_path = File.expand_path("../../../examples/sinatra_app/#{relative_path}", __dir__)
-    allow(File).to receive(:read).with(expanded_path).and_return("relative.jwt.value\n")
+    certification = certification_jwt(grant_types: ['client_credentials'])
+    allow(File).to receive(:read).with(expanded_path).and_return("#{certification}\n")
 
-    presenter = build_presenter(env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => relative_path))
+    presenter = build_presenter(
+      params: { 'use_configured_certifications' => '1' },
+      env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => relative_path)
+    )
 
-    expect(presenter.certifications_value).to eq('relative.jwt.value')
+    expect(presenter.certifications_value!).to eq(certification)
   end
 
   it 'surfaces a configuration error when the configured certifications file is unreadable' do
     presenter = build_presenter(
+      params: { 'use_configured_certifications' => '1' },
       env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => '/tmp/safire-missing-certifications.jwt')
     )
 
@@ -155,6 +194,7 @@ RSpec.describe UdapRegistrationPresenter do
 
   it 'raises the configuration error when an operation consumes an unreadable certifications file' do
     presenter = build_presenter(
+      params: { 'use_configured_certifications' => '1' },
       env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => '/tmp/safire-missing-certifications.jwt')
     )
 
@@ -169,6 +209,36 @@ RSpec.describe UdapRegistrationPresenter do
 
     expect(presenter.certifications_value).to eq('submitted.jwt.value')
     expect(presenter.display_error).to be_nil
+  end
+
+  it 'rejects a configured file without a certification matching the selected grant flow' do
+    Tempfile.create('udap-certifications') do |file|
+      file.write("#{certification_jwt(grant_types: ['client_credentials'])}\n")
+      file.flush
+
+      presenter = build_presenter(
+        params: { 'grant_type' => 'authorization_code', 'use_configured_certifications' => '1' },
+        env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path)
+      )
+
+      expect { presenter.certifications_value! }
+        .to raise_error(Safire::Errors::ConfigurationError, /authorization_code/)
+    end
+  end
+
+  it 'reports malformed configured certification JWTs as configuration errors' do
+    Tempfile.create('udap-certifications') do |file|
+      file.write("not-a-compact-jws\n")
+      file.flush
+
+      presenter = build_presenter(
+        params: { 'use_configured_certifications' => '1' },
+        env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path)
+      )
+
+      expect { presenter.certifications_value! }
+        .to raise_error(Safire::Errors::ConfigurationError, /client_credentials/)
+    end
   end
 
   it 'filters sensitive values from returned registration metadata' do

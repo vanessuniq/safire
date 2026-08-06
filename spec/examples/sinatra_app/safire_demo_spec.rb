@@ -1,5 +1,6 @@
 require 'rack/mock'
 require 'spec_helper'
+require 'tempfile'
 
 original_rack_env = ENV.fetch('RACK_ENV', nil)
 ENV['RACK_ENV'] = 'test'
@@ -154,6 +155,11 @@ RSpec.describe SafireDemo do
     expect(response.body).not_to include('access-token-must-not-render')
     expect(response.body).not_to include('cancel-registration-token-must-not-render')
     expect(response.body).not_to include('cancel-access-token-must-not-render')
+    expect(response.body).not_to include('client-assertion-must-not-render')
+    expect(response.body).not_to include('private-key-pem-must-not-render')
+    expect(response.body).not_to include('vendor-credential-must-not-render')
+    expect(response.body).not_to include('aaa.bbb.ccc')
+    expect(response.body).not_to include('xxx.yyy.zzz')
     expect(response.body).not_to include('private-key')
     expect(response.body).not_to include('certificate')
   end
@@ -569,7 +575,10 @@ RSpec.describe SafireDemo do
         'scope' => 'system/*.rs',
         'software_statement' => 'must.not.render',
         'registration_access_token' => 'registration-token-must-not-render',
-        'access_token' => 'access-token-must-not-render'
+        'access_token' => 'access-token-must-not-render',
+        'client_assertion' => 'client-assertion-must-not-render',
+        'private_key_pem' => 'private-key-pem-must-not-render',
+        'vendor_credential' => 'vendor-credential-must-not-render'
       }
     end
     let(:cancellation_response) do
@@ -719,7 +728,7 @@ RSpec.describe SafireDemo do
         response = form_response(
           :post,
           '/demo/udap-only/udap-registration',
-          params: registration_params.except(:certifications)
+          params: registration_params.except(:certifications).merge(use_configured_certifications: '1')
         )
 
         expect(response.status).to eq(200)
@@ -728,14 +737,56 @@ RSpec.describe SafireDemo do
       end
     end
 
+    it 'does not submit a configured certification file unless it is explicitly selected' do
+      Tempfile.create('udap-certifications') do |file|
+        file.write("configured.certification.jwt\n")
+        file.flush
+
+        with_env('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path) do
+          form_response(
+            :post,
+            '/demo/udap-only/udap-registration',
+            params: registration_params.except(:certifications)
+          )
+
+          expect(udap_client).to have_received(:register_client).with(
+            anything,
+            hash_including(certifications: nil)
+          )
+        end
+      end
+    end
+
+    it 'submits the grant-matched configured certification when explicitly selected' do
+      certification = JWT.encode({ 'grant_types' => ['client_credentials'] }, nil, 'none')
+
+      Tempfile.create('udap-certifications') do |file|
+        file.write("#{certification}\n")
+        file.flush
+
+        with_env('UDAP_CLIENT_CERTIFICATIONS_FILE' => file.path) do
+          form_response(
+            :post,
+            '/demo/udap-only/udap-registration',
+            params: registration_params.except(:certifications).merge(use_configured_certifications: '1')
+          )
+
+          expect(udap_client).to have_received(:register_client).with(
+            anything,
+            hash_including(certifications: [certification])
+          )
+        end
+      end
+    end
+
     it 'cancels registration and clears the stored UDAP client id when the response confirms the same id' do
       response = form_response(
         :post,
         '/demo/registered-udap/udap-registration/cancel',
-        params: registration_params.merge(
+        params: {
           client_uri: 'https://attacker.example.com',
           community: 'https://attacker.example.com/community'
-        ),
+        },
         env: { 'HTTP_HOST' => 'localhost:4567' }
       )
 
@@ -747,6 +798,21 @@ RSpec.describe SafireDemo do
       expect(registered_udap_server).to have_received(:save)
       expect(response.body).to include('Registration cancelled')
       expect_response_to_hide_registration_artifacts(response)
+    end
+
+    it 'submits explicitly supplied certifications during cancellation' do
+      response = form_response(
+        :post,
+        '/demo/registered-udap/udap-registration/cancel',
+        params: { certifications: "cancel.aaa.jwt\ncancel.bbb.jwt" }
+      )
+
+      expect(udap_client).to have_received(:cancel_registration).with(
+        anything,
+        hash_including(certifications: %w[cancel.aaa.jwt cancel.bbb.jwt])
+      )
+      expect(response.body).not_to include('cancel.aaa.jwt')
+      expect(response.body).not_to include('cancel.bbb.jwt')
     end
 
     it 'does not submit cancellation when no UDAP client id is stored' do

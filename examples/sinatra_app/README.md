@@ -33,7 +33,9 @@ bin/demo
 
 `bin/demo` installs the demo bundle, creates `examples/sinatra_app/.env` when
 needed, and fills missing local-only secrets, SMART asymmetric demo credentials,
-UDAP client signing credentials, and a sample self-signed certification JWT.
+UDAP client signing credentials, and grant-specific sample self-signed
+certification JWTs. The sample certifications are never submitted unless they
+are explicitly selected in the registration form.
 Existing nonblank `.env` values are preserved.
 
 Or from this directory:
@@ -75,7 +77,7 @@ but they do not generate production UDAP trust anchors or CRLs.
 | `UDAP_CLIENT_NAME` | No | Client name prefilled in the UDAP registration form |
 | `UDAP_CLIENT_CONTACTS` | No | Comma, space, or newline-separated contact URIs prefilled in the UDAP registration form |
 | `UDAP_CLIENT_LOGO_URI` | No | Logo URI prefilled for authorization-code UDAP registration; generated as the demo logo endpoint when absent |
-| `UDAP_CLIENT_CERTIFICATIONS_FILE` | No | File containing compact JWS certification or endorsement JWTs, one per line; the managed default is generated when absent, while custom paths must identify an existing non-empty file |
+| `UDAP_CLIENT_CERTIFICATIONS_FILE` | No | File containing compact JWS certification or endorsement JWTs, one per line; matching JWTs are submitted only when explicitly selected, the managed development sample is generated when absent, and custom paths must identify an existing non-empty file |
 
 ### Setting Up Asymmetric Authentication
 
@@ -174,20 +176,27 @@ certificate must contain a URI SAN that exactly matches the `client_uri` value
 submitted by the registration form. For local testing, run the demo at
 `http://localhost:4567` or edit the form's client URI to match your certificate.
 
-Generated UDAP demo credentials and the sample self-signed certification JWT
+Generated UDAP demo credentials and the sample self-signed certification JWTs
 expire after one year. `bin/demo` intentionally preserves non-empty `.env`
-values and certification files so it does not overwrite issued test
-credentials. To refresh only the generated local demo identity, blank both
+values and caller-managed certification files so it does not overwrite issued
+test credentials. To refresh only the generated local demo identity, blank both
 `UDAP_CLIENT_PRIVATE_KEY_PEM` and `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` together,
 blank `UDAP_REGISTRATION_SIGNING_ALGORITHM` unless it is still compatible with
-the regenerated key, leave `UDAP_CLIENT_CERTIFICATIONS_FILE` blank or set to
-the managed default, remove or empty
-`data/udap_self_signed_certification.jwt`, and rerun `bin/demo`.
+the regenerated key, leave `UDAP_CLIENT_CERTIFICATIONS_FILE` blank or set to the
+managed default, and rerun `bin/demo`.
 
-The setup script generates a certification JWT only at its managed default
+The setup script generates certification JWTs only at its managed default
 path, `data/udap_self_signed_certification.jwt`. A custom
 `UDAP_CLIENT_CERTIFICATIONS_FILE` must already identify a non-empty file; the
-script never creates or replaces caller-managed certification files.
+script never creates or replaces caller-managed certification files. The
+managed file contains separate STU2-shaped self-declarations for the
+`client_credentials` and `authorization_code` demo flows. Selecting the
+configured file in the registration form submits only the JWT matching the
+chosen flow. The sample uses the example certification URI and is not evidence
+that a server or trust community recognizes its framework or issuer. The setup
+script validates managed samples and regenerates legacy, expired, malformed, or
+signing-key-mismatched files. It never performs that replacement for a custom
+path.
 
 ### Adding a FHIR Server
 
@@ -288,20 +297,25 @@ The registration screen supports:
 - `client_credentials` registration for system access
 - `authorization_code` registration with the demo callback URI, logo URI, and
   Safire-generated `response_types: ["code"]`
-- optional `community` and certification or endorsement JWTs
+- optional `community`, pasted certification or endorsement JWTs, and explicit
+  selection of grant-matched JWTs from the configured file
 - persistence of the returned `client_id`, exact client URI, and optional
   community so cancellation uses the original registration identity
 - cancellation only when the server confirms the same returned `client_id`
 
-The page displays filtered registration metadata. It never renders software
-statements, access tokens, private keys, certificate chains, or other signing
-material.
+The page displays only allowlisted registration metadata fields. Unknown fields
+and structurally unexpected values are replaced with `[FILTERED]`; software
+statements, access tokens, private keys, certificate chains, assertions, and
+other credential or signing material are never rendered.
 
 If server metadata advertises `udap_certifications_required`, the registration
 request must include matching certification or endorsement JWTs in the
 `certifications` array. The metadata value is a required certification URI; it is
 not itself the JWT to submit. Point `UDAP_CLIENT_CERTIFICATIONS_FILE` at a local
-ignored file, or paste JWTs into the form for one-off testing.
+ignored file and explicitly select it, or paste JWTs into the form for one-off
+testing. For cancellation, paste any certifications required by the server into
+the cancellation form; certification JWTs are intentionally not persisted with
+the server record.
 
 ### Token Refresh
 

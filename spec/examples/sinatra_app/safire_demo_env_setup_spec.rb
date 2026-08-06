@@ -55,25 +55,55 @@ RSpec.describe SafireDemoEnvSetup do
     end
   end
 
-  it 'generates a compact JWS self-declaration certification file' do
+  it 'signs the generated self-declarations with the configured client identity' do
     setup.run
 
     cert = OpenSSL::X509::Certificate.new(env_value('UDAP_CLIENT_CERTIFICATE_CHAIN_PEM'))
-    payload, header = JWT.decode(
-      certification_jwt,
-      cert.public_key,
-      true,
-      algorithms: ['RS256'],
-      verify_expiration: false
-    )
+    decoded = decoded_certifications(cert)
+    payloads = decoded.map(&:first)
 
     aggregate_failures do
-      expect(header['x5c']).to contain_exactly(Base64.strict_encode64(cert.to_der))
-      expect(payload).to include('iss' => client_uri, 'sub' => client_uri)
-      expect(payload['certification_name']).to eq('Safire Demo Self-Declaration')
-      expect(payload['certification_uris']).to include('https://www.example.com/udap/profiles/example-certification')
+      expect(decoded.map(&:last).pluck('x5c')).to all(contain_exactly(Base64.strict_encode64(cert.to_der)))
+      expect(payloads).to all(include('iss' => client_uri, 'sub' => client_uri))
+      expect(payloads.pluck('certification_name')).to all(eq('Safire Demo Self-Declaration'))
+      expect(payloads.pluck('certification_uris')).to all(
+        include('https://www.example.com/udap/profiles/example-certification')
+      )
       expect(file_mode(File.join(app_root, env_value('UDAP_CLIENT_CERTIFICATIONS_FILE')))).to eq(0o600)
     end
+  end
+
+  it 'generates STU2 self-declarations for both demo grant flows' do
+    setup.run
+
+    cert = OpenSSL::X509::Certificate.new(env_value('UDAP_CLIENT_CERTIFICATE_CHAIN_PEM'))
+    payloads = decoded_certifications(cert).map(&:first)
+
+    aggregate_failures do
+      expect(payloads.pluck('grant_types')).to contain_exactly(
+        ['client_credentials'],
+        %w[authorization_code refresh_token]
+      )
+      expect(payloads.find { |payload| payload['grant_types'].include?('authorization_code') })
+        .to include('response_types' => ['code'])
+      expect(payloads.find { |payload| payload['grant_types'] == ['client_credentials'] })
+        .not_to have_key('response_types')
+    end
+  end
+
+  it 'replaces a legacy managed self-declaration with the current grant profiles' do
+    setup.run
+    write_legacy_managed_certification
+
+    setup.run
+
+    cert = OpenSSL::X509::Certificate.new(env_value('UDAP_CLIENT_CERTIFICATE_CHAIN_PEM'))
+    payloads = decoded_certifications(cert).map(&:first)
+
+    expect(payloads.pluck('grant_types')).to contain_exactly(
+      ['client_credentials'],
+      %w[authorization_code refresh_token]
+    )
   end
 
   it 'corrects a permissive existing .env file mode' do
@@ -193,13 +223,7 @@ RSpec.describe SafireDemoEnvSetup do
 
     setup.run
 
-    payload, header = JWT.decode(
-      certification_jwt,
-      cert.public_key,
-      true,
-      algorithms: ['ES256'],
-      verify_expiration: false
-    )
+    payload, header = decoded_certifications(cert, algorithm: 'ES256').first
 
     aggregate_failures do
       expect(env_value('UDAP_REGISTRATION_SIGNING_ALGORITHM')).to eq('ES256')
@@ -215,13 +239,7 @@ RSpec.describe SafireDemoEnvSetup do
 
     setup.run
 
-    _payload, header = JWT.decode(
-      certification_jwt,
-      cert.public_key,
-      true,
-      algorithms: ['RS384'],
-      verify_expiration: false
-    )
+    _payload, header = decoded_certifications(cert, algorithm: 'RS384').first
 
     expect(header['alg']).to eq('RS384')
   end
@@ -329,7 +347,7 @@ RSpec.describe SafireDemoEnvSetup do
   it 'is idempotent after the initial local setup' do
     setup.run
     first_env = File.read(env_path)
-    first_certification = certification_jwt
+    first_certifications = certification_jwts
     output.truncate(0)
     output.rewind
 
@@ -337,7 +355,7 @@ RSpec.describe SafireDemoEnvSetup do
 
     aggregate_failures do
       expect(File.read(env_path)).to eq(first_env)
-      expect(certification_jwt).to eq(first_certification)
+      expect(certification_jwts).to eq(first_certifications)
       expect(output.string).to include('Demo environment already configured.')
     end
   end
@@ -346,9 +364,39 @@ RSpec.describe SafireDemoEnvSetup do
     SafireDemoEnvSetup::DotenvDocument.parse(File.read(env_path)).value(key)
   end
 
-  def certification_jwt
+  def certification_jwts
     path = File.join(app_root, env_value('UDAP_CLIENT_CERTIFICATIONS_FILE'))
-    File.read(path).strip
+    File.read(path).split
+  end
+
+  def decoded_certifications(cert, algorithm: 'RS256')
+    certification_jwts.map do |certification|
+      JWT.decode(
+        certification,
+        cert.public_key,
+        true,
+        algorithms: [algorithm],
+        verify_expiration: false
+      )
+    end
+  end
+
+  def write_legacy_managed_certification
+    key = OpenSSL::PKey.read(env_value('UDAP_CLIENT_PRIVATE_KEY_PEM'))
+    cert = OpenSSL::X509::Certificate.new(env_value('UDAP_CLIENT_CERTIFICATE_CHAIN_PEM'))
+    payload = {
+      'iss' => client_uri,
+      'sub' => client_uri,
+      'iat' => now.to_i,
+      'exp' => now.to_i + (365 * 24 * 60 * 60),
+      'jti' => 'legacy-certification',
+      'certification_name' => 'Safire Demo Self-Declaration',
+      'certification_uris' => ['https://www.example.com/udap/profiles/example-certification']
+    }
+    header = { 'x5c' => [Base64.strict_encode64(cert.to_der)] }
+    path = File.join(app_root, env_value('UDAP_CLIENT_CERTIFICATIONS_FILE'))
+
+    File.write(path, JWT.encode(payload, key, 'RS256', header))
   end
 
   def file_mode(path)

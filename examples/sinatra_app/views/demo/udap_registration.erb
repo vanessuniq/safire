@@ -157,6 +157,16 @@
               Paste compact JWS certification or endorsement JWTs, one per line. When server metadata lists
               required certification URIs, provide matching JWTs issued through that certification framework.
             </small>
+            <% if presenter.configured_certifications? %>
+              <label class="checkbox-option">
+                <input type="checkbox" name="use_configured_certifications" value="1"
+                       <%= 'checked' if presenter.configured_certifications_selected? %>>
+                <span>
+                  <strong>Use configured certification file</strong><br>
+                  Selects only JWTs matching the chosen grant type. Pasted JWTs take precedence.
+                </span>
+              </label>
+            <% end %>
           </div>
         </div>
       </div>
@@ -183,8 +193,12 @@
         <% end %>
       </div>
       <form action="/demo/<%= @server.id %>/udap-registration/cancel" method="post"
-            onsubmit="return confirm('Cancel this UDAP registration?');">
+            class="danger-zone-form" onsubmit="return confirm('Cancel this UDAP registration?');">
         <%= csrf_field %>
+        <label for="cancellation_certifications">Certification JWTs</label>
+        <textarea id="cancellation_certifications" name="certifications"
+                  class="form-input" rows="2"><%= h(presenter.certifications_value) %></textarea>
+        <small>Provide matching certification JWTs when required by the server.</small>
         <button type="submit" class="btn btn-danger"
                 <%= 'disabled' unless presenter.credentials_configured? && presenter.cancellation_context_configured? %>>
           Cancel UDAP Registration

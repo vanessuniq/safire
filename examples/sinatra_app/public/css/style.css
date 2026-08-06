@@ -873,6 +873,16 @@ section {
   padding-bottom: 0;
 }
 
+.danger-zone-form {
+  display: grid;
+  gap: 0.5rem;
+  min-width: min(28rem, 50%);
+}
+
+.danger-zone-form .btn {
+  justify-self: end;
+}
+
 /* Back link */
 .back-link {
   margin-top: 2rem;
@@ -1422,6 +1432,15 @@ select.form-input {
   .danger-zone {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .danger-zone-form {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .danger-zone-form .btn {
+    justify-self: stretch;
   }
 }
 

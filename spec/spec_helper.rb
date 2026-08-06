@@ -17,7 +17,7 @@ if ENV['COVERAGE']
   require 'simplecov'
   require 'simplecov-cobertura'
   SimpleCov.start do
-    add_filter '/spec/'
+    skip '/spec/'
     formatter SimpleCov::Formatter::CoberturaFormatter
   end
 end

@@ -10,29 +10,29 @@
     <h3>Core Endpoints</h3>
     <dl class="details-list">
       <dt>Authorization Endpoint</dt>
-      <dd><code><%= @metadata.authorization_endpoint || 'Not provided' %></code></dd>
+      <dd><code><%= h(@metadata.authorization_endpoint || 'Not provided') %></code></dd>
 
       <dt>Token Endpoint</dt>
-      <dd><code><%= @metadata.token_endpoint || 'Not provided' %></code></dd>
+      <dd><code><%= h(@metadata.token_endpoint || 'Not provided') %></code></dd>
 
       <% if @metadata.registration_endpoint %>
         <dt>Registration Endpoint</dt>
-        <dd><code><%= @metadata.registration_endpoint %></code></dd>
+        <dd><code><%= h(@metadata.registration_endpoint) %></code></dd>
       <% end %>
 
       <% if @metadata.introspection_endpoint %>
         <dt>Introspection Endpoint</dt>
-        <dd><code><%= @metadata.introspection_endpoint %></code></dd>
+        <dd><code><%= h(@metadata.introspection_endpoint) %></code></dd>
       <% end %>
 
       <% if @metadata.revocation_endpoint %>
         <dt>Revocation Endpoint</dt>
-        <dd><code><%= @metadata.revocation_endpoint %></code></dd>
+        <dd><code><%= h(@metadata.revocation_endpoint) %></code></dd>
       <% end %>
 
       <% if @metadata.management_endpoint %>
         <dt>Management Endpoint</dt>
-        <dd><code><%= @metadata.management_endpoint %></code></dd>
+        <dd><code><%= h(@metadata.management_endpoint) %></code></dd>
       <% end %>
     </dl>
   </div>
@@ -42,10 +42,10 @@
       <h3>OpenID Connect</h3>
       <dl class="details-list">
         <dt>Issuer</dt>
-        <dd><code><%= @metadata.issuer %></code></dd>
+        <dd><code><%= h(@metadata.issuer) %></code></dd>
 
         <dt>JWKS URI</dt>
-        <dd><code><%= @metadata.jwks_uri %></code></dd>
+        <dd><code><%= h(@metadata.jwks_uri) %></code></dd>
       </dl>
     </div>
   <% end %>
@@ -54,7 +54,7 @@
     <h3>Supported Capabilities</h3>
     <div class="capability-badges">
       <% (@metadata.capabilities || []).each do |cap| %>
-        <span class="badge badge-capability"><%= cap %></span>
+        <span class="badge badge-capability"><%= h(cap) %></span>
       <% end %>
     </div>
 
@@ -87,7 +87,7 @@
       <dt>Grant Types Supported</dt>
       <dd>
         <% (@metadata.grant_types_supported || []).each do |grant| %>
-          <span class="badge badge-info"><%= grant %></span>
+          <span class="badge badge-info"><%= h(grant) %></span>
         <% end %>
       </dd>
 
@@ -95,7 +95,7 @@
       <dd>
         <% if @metadata.response_types_supported&.any? %>
           <% @metadata.response_types_supported.each do |rt| %>
-            <span class="badge badge-info"><%= rt %></span>
+            <span class="badge badge-info"><%= h(rt) %></span>
           <% end %>
         <% else %>
           <em>Not specified</em>
@@ -106,7 +106,7 @@
       <dd>
         <% if @metadata.token_endpoint_auth_methods_supported&.any? %>
           <% @metadata.token_endpoint_auth_methods_supported.each do |method| %>
-            <span class="badge badge-info"><%= method %></span>
+            <span class="badge badge-info"><%= h(method) %></span>
           <% end %>
         <% else %>
           <em>Not specified</em>
@@ -116,7 +116,7 @@
       <dt>PKCE Code Challenge Methods</dt>
       <dd>
         <% (@metadata.code_challenge_methods_supported || []).each do |method| %>
-          <span class="badge badge-info"><%= method %></span>
+          <span class="badge badge-info"><%= h(method) %></span>
         <% end %>
       </dd>
     </dl>
@@ -127,7 +127,7 @@
       <h3>Supported Scopes</h3>
       <div class="scope-list">
         <% @metadata.scopes_supported.each do |scope| %>
-          <span class="badge badge-scope"><%= scope %></span>
+          <span class="badge badge-scope"><%= h(scope) %></span>
         <% end %>
       </div>
     </div>

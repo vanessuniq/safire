@@ -15,6 +15,7 @@ class UdapRegistrationPresenter
     x5c
     client_secret
   ].freeze
+  TOKEN_FIELD_SUFFIX = '_token'
   FILTERED_VALUE = '[FILTERED]'
   DEFAULT_CLIENT_NAME = 'Safire Demo App'
   DEFAULT_CONTACTS = 'mailto:admin@example.com'
@@ -23,7 +24,7 @@ class UdapRegistrationPresenter
   CERTIFICATIONS_FILE_ENV = 'UDAP_CLIENT_CERTIFICATIONS_FILE'
   APP_ROOT = File.expand_path('..', __dir__)
 
-  private_constant :GRANT_TYPES, :SENSITIVE_RESPONSE_FIELDS, :FILTERED_VALUE,
+  private_constant :GRANT_TYPES, :SENSITIVE_RESPONSE_FIELDS, :TOKEN_FIELD_SUFFIX, :FILTERED_VALUE,
                    :DEFAULT_CLIENT_NAME, :DEFAULT_CONTACTS, :DEFAULT_SCOPE,
                    :DEMO_LOGO_PATH, :CERTIFICATIONS_FILE_ENV, :APP_ROOT
 
@@ -84,6 +85,12 @@ class UdapRegistrationPresenter
 
   def certifications_value
     certifications_status[:value].to_s
+  end
+
+  def certifications_value!
+    raise certifications_status[:error] if certifications_status[:error]
+
+    certifications_value
   end
 
   def scope
@@ -206,7 +213,7 @@ class UdapRegistrationPresenter
   end
 
   def sensitive_response_field?(key)
-    SENSITIVE_RESPONSE_FIELDS.include?(key)
+    SENSITIVE_RESPONSE_FIELDS.include?(key) || key.end_with?(TOKEN_FIELD_SUFFIX)
   end
 
   def trust_policy_status

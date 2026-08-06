@@ -4,7 +4,6 @@ require 'base64'
 require 'fileutils'
 require 'jwt'
 require 'openssl'
-require 'pathname'
 require 'securerandom'
 require 'time'
 
@@ -20,6 +19,7 @@ class SafireDemoEnvSetup
   PRIVATE_KEY_ENV = 'UDAP_CLIENT_PRIVATE_KEY_PEM'
   CERTIFICATE_CHAIN_ENV = 'UDAP_CLIENT_CERTIFICATE_CHAIN_PEM'
   SIGNING_ALGORITHM_ENV = 'UDAP_REGISTRATION_SIGNING_ALGORITHM'
+  CERTIFICATIONS_FILE_ENV = 'UDAP_CLIENT_CERTIFICATIONS_FILE'
   CERTIFICATION_URIS = ['https://www.example.com/udap/profiles/example-certification'].freeze
   PLACEHOLDER_SNIPPETS = [
     'your_session_secret_here',
@@ -122,10 +122,6 @@ class SafireDemoEnvSetup
 
       body = stripped[1...-1].to_s
       body.gsub("\\#{quote}", quote).gsub('\\\\', '\\')
-    end
-
-    def self.quoted?(value)
-      !surrounding_quote(value).nil?
     end
 
     def self.surrounding_quote(value)
@@ -240,7 +236,7 @@ class SafireDemoEnvSetup
       ['UDAP_CLIENT_CONTACTS', -> { DEFAULT_CONTACTS }],
       ['UDAP_CLIENT_LOGO_URI', -> { "#{client_uri}/safire-demo-logo.png" }],
       [SIGNING_ALGORITHM_ENV, -> { default_algorithm_for_key(udap_private_key(document)) }],
-      ['UDAP_CLIENT_CERTIFICATIONS_FILE', -> { DEFAULT_CERTIFICATIONS_FILE }]
+      [CERTIFICATIONS_FILE_ENV, -> { DEFAULT_CERTIFICATIONS_FILE }]
     ]
   end
 
@@ -332,18 +328,34 @@ class SafireDemoEnvSetup
 
   def ensure_certification_file(document)
     path = certification_file_path(document)
-    return if File.exist?(path) && !File.read(path).strip.empty?
+    return if populated_certification_file?(path)
+
+    unless path == managed_certification_file_path
+      raise SetupError,
+            "#{CERTIFICATIONS_FILE_ENV} must reference an existing non-empty file when set to a custom path; " \
+            "leave it blank to generate #{DEFAULT_CERTIFICATIONS_FILE}"
+    end
 
     FileUtils.mkdir_p(File.dirname(path))
     secure_write(path, "#{certification_jwt(document)}\n")
-    @changed << document.value('UDAP_CLIENT_CERTIFICATIONS_FILE')
+    @changed << document.value(CERTIFICATIONS_FILE_ENV)
   end
 
   def certification_file_path(document)
-    path = document.value('UDAP_CLIENT_CERTIFICATIONS_FILE')
-    return path if Pathname.new(path).absolute?
+    File.expand_path(document.value(CERTIFICATIONS_FILE_ENV), app_root)
+  end
 
-    File.expand_path(path, app_root)
+  def managed_certification_file_path
+    File.expand_path(DEFAULT_CERTIFICATIONS_FILE, app_root)
+  end
+
+  def populated_certification_file?(path)
+    return false unless File.exist?(path)
+    raise SetupError, "#{CERTIFICATIONS_FILE_ENV} must reference a regular file" unless File.file?(path)
+
+    !File.read(path).strip.empty?
+  rescue Errno::EACCES, Errno::ENOENT, Errno::ENOTDIR
+    raise SetupError, "#{CERTIFICATIONS_FILE_ENV} must reference a readable file"
   end
 
   def certification_jwt(document)

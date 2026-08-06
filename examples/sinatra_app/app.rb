@@ -819,7 +819,7 @@ class SafireDemo < Sinatra::Base
   end
 
   def udap_registration_certifications
-    certifications = parse_list_param(@udap_registration_presenter.certifications_value)
+    certifications = parse_list_param(@udap_registration_presenter.certifications_value!)
     certifications.empty? ? nil : certifications
   end
 

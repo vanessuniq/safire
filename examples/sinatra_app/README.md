@@ -75,7 +75,7 @@ but they do not generate production UDAP trust anchors or CRLs.
 | `UDAP_CLIENT_NAME` | No | Client name prefilled in the UDAP registration form |
 | `UDAP_CLIENT_CONTACTS` | No | Comma, space, or newline-separated contact URIs prefilled in the UDAP registration form |
 | `UDAP_CLIENT_LOGO_URI` | No | Logo URI prefilled for authorization-code UDAP registration; generated as the demo logo endpoint when absent |
-| `UDAP_CLIENT_CERTIFICATIONS_FILE` | No | Optional file containing compact JWS certification or endorsement JWTs, one per line; generated as a local self-signed demo file when absent |
+| `UDAP_CLIENT_CERTIFICATIONS_FILE` | No | File containing compact JWS certification or endorsement JWTs, one per line; the managed default is generated when absent, while custom paths must identify an existing non-empty file |
 
 ### Setting Up Asymmetric Authentication
 
@@ -180,8 +180,14 @@ values and certification files so it does not overwrite issued test
 credentials. To refresh only the generated local demo identity, blank both
 `UDAP_CLIENT_PRIVATE_KEY_PEM` and `UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` together,
 blank `UDAP_REGISTRATION_SIGNING_ALGORITHM` unless it is still compatible with
-the regenerated key, remove or empty the file named by
-`UDAP_CLIENT_CERTIFICATIONS_FILE`, and rerun `bin/demo`.
+the regenerated key, leave `UDAP_CLIENT_CERTIFICATIONS_FILE` blank or set to
+the managed default, remove or empty
+`data/udap_self_signed_certification.jwt`, and rerun `bin/demo`.
+
+The setup script generates a certification JWT only at its managed default
+path, `data/udap_self_signed_certification.jwt`. A custom
+`UDAP_CLIENT_CERTIFICATIONS_FILE` must already identify a non-empty file; the
+script never creates or replaces caller-managed certification files.
 
 ### Adding a FHIR Server
 
@@ -287,8 +293,9 @@ The registration screen supports:
   community so cancellation uses the original registration identity
 - cancellation only when the server confirms the same returned `client_id`
 
-The page displays filtered registration metadata. It never renders the software
-statement, private key, certificate chain, or other signing material.
+The page displays filtered registration metadata. It never renders software
+statements, access tokens, private keys, certificate chains, or other signing
+material.
 
 If server metadata advertises `udap_certifications_required`, the registration
 request must include matching certification or endorsement JWTs in the
@@ -320,6 +327,8 @@ examples/sinatra_app/
 ├── config.ru           # Rack configuration
 ├── Gemfile             # Demo app dependencies
 ├── .env.example        # Environment variable template
+├── bin/
+│   └── setup_env.rb    # Idempotent local environment bootstrap
 ├── data/
 │   └── servers.yml     # Server configurations (YAML storage)
 ├── models/
@@ -327,6 +336,7 @@ examples/sinatra_app/
 │   ├── udap_client_credentials.rb    # UDAP demo client signing credential loader
 │   ├── udap_discovery_presenter.rb   # UDAP discovery presentation model
 │   ├── udap_pem_parsing.rb           # Shared UDAP demo PEM parsing helper
+│   ├── udap_registration_presenter.rb # UDAP registration presentation model
 │   └── udap_trust_policy.rb          # UDAP signed_metadata server trust policy
 ├── public/
 │   ├── css/
@@ -347,6 +357,7 @@ examples/sinatra_app/
         ├── tokens.erb
         ├── refresh.erb
         ├── udap_discovery.erb
+        ├── udap_registration.erb
         └── backend_token.erb
 ```
 
@@ -355,8 +366,8 @@ examples/sinatra_app/
 | Path | Description |
 |------|-------------|
 | `/.well-known/jwks.json` | JWKS endpoint serving the app's public key |
-| `GET /register` | Dynamic Client Registration form |
-| `POST /register` | Submits the registration request and saves the new server entry |
+| `GET /register` | SMART Dynamic Client Registration form |
+| `POST /register` | Submits a SMART registration request and saves the new server entry |
 | `/launch` | EHR/Portal launch endpoint |
 | `/callback` | OAuth2 callback handler |
 | `GET /demo/:id/discovery` | SMART discovery result page |

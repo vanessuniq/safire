@@ -45,6 +45,10 @@ RSpec.describe UdapRegistrationPresenter do
       'client_id' => 'client-123',
       'software_statement' => 'secret.jwt.value',
       'certifications' => ['cert.jwt.value'],
+      'registration_access_token' => 'registration-access-token',
+      'access_token' => 'access-token',
+      'refresh_token' => 'refresh-token',
+      'id_token' => 'id-token',
       'nested' => {
         'private_key' => 'private-key-value',
         'x5c' => ['raw-cert-value'],
@@ -58,6 +62,10 @@ RSpec.describe UdapRegistrationPresenter do
       'client_id' => 'client-123',
       'software_statement' => '[FILTERED]',
       'certifications' => '[FILTERED]',
+      'registration_access_token' => '[FILTERED]',
+      'access_token' => '[FILTERED]',
+      'refresh_token' => '[FILTERED]',
+      'id_token' => '[FILTERED]',
       'nested' => {
         'private_key' => '[FILTERED]',
         'x5c' => '[FILTERED]',
@@ -125,6 +133,16 @@ RSpec.describe UdapRegistrationPresenter do
     end
   end
 
+  it 'resolves relative certification paths from the demo app root' do
+    relative_path = 'data/relative-certifications.jwt'
+    expanded_path = File.expand_path("../../../examples/sinatra_app/#{relative_path}", __dir__)
+    allow(File).to receive(:read).with(expanded_path).and_return("relative.jwt.value\n")
+
+    presenter = build_presenter(env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => relative_path))
+
+    expect(presenter.certifications_value).to eq('relative.jwt.value')
+  end
+
   it 'surfaces a configuration error when the configured certifications file is unreadable' do
     presenter = build_presenter(
       env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => '/tmp/safire-missing-certifications.jwt')
@@ -133,6 +151,14 @@ RSpec.describe UdapRegistrationPresenter do
     expect(presenter.certifications_value).to eq('')
     expect(presenter.display_error).to be_a(Safire::Errors::ConfigurationError)
     expect(presenter.display_error.message).to include('UDAP_CLIENT_CERTIFICATIONS_FILE')
+  end
+
+  it 'raises the configuration error when an operation consumes an unreadable certifications file' do
+    presenter = build_presenter(
+      env: env.merge('UDAP_CLIENT_CERTIFICATIONS_FILE' => '/tmp/safire-missing-certifications.jwt')
+    )
+
+    expect { presenter.certifications_value! }.to raise_error(Safire::Errors::ConfigurationError)
   end
 
   it 'uses submitted certification JWTs without reading the configured file' do
@@ -149,6 +175,22 @@ RSpec.describe UdapRegistrationPresenter do
     presenter = build_presenter(registration_response: registration_response_with_sensitive_values)
 
     expect(presenter.safe_registration_response).to eq(filtered_registration_response)
+  end
+
+  it 'filters access tokens from returned cancellation metadata' do
+    presenter = build_presenter(
+      cancellation_response: {
+        'client_id' => 'stored-client',
+        'grant_types' => [],
+        'registration_access_token' => 'registration-access-token',
+        'access_token' => 'access-token'
+      }
+    )
+
+    expect(presenter.safe_cancellation_response).to include(
+      'registration_access_token' => '[FILTERED]',
+      'access_token' => '[FILTERED]'
+    )
   end
 
   it 'detects cancellation confirmation and client-id mismatches' do

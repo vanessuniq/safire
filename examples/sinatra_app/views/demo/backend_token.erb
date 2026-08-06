@@ -32,16 +32,16 @@
       <h3>Token Details</h3>
       <dl class="details-list">
         <dt>Token Type</dt>
-        <dd><%= @token_response['token_type'] || 'Not specified' %></dd>
+        <dd><%= h(@token_response['token_type'] || 'Not specified') %></dd>
 
         <dt>Expires In</dt>
-        <dd><%= @token_response['expires_in'] ? "#{@token_response['expires_in']} seconds" : 'Not specified' %></dd>
+        <dd><%= h(@token_response['expires_in'] ? "#{@token_response['expires_in']} seconds" : 'Not specified') %></dd>
 
         <dt>Scope</dt>
         <dd>
           <% if @token_response['scope'] %>
             <% @token_response['scope'].split(' ').each do |scope| %>
-              <span class="badge badge-scope"><%= scope %></span>
+              <span class="badge badge-scope"><%= h(scope) %></span>
             <% end %>
           <% else %>
             <em>Not specified</em>

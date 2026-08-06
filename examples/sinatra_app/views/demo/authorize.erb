@@ -46,7 +46,7 @@
           To test EHR or Patient Portal launches, register this app's launch URL with your EHR/Portal:
         </p>
         <div class="launch-url-box">
-          <code><%= request.scheme %>://<%= request.host_with_port %>/launch</code>
+          <code><%= h("#{request.scheme}://#{request.host_with_port}/launch") %></code>
         </div>
         <p class="form-note">
           The EHR/Portal will call this URL with <code>launch</code> and <code>iss</code> parameters
@@ -123,7 +123,7 @@
       <p class="form-help">The following scopes will be requested:</p>
       <div class="scope-preview">
         <% @server.scopes.each do |scope| %>
-          <span class="badge badge-scope"><%= scope %></span>
+          <span class="badge badge-scope"><%= h(scope) %></span>
         <% end %>
         <span class="badge badge-scope badge-added">+ launch/patient</span>
       </div>

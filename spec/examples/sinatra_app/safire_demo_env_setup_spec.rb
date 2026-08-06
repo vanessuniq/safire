@@ -103,6 +103,63 @@ RSpec.describe SafireDemoEnvSetup do
     end
   end
 
+  it 'does not create a missing caller-managed certification file' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = build_certificate(key, uri_san: client_uri)
+    custom_path = File.join(app_root, 'custom', 'certification.jwt')
+    write_existing_env(key, cert, certifications_file: custom_path)
+
+    expect { setup.run }
+      .to raise_error(
+        SafireDemoEnvSetup::SetupError,
+        /must reference an existing non-empty file when set to a custom path/
+      )
+    expect(File).not_to exist(custom_path)
+  end
+
+  it 'does not create a certification file through a path escaping the app directory' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = build_certificate(key, uri_san: client_uri)
+    custom_path = File.join(app_root, '..', "#{File.basename(app_root)}-certification.jwt")
+    write_existing_env(key, cert, certifications_file: custom_path)
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /leave it blank to generate/)
+    expect(File).not_to exist(File.expand_path(custom_path))
+  end
+
+  it 'does not replace an empty caller-managed certification file' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = build_certificate(key, uri_san: client_uri)
+    custom_path = File.join(app_root, 'custom.jwt')
+    File.write(custom_path, '')
+    write_existing_env(key, cert, certifications_file: custom_path)
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /existing non-empty file/)
+    expect(File.read(custom_path)).to be_empty
+  end
+
+  it 'rejects a caller-managed certification path that is not a regular file' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = build_certificate(key, uri_san: client_uri)
+    custom_path = File.join(app_root, 'certifications')
+    FileUtils.mkdir_p(custom_path)
+    write_existing_env(key, cert, certifications_file: custom_path)
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /must reference a regular file/)
+  end
+
+  it 'rejects an unreadable caller-managed certification file' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = build_certificate(key, uri_san: client_uri)
+    custom_path = File.join(app_root, 'certification.jwt')
+    File.write(custom_path, 'configured.jwt')
+    write_existing_env(key, cert, certifications_file: custom_path)
+    allow(File).to receive(:read).and_call_original
+    allow(File).to receive(:read).with(custom_path).and_raise(Errno::EACCES)
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /must reference a readable file/)
+  end
+
   it 'parses single-quoted multiline dotenv values' do
     document = described_class::DotenvDocument.parse("KEY='line one\nline two'\n")
 
@@ -132,7 +189,7 @@ RSpec.describe SafireDemoEnvSetup do
   it 'selects an EC-compatible signing algorithm for preserved EC credentials' do
     key = OpenSSL::PKey::EC.generate('prime256v1')
     cert = build_certificate(key, uri_san: client_uri)
-    write_existing_env(key, cert, algorithm: '')
+    write_existing_env(key, cert, algorithm: '', certifications_file: '')
 
     setup.run
 
@@ -154,7 +211,7 @@ RSpec.describe SafireDemoEnvSetup do
   it 'uses an explicitly configured RSA-compatible signing algorithm for the certification JWT' do
     key = OpenSSL::PKey::RSA.generate(2048)
     cert = build_certificate(key, uri_san: client_uri)
-    write_existing_env(key, cert, algorithm: 'RS384')
+    write_existing_env(key, cert, algorithm: 'RS384', certifications_file: '')
 
     setup.run
 
@@ -193,6 +250,80 @@ RSpec.describe SafireDemoEnvSetup do
     setup.run
 
     expect(File.read(env_path)).to include('UDAP_TRUST_ANCHORS_PEM=""')
+  end
+
+  it 'creates an environment without an example template' do
+    FileUtils.rm_f(example_env_path)
+
+    setup.run
+
+    expect(env_value('SESSION_SECRET')).not_to be_empty
+  end
+
+  it 'rejects an invalid UDAP private key' do
+    File.write(
+      env_path,
+      %(UDAP_CLIENT_PRIVATE_KEY_PEM="not-a-key"\nUDAP_CLIENT_CERTIFICATE_CHAIN_PEM="certificate"\n)
+    )
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /valid PEM private key/)
+  end
+
+  it 'rejects a public-only UDAP key' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = build_certificate(key, uri_san: client_uri)
+    File.write(
+      env_path,
+      [
+        %(UDAP_CLIENT_PRIVATE_KEY_PEM="#{key.public_key.to_pem}"\n),
+        %(UDAP_CLIENT_CERTIFICATE_CHAIN_PEM="#{cert.to_pem}"\n)
+      ].join
+    )
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /must contain a PEM private key/)
+  end
+
+  it 'rejects an invalid UDAP certificate chain' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    invalid_cert = "-----BEGIN CERTIFICATE-----\ninvalid\n-----END CERTIFICATE-----"
+    File.write(
+      env_path,
+      %(UDAP_CLIENT_PRIVATE_KEY_PEM="#{key.to_pem}"\nUDAP_CLIENT_CERTIFICATE_CHAIN_PEM="#{invalid_cert}"\n)
+    )
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /valid PEM certificate chain/)
+  end
+
+  it 'rejects an incompatible explicit signing algorithm' do
+    key = OpenSSL::PKey::RSA.generate(2048)
+    cert = build_certificate(key, uri_san: client_uri)
+    write_existing_env(key, cert, algorithm: 'ES256', certifications_file: '')
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /is not compatible/)
+  end
+
+  it 'rejects unsupported private-key types when selecting a default algorithm' do
+    key = OpenSSL::PKey::DSA.generate(1024)
+    cert = build_certificate(key, uri_san: client_uri)
+    write_existing_env(key, cert, algorithm: '', certifications_file: '')
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /must be an RSA or NIST/)
+  end
+
+  it 'rejects unsupported private-key types with an explicit algorithm' do
+    key = OpenSSL::PKey::DSA.generate(1024)
+    cert = build_certificate(key, uri_san: client_uri)
+    write_existing_env(key, cert, algorithm: 'RS256', certifications_file: '')
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /must be an RSA or NIST/)
+  end
+
+  it 'rejects unsupported EC signing curves' do
+    key = OpenSSL::PKey::EC.generate('secp521r1')
+    cert = build_certificate(key, uri_san: client_uri)
+    write_existing_env(key, cert, algorithm: '', certifications_file: '')
+
+    expect { setup.run }.to raise_error(SafireDemoEnvSetup::SetupError, /unsupported EC curve/)
   end
 
   it 'is idempotent after the initial local setup' do

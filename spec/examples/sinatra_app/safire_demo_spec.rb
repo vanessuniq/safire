@@ -150,6 +150,10 @@ RSpec.describe SafireDemo do
 
   def expect_response_to_hide_registration_artifacts(response)
     expect(response.body).not_to include('must.not.render')
+    expect(response.body).not_to include('registration-token-must-not-render')
+    expect(response.body).not_to include('access-token-must-not-render')
+    expect(response.body).not_to include('cancel-registration-token-must-not-render')
+    expect(response.body).not_to include('cancel-access-token-must-not-render')
     expect(response.body).not_to include('private-key')
     expect(response.body).not_to include('certificate')
   end
@@ -344,6 +348,24 @@ RSpec.describe SafireDemo do
       expect(response.body).to include("#{smart_server.base_url}/authorize")
     end
 
+    it 'escapes metadata values supplied by a SMART server' do
+      unsafe_value = '<script>alert("metadata")</script>'
+      metadata = Safire::Protocols::SmartMetadata.new(
+        smart_metadata_hash.merge(
+          'authorization_endpoint' => unsafe_value,
+          'capabilities' => [unsafe_value]
+        )
+      )
+      client = instance_double(Safire::Client, server_metadata: metadata)
+      allow(Safire::Client).to receive(:new).and_return(client)
+
+      response = response_for(:get, '/demo/smart-only/discovery')
+
+      expect(response.status).to eq(200)
+      expect(response.body).not_to include(unsafe_value)
+      expect(response.body).to include('&lt;script&gt;alert')
+    end
+
     it 'redirects when SMART discovery fails before a demo route renders' do
       client = instance_double(Safire::Client)
       allow(Safire::Client).to receive(:new).and_return(client)
@@ -465,6 +487,28 @@ RSpec.describe SafireDemo do
                                                                            flow: :backend_services)
       expect_backend_services_client_configuration
     end
+
+    it 'escapes token response values supplied by a SMART server' do
+      unsafe_value = '<script>alert("token")</script>'
+      allow(Safire::Client).to receive(:new).and_return(
+        metadata_client,
+        instance_double(
+          Safire::Client,
+          request_backend_token: backend_token_response.merge(
+            'access_token' => unsafe_value,
+            'token_type' => unsafe_value,
+            'scope' => unsafe_value
+          ),
+          token_response_valid?: true
+        )
+      )
+
+      response = request_backend_token_with_env
+
+      expect(response.status).to eq(200)
+      expect(response.body).not_to include(unsafe_value)
+      expect(response.body).to include('&lt;script&gt;alert')
+    end
   end
 
   describe 'UDAP discovery' do
@@ -523,10 +567,19 @@ RSpec.describe SafireDemo do
         'client_id' => 'new-udap-client',
         'grant_types' => ['client_credentials'],
         'scope' => 'system/*.rs',
-        'software_statement' => 'must.not.render'
+        'software_statement' => 'must.not.render',
+        'registration_access_token' => 'registration-token-must-not-render',
+        'access_token' => 'access-token-must-not-render'
       }
     end
-    let(:cancellation_response) { { 'client_id' => 'stored-udap-client', 'grant_types' => [] } }
+    let(:cancellation_response) do
+      {
+        'client_id' => 'stored-udap-client',
+        'grant_types' => [],
+        'registration_access_token' => 'cancel-registration-token-must-not-render',
+        'access_token' => 'cancel-access-token-must-not-render'
+      }
+    end
     let(:registration_params) do
       {
         grant_type: 'client_credentials',
@@ -661,6 +714,20 @@ RSpec.describe SafireDemo do
       expect(response.body).to include('Safire Demo App')
     end
 
+    it 'does not submit registration when the configured certifications file is unreadable' do
+      with_env('UDAP_CLIENT_CERTIFICATIONS_FILE' => '/tmp/safire-missing-certifications.jwt') do
+        response = form_response(
+          :post,
+          '/demo/udap-only/udap-registration',
+          params: registration_params.except(:certifications)
+        )
+
+        expect(response.status).to eq(200)
+        expect(response.body).to include('UDAP_CLIENT_CERTIFICATIONS_FILE')
+        expect(udap_client).not_to have_received(:register_client)
+      end
+    end
+
     it 'cancels registration and clears the stored UDAP client id when the response confirms the same id' do
       response = form_response(
         :post,
@@ -679,6 +746,7 @@ RSpec.describe SafireDemo do
       expect(registered_udap_server.udap_community).to be_nil
       expect(registered_udap_server).to have_received(:save)
       expect(response.body).to include('Registration cancelled')
+      expect_response_to_hide_registration_artifacts(response)
     end
 
     it 'does not submit cancellation when no UDAP client id is stored' do

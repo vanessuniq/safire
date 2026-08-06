@@ -75,6 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lifecycle actions, cancellation confirmation, home-page entry points for
   unregistered UDAP servers, and a development-only HTTP loopback policy aligned
   with SMART demo registration.
+- The Sinatra demo HTML-escapes SMART metadata and token responses and redacts
+  signing material, client secrets, and token fields from displayed UDAP
+  registration and cancellation responses.
 - `bin/demo` now prepares the ignored Sinatra demo `.env` file before boot,
   filling absent local-only session secrets, SMART asymmetric demo credentials,
   UDAP client signing credentials, and a sample self-signed certification JWT

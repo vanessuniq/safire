@@ -4,7 +4,8 @@ module Safire
     #
     # Include this module in a protocol class to declare conformance with the
     # Safire protocol interface. Each method raises +NotImplementedError+ by
-    # default; concrete protocol classes must override every method.
+    # default; concrete protocol classes override the methods they support so
+    # unsupported flows fail explicitly through the shared contract.
     #
     # @abstract
     # @api private

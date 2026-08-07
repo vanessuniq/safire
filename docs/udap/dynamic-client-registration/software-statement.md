@@ -40,7 +40,8 @@ leaf-first, issuer-ordered certificate chain encoded as Base64 DER strings,
 without PEM wrappers.
 
 Safire does not emit `typ`, `kid`, `jku`, or `x5u` for registration software
-statements.
+statements. STU2's experimental `jku` alternative applies only to access-token
+request and response workflows, not registration requests.
 
 ## Signing Identity
 
@@ -84,7 +85,8 @@ When `jwt_algorithm` is omitted, Safire selects the first compatible advertised
 algorithm. RSA keys prefer `RS256` because it is the STU2 baseline. An explicit
 algorithm must be advertised by the server and compatible with the key. Safire
 raises `DiscoveryError` before signing if the server metadata omits mandatory
-`RS256` registration signing support.
+`RS256` registration signing support, even when the client will use another
+compatible algorithm also advertised by the server.
 
 ## Validation Boundaries
 
@@ -103,6 +105,11 @@ Safire performs local consistency checks before signing:
 Safire does not decide whether the authorization server trusts the client
 certificate. Chain validation, revocation status, and community trust for the
 client certificate are authorization-server decisions during registration.
+
+The server trust policy used to validate discovery metadata is separate. Pass
+`trusted_anchors:`, `crls:`, or `revocation_checker:` to `register_client` or
+`cancel_registration`; do not place server trust anchors in the client
+`certificate_chain`.
 
 See [ADR-014]({% link adr/ADR-014-udap-software-statement-signing.md %}) for
 the signing design rationale.

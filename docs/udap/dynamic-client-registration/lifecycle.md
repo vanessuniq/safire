@@ -20,8 +20,8 @@ response rules.
 ## Create or Modify
 
 Call `register_client` for both new registration and modification. A repeated
-call with the same `client_uri` and community requests modification of the
-existing registration.
+call against the same registration endpoint with the same `client_uri` and
+community requests modification of the existing registration.
 
 ```ruby
 registration = client.register_client(
@@ -40,6 +40,23 @@ registration = client.register_client(
 Safire accepts new-registration `201 Created` responses and update-style `200`
 responses. Either response must be a JSON object with a non-blank string
 `client_id`.
+
+The authorization server identifies the registration from the software
+statement's client URI (`iss`) and certificate trust-community context, not from
+a caller-supplied `client_id`. A modification replaces the prior registration
+metadata and may also replace optional certifications. Pass
+`certifications: []` to explicitly clear optional certifications.
+
+The server should preserve the previous `client_id`. If it returns a different
+one, STU2 requires the server to cancel the old registration and the client to
+use only the replacement identifier. Safire returns the response without
+assuming that the identifier is unchanged.
+
+FHIR servers that advertise the same `registration_endpoint` belong to one
+logical registration group. Registering against one server in that group may
+therefore register the client for every endpoint in the group. Safire does not
+attempt to infer these groups from different FHIR base URLs; use the discovered
+registration endpoint and server documentation when managing registrations.
 
 ## Cancel
 
@@ -66,6 +83,12 @@ cancellation['grant_types'] # => []
 Cancellation uses the same discovery-bound registration endpoint, community
 scoping, trust policy, `certifications:`, and X.509 signing configuration as
 `register_client`.
+
+The cancellation request does not send a `client_id`. The authorization server
+identifies the existing registration from the same client URI and
+trust-community identity used for registration. Applications should still
+compare the response `client_id` with the identifier they currently store before
+discarding local registration state.
 
 Unlike registration, Safire does not require a specific success status such as
 `200` or `201` for cancellation, but the final HTTP response must still be a

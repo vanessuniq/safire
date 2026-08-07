@@ -4,7 +4,7 @@ A Sinatra-based web application that demonstrates the Safire gem for SMART autho
 
 ## Features
 
-- **Dynamic Client Registration**: Register this application with a SMART server at runtime using RFC 7591 to obtain a `client_id` automatically
+- **SMART Dynamic Client Registration**: Register this application with a SMART server at runtime using RFC 7591 to obtain a `client_id` automatically
 - **Server Management**: Add, edit, and remove FHIR server configurations with protocol-aware SMART and UDAP sections
 - **SMART Discovery**: View server capabilities from `/.well-known/smart-configuration` including supported scopes, capabilities, and endpoints
 - **UDAP Discovery**: Fetch `/.well-known/udap`, validate `signed_metadata`, inspect STU2 fields, and run community-scoped discovery
@@ -200,14 +200,31 @@ path.
 
 ### Adding a FHIR Server
 
-The home page offers dynamic SMART registration or manual server setup.
+The home page offers protocol-specific SMART and UDAP dynamic registration,
+plus manual server setup.
 
-**Register Dynamically (RFC 7591)** — if the server advertises a `registration_endpoint`:
+**SMART Dynamic Registration (RFC 7591)** creates the server entry as part of
+registration when the SMART server advertises a `registration_endpoint`:
 
 1. Click "Register with a Server" on the home page
 2. Enter the server name and base URL
 3. Choose grant types, authentication method, and optional scope
 4. Click "Register Client" — the app POSTs your metadata to the server, receives a `client_id`, and saves the server entry automatically
+
+**UDAP Dynamic Registration (STU2)** starts from an existing UDAP-enabled server
+entry because discovery, protocol selection, and optional community context
+belong to that server:
+
+1. Add a UDAP server manually if it is not already configured
+2. Use the home-page UDAP action or open the server detail page
+3. Review the prepopulated client metadata and choose a grant profile
+4. Register the certificate-backed software statement; the returned
+   `udap_client_id`, exact client URI, and community are stored on that server
+
+Once a UDAP client ID is stored, registration actions become lifecycle
+management actions. The demo prevents duplicate registration and offers
+cancellation when the stored registration also has the client URI context
+needed to reproduce its issuer identity.
 
 **Add Server Manually** — for SMART credentials, UDAP discovery, or both:
 

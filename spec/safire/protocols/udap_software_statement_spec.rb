@@ -240,6 +240,15 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
       expect(header['alg']).to eq('ES384')
     end
 
+    it 'rejects EC curves without a supported UDAP signing algorithm' do
+      ec_key = OpenSSL::PKey::EC.generate('secp521r1')
+      cert = build_valid_certificate(key: ec_key, uri_san: client_uri)
+
+      expect do
+        build_statement(private_key: ec_key, certificate_chain: [cert], supported_algorithms: ['ES384'])
+      end.to raise_error(Safire::Errors::ConfigurationError, /algorithm/)
+    end
+
     it 'honors an explicit compatible algorithm when advertised' do
       statement = build_statement(algorithm: 'RS384', supported_algorithms: %w[RS256 RS384])
       _payload, header = decode_statement(statement, algorithm: 'RS384')
@@ -310,8 +319,18 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
         .to raise_error(Safire::Errors::ConfigurationError, /private_key/)
     end
 
+    it 'rejects unsupported private key input types' do
+      expect { build_statement(private_key: Object.new) }
+        .to raise_error(Safire::Errors::ConfigurationError, /private_key/)
+    end
+
     it 'rejects an empty certificate chain' do
       expect { build_statement(certificate_chain: []) }
+        .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain/)
+    end
+
+    it 'rejects unsupported certificate chain entry types' do
+      expect { build_statement(certificate_chain: [nil]) }
         .to raise_error(Safire::Errors::ConfigurationError, /certificate_chain/)
     end
 
@@ -419,6 +438,11 @@ RSpec.describe Safire::Protocols::UdapSoftwareStatement do
       bad_clock = class_double(Time, now: Object.new)
 
       expect { build_statement(clock: bad_clock) }
+        .to raise_error(Safire::Errors::ConfigurationError, /clock/)
+    end
+
+    it 'requires the clock to respond to now' do
+      expect { build_statement(clock: Object.new) }
         .to raise_error(Safire::Errors::ConfigurationError, /clock/)
     end
 

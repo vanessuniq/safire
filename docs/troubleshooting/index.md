@@ -28,7 +28,7 @@ Safire raises typed errors so you can handle each failure category separately:
 
 | Error class | When raised |
 |-------------|-------------|
-| `Safire::Errors::ConfigurationError` | Missing or invalid client configuration — caught at construction time |
+| `Safire::Errors::ConfigurationError` | Missing or incompatible configuration; URI and shape errors may be caught at construction, while flow-specific requirements are checked when used |
 | `Safire::Errors::DiscoveryError` | SMART or UDAP metadata discovery failed (HTTP error, invalid JSON, missing SMART `token_endpoint` when required, or UDAP `signed_metadata` validation failure) |
 | `Safire::Errors::ValidationError` | Caller-controlled input is invalid before a request is sent, such as UDAP registration metadata or certification JWT shape |
 | `Safire::Errors::CertificateError` | UDAP `x5c` certificate data could not be parsed or the configured UDAP client certificate chain cannot support signing |

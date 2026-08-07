@@ -81,6 +81,11 @@ key, and advertised by the server. Without an explicit algorithm, Safire chooses
 the first key-compatible advertised algorithm, preferring `RS256` over `RS384`
 for RSA keys because `RS256` is the STU2 baseline.
 
+Protocol orchestration separately requires every DCR-capable server to advertise
+mandatory `RS256` support before Safire signs with any compatible advertised
+algorithm. This enforces the server baseline independently from the configured
+client key type.
+
 ### Validate local signing identity, not server trust
 
 Before signing, Safire parses and snapshots the certificate chain, checks that

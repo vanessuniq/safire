@@ -99,7 +99,7 @@ def fetch_client_secret
 end
 ```
 
-### Private Keys (Confidential Asymmetric)
+### Private Keys and Client Certificates
 
 ```ruby
 # ❌ NEVER: render or log the key
@@ -130,7 +130,8 @@ def fetch_private_key
 end
 ```
 
-Use strong keys:
+For SMART confidential-asymmetric flows, use strong keys compatible with the
+SMART signing algorithms:
 
 ```ruby
 # RSA: minimum 2048-bit, 4096-bit recommended
@@ -142,6 +143,38 @@ key = OpenSSL::PKey::EC.generate('secp384r1')
 
 {: .note }
 > Safire automatically masks `client_secret` and `private_key` in `inspect` output and error messages, so they will not appear in Rails logs even if a `ClientConfig` object is accidentally logged.
+
+UDAP Dynamic Client Registration additionally requires a leaf-first client
+certificate chain. The certificates contain public material, but they identify
+the client's operational signing identity and can be large, so Safire masks
+`certificate_chain` in `ClientConfig#inspect` and `#to_hash` as well.
+
+```ruby
+udap_client = Safire::Client.new(
+  {
+    base_url: 'https://fhir.example.com',
+    private_key: Rails.application.credentials.udap[:private_key_pem],
+    certificate_chain: [
+      File.read(ENV.fetch('UDAP_CLIENT_CERTIFICATE_PATH')),
+      File.read(ENV.fetch('UDAP_CLIENT_ISSUING_CA_PATH'))
+    ]
+  },
+  protocol: :udap
+)
+```
+
+Keep the two UDAP trust directions separate:
+
+- `private_key` and `certificate_chain` identify the client and sign
+  registration software statements.
+- `trusted_anchors`, `crls`, and `revocation_checker` validate the server's
+  discovery `signed_metadata`.
+
+Never use `verify_chain: false` or `allow_insecure_localhost: true` in
+production. The generated credentials and self-declaration JWTs in the
+unbundled Sinatra demo are development fixtures, not production trust material.
+See [UDAP Dynamic Client Registration]({% link udap/dynamic-client-registration/index.md %})
+for the complete trust model.
 
 ---
 

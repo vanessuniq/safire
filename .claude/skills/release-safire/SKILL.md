@@ -76,7 +76,7 @@ Stage `CHANGELOG.md` only — no other files.
 
 ---
 
-## Phase 5: Bump Version and Update Gemfile.lock (release commit)
+## Phase 5: Bump Version, Update Gemfile.lock and ROADMAP (release commit)
 
 Show the user the exact change to `lib/safire/version.rb`:
 ```ruby
@@ -93,7 +93,7 @@ git add lib/safire/version.rb Gemfile.lock ROADMAP.md
 git commit -s -m "Bump version to X.Y.Z"
 ```
 
-Stage `lib/safire/version.rb` and `Gemfile.lock` only — no other files.
+Stage `lib/safire/version.rb`, `Gemfile.lock`, and `ROADMAP.md` only — no other files.
 
 ---
 
@@ -147,7 +147,7 @@ After the PR is created, tell the user the remaining manual steps:
 ## Rules (never violate)
 
 - All commits use `-s`; subjects are one-line only
-- Two-commit structure on the release branch: docs commit (CHANGELOG) then release commit (version.rb + Gemfile.lock)
+- Two-commit structure on the release branch: docs commit (CHANGELOG) then release commit (version.rb + Gemfile.lock + ROADMAP.md)
 - Never commit a `.gem` file
 - Separate doc changes from code changes into distinct commits
 - Always get explicit user approval before modifying files or running commands

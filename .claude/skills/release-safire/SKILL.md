@@ -85,9 +85,11 @@ VERSION = 'X.Y.Z'.freeze
 
 Wait for approval, then edit the file and run `bundle install` to regenerate `Gemfile.lock`.
 
+Update the `Latest Published Release` in the Roadmap.md file
+
 Ask the user to approve this commit:
 ```
-git add lib/safire/version.rb Gemfile.lock
+git add lib/safire/version.rb Gemfile.lock ROADMAP.md
 git commit -s -m "Bump version to X.Y.Z"
 ```
 

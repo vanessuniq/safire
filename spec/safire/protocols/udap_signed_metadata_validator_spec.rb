@@ -292,6 +292,22 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
         end
       end
 
+      context 'when a custom revocation checker raises' do
+        it 'fails closed and logs a revocation failure' do
+          checker = ->(**_kwargs) { raise 'revocation service unavailable' }
+
+          result = validator.signed_endpoint_claims(
+            base_url:,
+            trusted_anchors: [cert],
+            revocation_checker: checker,
+            verify_chain: true
+          )
+
+          expect(result).to be_nil
+          expect(Safire.logger).to have_received(:warn).with(/certificate revocation check failed/)
+        end
+      end
+
       context 'when no trusted anchors are provided for a self-signed cert' do
         it 'returns nil' do
           expect(

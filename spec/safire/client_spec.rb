@@ -80,6 +80,11 @@ RSpec.describe Safire::Client do
         .to raise_error(Safire::Errors::ConfigurationError, /client_type.*bogus/i)
     end
 
+    it 'raises ConfigurationError for a non-string, non-symbol client_type' do
+      expect { described_class.new(config, client_type: Object.new) }
+        .to raise_error(Safire::Errors::ConfigurationError, /client_type/)
+    end
+
     it 'symbolizes a string client_type keyword' do
       client = described_class.new(config, client_type: 'confidential_symmetric')
       expect(client.client_type).to eq(:confidential_symmetric)

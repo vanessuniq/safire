@@ -648,7 +648,7 @@ RSpec.describe Safire::Protocols::Udap do
       expect(WebMock).not_to have_requested(:post, registration_endpoint)
     end
 
-    it 'raises DiscoveryError when the server does not advertise UDAP DCR capability' do
+    it 'raises DiscoveryError when metadata omits the required UDAP DCR profile' do
       stub_udap(
         body: registration_discovery_body.merge(
           'udap_profiles_supported' => %w[udap_authn udap_authz]
@@ -656,7 +656,21 @@ RSpec.describe Safire::Protocols::Udap do
       )
 
       expect { udap.register_client(client_metadata, client_uri:) }
-        .to raise_error(Safire::Errors::DiscoveryError, /Dynamic Client Registration/)
+        .to raise_error(Safire::Errors::DiscoveryError, /structurally conformant/)
+      expect(WebMock).not_to have_requested(:post, registration_endpoint)
+    end
+
+    it 'raises DiscoveryError when conformant metadata does not expose usable DCR capability' do
+      discovered = instance_double(
+        Safire::Protocols::UdapMetadata,
+        valid?: true,
+        supports_dynamic_registration?: false
+      )
+      stub_udap
+      allow(Safire::Protocols::UdapMetadata).to receive(:new).and_return(discovered)
+
+      expect { udap.register_client(client_metadata, client_uri:) }
+        .to raise_error(Safire::Errors::DiscoveryError, /does not advertise UDAP Dynamic Client Registration/)
       expect(WebMock).not_to have_requested(:post, registration_endpoint)
     end
 

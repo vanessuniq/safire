@@ -204,7 +204,11 @@ RSpec.describe Safire::Protocols::UdapRegistrationMetadata do
     end
 
     it 'preserves non-mail contact URIs alongside a valid mailto contact' do
-      input[:contacts] = ['https://example.com/security', 'mailto:security@example.com']
+      input[:contacts] = [
+        'mailto:security@example.com',
+        'tel:+1-555-0100',
+        'sip:security@example.com'
+      ]
 
       expect(metadata.to_h['contacts']).to eq(input[:contacts])
     end

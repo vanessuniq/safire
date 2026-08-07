@@ -3,7 +3,7 @@ layout: default
 title: Home
 nav_order: 1
 permalink: /
-description: "Safire is a Ruby gem implementing SMART App Launch 2.2.0 and UDAP Security STU2 for healthcare client applications."
+description: "Safire implements SMART App Launch 2.2.0 plus UDAP Security STU2 discovery and Dynamic Client Registration for Ruby clients."
 ---
 
 # Safire Documentation
@@ -55,7 +55,8 @@ A Sinatra-based demo app is included to help you explore Safire's features:
 bin/demo
 ```
 
-Visit http://localhost:4567 to test SMART discovery, authorization flows, token management, and backend services token requests.
+Visit http://localhost:4567 to test SMART registration and authorization flows,
+UDAP signed metadata discovery, and the UDAP registration lifecycle.
 
 See [`examples/sinatra_app/README.md`](https://github.com/vanessuniq/safire/tree/main/examples/sinatra_app) for details.
 

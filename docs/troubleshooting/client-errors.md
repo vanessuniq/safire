@@ -38,7 +38,7 @@ For UDAP, the registration endpoint is always discovery-bound. Safire raises
 `DiscoveryError` before POSTing when discovery fails, `signed_metadata` cannot
 be validated, `UdapMetadata#valid?` reports structural non-conformance, the
 server does not advertise `udap_dcr`, or the server does not publish
-registration signing algorithms:
+mandatory `RS256` registration signing support:
 
 ```ruby
 registration = udap_client.register_client(
@@ -66,7 +66,9 @@ Common causes:
 - non-HTTPS redirect or logo URIs, except HTTP localhost when explicitly enabled for development
 - reserved claims such as `iss`, `sub`, `aud`, `exp`, `jti`, `software_statement`, `certifications`, or `udap`
 - `certifications:` is not `nil` or an array of compact JWS strings
-- discovery declares required certifications, but `certifications:` is omitted or empty
+- discovery declares required certification policy URIs, but `certifications:`
+  is omitted or empty; the server still decides whether supplied JWTs satisfy
+  those policies
 
 ### `CertificateError`: UDAP client signing identity cannot support registration
 

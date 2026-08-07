@@ -12,26 +12,21 @@ has_children: true
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-**Implemented now:** UDAP Security STU2 discovery (`/.well-known/udap`)
-including signed metadata validation and optional community scoping, plus
-certificate-backed Dynamic Client Registration for registration, modification,
-and cancellation. JWT client authentication and Tiered OAuth remain planned. See
-[ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md).
+Safire implements UDAP Security STU2 discovery, signed metadata validation,
+community scoping, and certificate-backed Dynamic Client Registration for new
+registration, modification, and cancellation. JWT client authentication and
+Tiered OAuth remain planned.
 </div>
-
-## Table of contents
-{: .no_toc .text-delta }
-
-1. TOC
-{:toc}
-
----
 
 ## Overview
 
-UDAP (Unified Data Access Profiles) is a security framework for healthcare data exchange defined by the [UDAP Security STU2 / v2.0.0 Implementation Guide](https://hl7.org/fhir/us/udap-security/STU2/index.html). It extends standard OAuth 2.0 with X.509 certificate-based identity, dynamic client registration, and trust community models, designed primarily for backend system-to-system integration and cross-organizational data access.
+UDAP (Unified Data Access Profiles) is a security framework for healthcare data
+exchange defined by the
+[UDAP Security STU2 / v2.0.0 Implementation Guide](https://hl7.org/fhir/us/udap-security/STU2/index.html).
+It adds X.509-based identity, signed metadata, dynamic registration, and trust
+community semantics to OAuth-based workflows.
 
-UDAP is a separate protocol from SMART. In Safire, select it via `protocol: :udap` rather than a `client_type:`.
+Select UDAP independently from SMART client authentication types:
 
 ```ruby
 client = Safire::Client.new(
@@ -40,51 +35,46 @@ client = Safire::Client.new(
 )
 ```
 
-`client_type:` is not applicable to UDAP. Passing one explicitly, or assigning `client.client_type = ...` on a UDAP client, raises `Safire::Errors::ConfigurationError`.
-
----
+`client_type:` is not applicable to UDAP. Passing one explicitly, or assigning
+`client.client_type = ...` on a UDAP client, raises
+`Safire::Errors::ConfigurationError`.
 
 ## Discovery
 
-UDAP server metadata discovery fetches `/.well-known/udap`, validates the `signed_metadata` JWT, and merges the authoritative signed endpoint claims into a `UdapMetadata` object. Results are cached per community and trust policy within a client instance. Cache hits revalidate the cached `signed_metadata` before returning; if the JWT, certificate chain, or revocation policy no longer validates, Safire discards the cached entry and refetches discovery metadata.
+`server_metadata` fetches `/.well-known/udap`, validates the required
+`signed_metadata` JWT, and merges authoritative signed endpoint claims over
+their unsigned JSON counterparts before returning `UdapMetadata`.
 
-### Trust anchors and revocation
+### Server trust and revocation
 
-Per UDAP Security STU2, `signed_metadata` JWT signature, X.509 chain verification, and certificate revocation status checking are performed on every production discovery call. Provide your trust anchors as `OpenSSL::X509::Certificate` objects and either CRLs as `OpenSSL::X509::CRL` objects or a custom `revocation_checker:`:
+Production discovery requires caller-supplied trust anchors plus an explicit
+revocation policy. Use CRLs or a custom checker:
 
 ```ruby
-ca_cert = OpenSSL::X509::Certificate.new(File.read('udap_ca.pem'))
-ca_crl  = OpenSSL::X509::CRL.new(File.read('udap_ca.crl'))
-
-client = Safire::Client.new(
-  { base_url: 'https://fhir.example.com' },
-  protocol: :udap
-)
+ca_cert = OpenSSL::X509::Certificate.new(File.read('udap-ca.pem'))
+ca_crl  = OpenSSL::X509::CRL.new(File.read('udap-ca.crl'))
 
 metadata = client.server_metadata(
   trusted_anchors: [ca_cert],
   crls:            [ca_crl]
 )
-puts metadata.token_endpoint
-puts metadata.udap_versions_supported.inspect
-puts metadata.udap_profiles_supported.inspect
 ```
 
-{: .note }
-> **Development and testing**: Pass `verify_chain: false` to skip X.509 chain and revocation validation when working with self-signed certificates or local servers that do not have a CA-issued UDAP certificate. Never use `verify_chain: false` in production.
->
-> ```ruby
-> metadata = client.server_metadata(verify_chain: false)
-> ```
->
-> Local HTTP loopback servers also require `allow_insecure_localhost: true`
-> in the client configuration. That option permits HTTP only on `localhost`
-> and `127.0.0.1`; it is a Safire development exception, not UDAP production
-> conformance.
+Safire verifies the JWT signature, certificate chain and revocation status,
+issuer/SAN relationship, time claims, `jti`, and signed endpoint claims. Results
+are cached per community and trust policy, but cache hits revalidate the signed
+metadata before reuse. An expired or newly untrusted entry is discarded and
+refetched.
+
+{: .warning }
+> `verify_chain: false` skips X.509 chain and revocation validation. Use it only
+> for development and tests. Local HTTP loopback servers separately require
+> `allow_insecure_localhost: true` in `ClientConfig`; this permits HTTP only on
+> `localhost` and `127.0.0.1` and is not production UDAP conformance.
 
 ### Community-scoped discovery
 
-Many UDAP servers host multiple trust communities at the same base URL, each scoped by a community URI. Pass `community:` to target a specific community:
+Pass a trust-community URI when a server supports multiple communities:
 
 ```ruby
 metadata = client.server_metadata(
@@ -92,89 +82,69 @@ metadata = client.server_metadata(
   trusted_anchors: [ca_cert],
   crls:            [ca_crl]
 )
-puts metadata.token_endpoint
 ```
 
-Results are cached separately per community and trust policy. Calling `server_metadata` with different community, `trusted_anchors`, `crls`, or `revocation_checker` arguments uses a separate cache entry, and each cached entry is revalidated before reuse.
+Different community, trust-anchor, CRL, revocation-checker, or chain-verification
+arguments use separate cache entries.
 
-### Validation helpers
+### Structural and capability helpers
 
-`UdapMetadata#valid?` checks the structure and STU2 value rules in the discovered JSON. It verifies required fields, fixed STU2 values such as `udap_versions_supported == ["1"]`, required profile advertisements, array types, conditional fields, and endpoint URL shape. It logs warnings and returns `false` for non-conformant metadata.
+`UdapMetadata#valid?` checks required fields, exact STU2 fixed values, array and
+string types, conditional fields, subset rules, and endpoint URL shape. It logs
+each violation and returns `false`; it does not repeat cryptographic validation.
 
 ```ruby
-metadata = client.server_metadata(trusted_anchors: [ca_cert], crls: [ca_crl])
-
 unless metadata.valid?
-  # Safire.logger.warn has already logged each conformance violation.
+  # Safire.logger.warn has already recorded each structural violation.
   raise 'UDAP metadata is structurally non-conformant'
 end
 ```
 
-`server_metadata` already validates `signed_metadata` before returning. Use `signed_metadata_valid?` when you need to re-check an existing metadata object against a different trust policy:
+Profile-only helpers inspect raw profile advertisements. Capability helpers add
+the endpoint or grant preconditions Safire can verify locally:
 
-```ruby
-metadata.signed_metadata_valid?(
-  base_url:         'https://fhir.example.com',
-  trusted_anchors: [alternate_ca],
-  crls:            [alternate_crl]
-)
-```
+| Capability helper | Checks |
+|-------------------|--------|
+| `supports_dynamic_registration?` | `udap_dcr` profile plus a valid `registration_endpoint` |
+| `supports_jwt_client_auth?` | `udap_authn` profile plus a valid `token_endpoint` |
+| `supports_client_authorization?` | `udap_authz`, `client_credentials`, and a valid `token_endpoint` |
+| `supports_authorization_code?` | `authorization_code` grant advertisement |
+| `supports_refresh_token?` | `refresh_token` grant advertisement |
+| `supports_tiered_oauth?` | `udap_to` profile advertisement |
+| `supports_signed_metadata?` | Compact-JWS-shaped `signed_metadata` value |
 
-Support helpers expose advertised profiles and usable discovery capabilities.
-Capability helpers combine profile or grant signals with the endpoint
-preconditions Safire can verify during discovery. These describe what the
-server advertises; `register_client` performs its own discovery-bound checks
-before submitting a UDAP registration request.
+The corresponding profile helpers are `dynamic_registration_profile?`,
+`jwt_client_auth_profile?`, `client_authorization_profile?`, and
+`tiered_oauth_profile?`.
 
-| Helper | Checks |
-|--------|--------|
-| `supports_dynamic_registration?` | `udap_dcr` profile and a valid endpoint URL for `registration_endpoint` |
-| `supports_jwt_client_auth?` | `udap_authn` profile and a valid endpoint URL for `token_endpoint` |
-| `supports_client_authorization?` | `udap_authz` profile, `client_credentials` grant, and a valid endpoint URL for `token_endpoint` |
-| `supports_authorization_code?` | `authorization_code` appears in `grant_types_supported` |
-| `supports_refresh_token?` | `refresh_token` appears in `grant_types_supported` |
-| `supports_tiered_oauth?` | `udap_to` profile is advertised |
-| `supports_signed_metadata?` | `signed_metadata` is present in compact-JWS format |
+Use `signed_metadata_valid?(base_url:, ...)` only when explicitly revalidating
+an existing metadata object against another trust policy. Metadata returned by
+`server_metadata` is already cryptographically validated.
 
-```ruby
-metadata.supports_dynamic_registration?
-metadata.supports_jwt_client_auth?
-metadata.supports_client_authorization?
-metadata.supports_authorization_code?
-metadata.supports_refresh_token?
-metadata.supports_tiered_oauth?
-metadata.supports_signed_metadata?
-```
+### Discovery failures
 
-Profile-only helpers check only whether a profile string appears in `udap_profiles_supported`; they do not check endpoints or grant types. Use these when you need to inspect the raw advertisement separately from capability readiness.
-
-```ruby
-metadata.dynamic_registration_profile?
-metadata.jwt_client_auth_profile?
-metadata.client_authorization_profile?
-metadata.tiered_oauth_profile?
-```
-
----
+| Condition | Safire behavior |
+|-----------|-----------------|
+| `404 Not Found` | Raises `DiscoveryError`; clients treat the server as not supporting UDAP workflows |
+| `204 No Content` | Raises `DiscoveryError` before body parsing; no UDAP workflow is available for that community |
+| Invalid `signed_metadata` | Raises `DiscoveryError` after validation warnings |
+| Malformed DER in JOSE `x5c` | Raises `CertificateError` |
+| Invalid `community:` | Raises `ConfigurationError` before HTTP |
+| Connection, TLS, timeout, or blocked redirect failure | Raises `NetworkError` |
 
 ## Dynamic Client Registration
 
-UDAP Dynamic Client Registration is available through the same facade method as
-SMART registration, selected by `protocol: :udap`. Safire discovers and
-validates UDAP metadata, signs your registration metadata into a
-`software_statement`, posts the fixed UDAP request envelope, and returns the
-server's registration response. Use `register_client` for new registration and
-modification, and `cancel_registration` for cancellation.
+UDAP DCR is discovery-bound. Safire validates discovery metadata, signs
+caller-controlled registration metadata into a short-lived X.509-backed
+`software_statement`, and POSTs the fixed UDAP envelope to the authoritative
+signed `registration_endpoint`.
 
 ```ruby
 client = Safire::Client.new(
   {
     base_url: 'https://fhir.example.com',
     private_key: File.read('client-key.pem'),
-    certificate_chain: [
-      File.read('client-cert.pem'),
-      File.read('issuing-ca.pem')
-    ]
+    certificate_chain: [File.read('client-cert.pem')]
   },
   protocol: :udap
 )
@@ -184,98 +154,49 @@ registration = client.register_client(
     client_name: 'Example Backend Service',
     contacts: ['mailto:security@example.com'],
     grant_types: ['client_credentials'],
-    scope: 'system/Patient.rs system/Observation.rs'
+    scope: 'system/Patient.rs'
   },
   client_uri:      'https://client.example.com',
   trusted_anchors: [ca_cert],
   crls:            [ca_crl]
 )
-
-registration['client_id']
 ```
 
-Cancel an existing registration with the same discovery and trust policy:
+Use `register_client` again with the same client URI and community to request a
+modification. Use `cancel_registration` to send a fresh software statement with
+an empty `grant_types` array. Safire accepts cancellation only when a successful
+response contains a non-blank `client_id` and an empty `grant_types` array.
 
-```ruby
-cancellation = client.cancel_registration(
-  {
-    client_name: 'Example Backend Service',
-    contacts: ['mailto:security@example.com'],
-    scope: 'system/Patient.rs system/Observation.rs'
-  },
-  client_uri:      'https://client.example.com',
-  trusted_anchors: [ca_cert],
-  crls:            [ca_crl]
-)
-
-cancellation['grant_types'] # => []
-```
-
-Pass `community:` when registering, modifying, or cancelling within a specific
-UDAP trust community.
-Pass `certifications:` when the community requires third-party certification
-JWTs. Safire shape-checks those JWT strings and sends them to the authorization
-server; it does not create, verify, or interpret certification contents.
+Pass `certifications:` when required by community policy. Certification and
+endorsement JWTs may be signed by the client operator or a third party. Safire
+validates their compact-JWS shape but leaves issuer, signature, claims, and
+policy evaluation to the authorization server.
 
 See [Dynamic Client Registration]({% link udap/dynamic-client-registration/index.md %})
-for metadata rules, software-statement behavior, trust-policy keywords,
-certification handling, and error boundaries.
+for prerequisites and public API usage, [Registration Metadata]({% link udap/dynamic-client-registration/registration-metadata.md %})
+for input rules, [Software Statements]({% link udap/dynamic-client-registration/software-statement.md %})
+for signing behavior, and [Registration Lifecycle]({% link udap/dynamic-client-registration/lifecycle.md %})
+for modification and cancellation semantics.
 
-### Error handling
+## Scope and Protocol Choice
 
-| Condition | Error raised |
-|-----------|-------------|
-| HTTP 404 | `Safire::Errors::DiscoveryError` with `status` set to `404`; per STU2, clients should treat this as "UDAP workflows are not supported" |
-| Other HTTP 4xx/5xx | `Safire::Errors::DiscoveryError` with `status` populated |
-| Server returns HTTP 204 | `Safire::Errors::DiscoveryError` (server signals no UDAP workflows for the requested community) |
-| `signed_metadata` JWT validation fails | `Safire::Errors::DiscoveryError` (invalid signature, chain, revocation status, endpoint claim, or missing required claim) |
-| Malformed DER certificate in `x5c` header | `Safire::Errors::CertificateError` |
-| Connection failure, timeout, SSL error, or redirect to a non-HTTPS URL | `Safire::Errors::NetworkError` |
-| `community:` is not a valid URI string | `Safire::Errors::ConfigurationError` (raised before any HTTP call) |
+Safire does not yet implement UDAP JWT client authentication, token acquisition,
+authorization-code handling, or Tiered OAuth. Those methods continue to raise
+`NotImplementedError` on a UDAP client. Dynamic registration obtains a
+`client_id`, but the later UDAP authentication and authorization flows remain
+separate roadmap work.
 
----
+| Feature | SMART App Launch in Safire | UDAP Security in Safire |
+|---------|----------------------------|--------------------------|
+| Discovery | SMART configuration JSON | Signed UDAP metadata with X.509 trust validation |
+| Dynamic registration | RFC 7591 metadata request | STU2 X.509-backed software statement |
+| Implemented client flows | App Launch and Backend Services | Registration lifecycle only |
+| Client selection | `client_type:` | `protocol: :udap`; no `client_type:` |
+| Trust model | Per-server client registration and registered keys/secrets | Certificate trust communities and signed metadata |
 
-## Planned Features
+Resources:
 
-### Client Flows
-
-- **JWT Client Authentication** — authenticate on every request using a signed JWT assertion (Authentication Token, AnT) with an X.509 certificate chain in the `x5c` header; the registered `client_id` is reused as `iss` and `sub` in each assertion
-- **Tiered OAuth** — delegated authorization for multi-system access per the UDAP Security IG
-- **Pushed Authorization Requests (RFC 9126)** — PAR support for pre-registering authorization requests
-
-### Trust Framework
-
-- **Client certificate trust management for auth flows** — apply trust anchors
-  and community policy to future UDAP client authentication flows; registration
-  server acceptance of the submitted client certificate remains the
-  authorization server's trust decision
-- **Trust Community Support** — integration with UDAP trust communities (e.g. Carequality, CommonWell)
-
----
-
-## Comparison with SMART
-
-| Feature | SMART | UDAP |
-|---------|-------|------|
-| Primary use case | User-facing apps, EHR launch | B2B, backend services, cross-org access |
-| Client registration | Pre-registered per server, optional DCR (recommended) | Dynamic (DCR) or pre-registered |
-| Authentication | Client secrets or `private_key_jwt` | Signed JWT assertions (AnT) with X.509 `x5c` chain |
-| Trust model | Per-server registration | Certificate-based trust communities |
-| Safire selection | `client_type: :public / :confidential_symmetric / :confidential_asymmetric` | `protocol: :udap` |
-
-### When to use UDAP
-
-| Scenario | Why UDAP |
-|----------|----------|
-| **Backend / B2B Integration** | Server-to-server flows without user interaction; certificate-based identity replaces pre-shared secrets |
-| **Dynamic Client Registration** | Clients can register programmatically without manual server-side approval |
-| **Cross-Organization Access** | Trust communities allow clients to be recognized across participant organizations without per-server registration |
-| **High-Assurance Identity** | X.509 certificates provide stronger identity guarantees than client secrets |
-
-### Resources
-
-- [UDAP Security STU2 / v2.0.0 IG](https://hl7.org/fhir/us/udap-security/STU2/index.html) — HL7 Implementation Guide
-- [UDAP JWT Client Auth](https://www.udap.org/udap-jwt-client-auth.html) — JWT assertion specification
-- [UDAP Dynamic Client Registration](https://www.udap.org/udap-dynamic-client-registration.html) — DCR specification
-- [RFC 9126 — Pushed Authorization Requests](https://datatracker.ietf.org/doc/html/rfc9126)
-- [UDAP Tiered OAuth](https://hl7.org/fhir/us/udap-security/STU2/user.html) — Tiered OAuth for User Authentication
+- [UDAP Security STU2 / v2.0.0 IG](https://hl7.org/fhir/us/udap-security/STU2/index.html)
+- [UDAP Dynamic Client Registration STU1](https://www.udap.org/udap-dynamic-client-registration-stu1.html)
+- [UDAP Certifications and Endorsements STU1](https://www.udap.org/udap-certifications-and-endorsements-stu1.html)
+- [Safire roadmap](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md)

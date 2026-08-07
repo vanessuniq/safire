@@ -9,8 +9,8 @@ module Safire
     # Discovery results are cached per community within each instance.
     #
     # Other UDAP flows (B2B client credentials token acquisition, B2C authorization
-    # code, and Tiered OAuth) raise +NotImplementedError+ and are planned for
-    # future PRs.
+    # code, and Tiered OAuth) raise +NotImplementedError+ and remain planned for
+    # future releases.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
     # instantiate it directly — use {Safire::Client} instead.
@@ -105,8 +105,8 @@ module Safire
       # @param client_uri [String] exact URI used as +iss+ and +sub+ and required
       #   to appear as a URI SAN in the leaf certificate
       # @param community [String, nil] optional UDAP community URI for discovery
-      # @param certifications [Array<String>, nil] optional third-party certification
-      #   JWTs; +nil+ omits the field and +[]+ sends an explicit empty collection
+      # @param certifications [Array<String>, nil] optional client-operator or third-party
+      #   certification/endorsement JWTs; +nil+ omits the field and +[]+ sends an explicit empty collection
       # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
       #   for signed metadata validation
       # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation
@@ -166,8 +166,8 @@ module Safire
       # @param client_uri [String] exact URI used as +iss+ and +sub+ and required
       #   to appear as a URI SAN in the leaf certificate
       # @param community [String, nil] optional UDAP community URI for discovery
-      # @param certifications [Array<String>, nil] optional third-party certification
-      #   JWTs; +nil+ omits the field and +[]+ sends an explicit empty collection
+      # @param certifications [Array<String>, nil] optional client-operator or third-party
+      #   certification/endorsement JWTs; +nil+ omits the field and +[]+ sends an explicit empty collection
       # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
       #   for signed metadata validation
       # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation

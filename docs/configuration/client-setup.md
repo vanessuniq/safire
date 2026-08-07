@@ -46,7 +46,13 @@ client = Safire::Client.new(config)
 ```
 
 {: .note }
-> `client_id` is the only authorization parameter validated at call time rather than at construction. `authorization_url`, `request_access_token`, `refresh_token`, and `request_backend_token` each raise `Safire::Errors::ConfigurationError` if `client_id` is absent when called. This means you can build a client without a `client_id` and call `register_client` to obtain one at runtime. See [SMART Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) or [UDAP Dynamic Client Registration]({{ site.baseurl }}/udap/dynamic-client-registration/) for details.
+> `client_id` is intentionally optional at construction. `authorization_url`,
+> `request_access_token`, `refresh_token`, and `request_backend_token` validate
+> it when called. This permits a temporary client to call `register_client` and
+> obtain an identifier first. Other flow-specific credentials and signing
+> requirements may also be validated when the operation that needs them runs.
+> See [SMART Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/)
+> or [UDAP Dynamic Client Registration]({{ site.baseurl }}/udap/dynamic-client-registration/).
 
 ---
 
@@ -198,7 +204,10 @@ For a decision guide on which workflow to use, see [SMART App Launch — Choosin
 
 ## URI Validation
 
-All URI parameters are validated at initialization. Safire raises `Safire::Errors::ConfigurationError` for any violation:
+All URI attributes supplied through `ClientConfig` are validated at
+initialization. Per-call values, such as UDAP registration metadata, are
+validated by the operation-specific value object or protocol flow. Safire
+raises `Safire::Errors::ConfigurationError` for invalid configuration URIs:
 
 - URIs must be well-formed (scheme + host required)
 - URIs must use `https` — required for SMART App Launch and UDAP discovery

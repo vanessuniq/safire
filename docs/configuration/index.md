@@ -50,7 +50,7 @@ flowchart TD
 | `certificate_chain` | Array of PEM strings / OpenSSL::X509::Certificate | No | — | Non-empty, leaf-first, issuer-ordered client certificate chain for UDAP software-statement signing |
 | `kid` | String | No | — | Key ID matching the public key registered with the server |
 | `jwt_algorithm` | String | No | auto | SMART: `RS384` or `ES384`; UDAP registration: `RS256`, `RS384`, `ES256`, or `ES384`, constrained by the key and server metadata |
-| `jwks_uri` | String | No | — | URL to client's public JWKS, included as `jku` in JWT header |
+| `jwks_uri` | String | No | — | SMART-only URL to the client's public JWKS, included as `jku` in SMART JWT assertions |
 | `scopes` | Array | No | — | Default scopes for authorization requests |
 | `authorization_endpoint` | String | No | — | Override the discovered authorization endpoint |
 | `token_endpoint` | String | No | — | Override the discovered token endpoint |

@@ -55,13 +55,15 @@ class Client
   def build_protocol_client
     case @protocol
     when :smart then Protocols::Smart.new(config, client_type:)
-    when :udap  then raise NotImplementedError, 'UDAP protocol client is not yet implemented'
+    when :udap  then Protocols::Udap.new(config)
     end
   end
 end
 ```
 
-`Protocols::Smart` includes `Protocols::Behaviours` to declare the required interface. Future protocol implementations (e.g. `Protocols::Udap`, once it exists) will do the same. Adding a new protocol requires:
+`Protocols::Smart` and `Protocols::Udap` include `Protocols::Behaviours` to
+declare the required interface. Unsupported methods inherit the default
+`NotImplementedError`. Adding another protocol requires:
 1. Implementing the `Behaviours` interface in a new class
 2. Adding a `when` branch to `build_protocol_client` in `Client`
 3. Adding its valid client types to `PROTOCOL_CLIENT_TYPES`
@@ -81,7 +83,10 @@ The original design aimed for "no changes to `Client` itself" when adding a prot
 - Protocol implementations are independently testable
 - `Forwardable` delegation is explicit and greppable
 - The `protocol:` keyword cleanly selects the implementation class without leaking subclass names to callers
-- `client_type=` mutation works naturally — the facade updates `@protocol_client` in place (see [ADR-006]({% link adr/ADR-006-lazy-discovery.md %}) for why this preserves cached discovery)
+- SMART `client_type=` mutation works naturally — the facade updates
+  `@protocol_client` in place (see [ADR-006]({% link adr/ADR-006-lazy-discovery.md %})
+  for why this preserves cached discovery); UDAP rejects `client_type=` because
+  SMART client types are not applicable
 
 **Trade-offs:**
 - `Client` itself has no runtime behaviour — all logic lives in protocol classes; contributors must know to look in `Protocols::Smart` for SMART logic, not in `Client`

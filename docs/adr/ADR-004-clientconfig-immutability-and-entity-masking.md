@@ -42,9 +42,10 @@ causes those values to appear as `'[FILTERED]'` in any hash serialisation.
 
 ```ruby
 def to_hash
-  ATTRIBUTES.each_with_object({}) do |attr, hash|
-    value = send(attr)
-    hash[attr] = sensitive_attributes.include?(attr) ? '[FILTERED]' : value
+  instance_variables.each_with_object({}) do |var, hash|
+    key = var.to_s.delete_prefix('@').to_sym
+    value = instance_variable_get(var)
+    hash[key] = sensitive_attributes.include?(key) && !value.nil? ? '[FILTERED]' : value
   end
 end
 ```
@@ -72,7 +73,8 @@ builder. The leaf-first ordering follows the
 - The order and PEM contents of a configured certificate-chain collection
   cannot be changed through the original input array or strings
 - Credentials cannot leak through `inspect`, `to_s`, exception trackers, or log output
-- Validation at construction means invalid configs are caught early, before any network calls
+- Configuration shape and URI validation run at construction; flow-specific
+  credential and signing checks run when the operation uses them
 - The `sensitive_attributes` hook is extensible — subclasses can add fields without modifying `Entity`
 
 **Trade-offs:**

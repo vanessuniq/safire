@@ -39,10 +39,12 @@ the single-responsibility principle and keeps the entity layer free of crypto de
 
 ### Warn-and-return-nil per failure; raise only on unrecoverable parse errors
 
-Each validation step logs a warning via `Safire.logger.warn` and returns `nil` on failure rather
-than raising. This surfaces every applicable warning in a single call. The only exception is a
-malformed DER certificate in `x5c`, which raises `Safire::Errors::CertificateError` because the
-input cannot be interpreted at all, making further validation impossible.
+Validation failures log a warning through `Safire.logger.warn` and return `nil`
+rather than raising. Decode, header, signature, and chain failures stop checks
+that depend on them; once a payload is trusted enough to inspect, claim checks
+run together so one call surfaces every applicable claim warning. The only
+exception is malformed certificate DER in `x5c`, which raises
+`Safire::Errors::CertificateError` because the certificate cannot be parsed.
 
 ### Chain and revocation verification on by default; `verify_chain: false` for dev/test only
 

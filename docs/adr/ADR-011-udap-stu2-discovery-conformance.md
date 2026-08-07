@@ -41,7 +41,8 @@ for `valid?`.
 **Signed metadata:** STU2 uses `signed_metadata` (not the deprecated `signed_endpoints` from
 earlier drafts). `signed_metadata` is treated as a required field by `UdapMetadata#valid?` and
 as an opaque string. Cryptographic validation of the JWT is intentionally deferred to a
-dedicated cryptographic validator; see [ADR-012](ADR-012-udap-signed-metadata-validation.md).
+dedicated cryptographic validator; see
+[ADR-012]({% link adr/ADR-012-udap-signed-metadata-validation.md %}).
 
 **Presence check uses `nil?`, not `blank?`:** Several required array fields — for example,
 `udap_authorization_extensions_supported` — may legitimately be empty arrays in a conformant
@@ -103,7 +104,7 @@ semantics.
 - `valid?` follows the same warn-and-return-false contract as `SmartMetadata#valid?`, giving
   callers a consistent API across protocols
 - `signed_metadata` cryptographic validation stays separate from the entity; see
-  [ADR-012](ADR-012-udap-signed-metadata-validation.md)
+  [ADR-012]({% link adr/ADR-012-udap-signed-metadata-validation.md %})
 
 **Trade-offs:**
 

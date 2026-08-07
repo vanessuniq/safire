@@ -83,7 +83,8 @@ def server_metadata(community: nil, trusted_anchors: [], crls: [], revocation_ch
     trusted_anchors:,
     crls:,
     revocation_checker:,
-    verify_chain:
+    verify_chain:,
+    allow_insecure_localhost: @allow_insecure_localhost
   }
   cache_key = build_cache_key(community, trusted_anchors, crls, revocation_checker, verify_chain)
   cached_entry = @metadata_cache[cache_key]
@@ -111,7 +112,10 @@ def fetch_metadata(community:, trust_policy:)
     trust_policy:
   )
   {
-    metadata: UdapMetadata.new(raw.merge(signed_claims)),
+    metadata: UdapMetadata.new(
+      raw.merge(signed_claims),
+      allow_insecure_localhost: @allow_insecure_localhost
+    ),
     raw:
   }
 end
@@ -127,7 +131,8 @@ A 204 response means the server has no UDAP workflows for that community. `Proto
 
 **Benefits:**
 - `Safire::Client.new` is instantaneous — no network calls, no stubs required at construction time
-- Configuration errors are raised before any HTTP call
+- Construction-time configuration errors are raised before HTTP; requirements
+  specific to an operation are validated when that operation runs
 - Callers control when discovery happens — supports application-level caching patterns (see [Advanced Examples]({{ site.baseurl }}/advanced/#metadata-caching))
 - `client_type=` mutation preserves cached SMART metadata — no re-discovery
 - UDAP community-and-trust-policy cache allows a single client instance to serve multiple communities without serving stale signed metadata

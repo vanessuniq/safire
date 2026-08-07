@@ -31,7 +31,13 @@ Safire::Client.new(config, protocol: :smart, client_type: :confidential_symmetri
 Safire::Client.new(config, protocol: :udap)  # client_type not applicable
 ```
 
-The key structural difference: SMART has three client authentication methods; UDAP has none — UDAP always authenticates via signed JWT assertions (AnT) with an X.509 certificate chain, and this is not user-configurable. Mixing them into one flat enum would create invalid combinations (`:udap_public`, `:udap_confidential_symmetric`) and make `client_type=` mutation impossible to express cleanly.
+The key structural difference: SMART has three client authentication methods,
+while UDAP does not expose SMART-style client types. The UDAP specification
+defines X.509-backed signed JWT assertions (AnT), although those authentication
+flows are not yet implemented by Safire. Mixing the dimensions into one flat
+enum would create invalid combinations (`:udap_public`,
+`:udap_confidential_symmetric`) and make `client_type=` mutation impossible to
+express cleanly.
 
 ---
 
@@ -44,7 +50,7 @@ VALID_PROTOCOLS = %i[smart udap].freeze
 
 PROTOCOL_CLIENT_TYPES = {
   smart: %i[public confidential_symmetric confidential_asymmetric],
-  udap:  nil   # not user-configurable; AnT with x5c always used
+  udap:  nil   # SMART client type is not applicable
 }.freeze
 ```
 
@@ -57,7 +63,8 @@ PROTOCOL_CLIENT_TYPES = {
 ## Consequences
 
 **Benefits:**
-- No invalid combinations — UDAP has no client type choices at all; this is enforced at the type level, not with runtime checks
+- No invalid combinations — the facade rejects every explicit UDAP
+  `client_type:` value at construction and assignment
 - `client_type=` mutation is clean and natural for the "discover first, then select client type" pattern
 - Adding a new SMART client type requires only adding a symbol to `PROTOCOL_CLIENT_TYPES[:smart]`
 - Adding a new protocol requires adding an entry to `PROTOCOL_CLIENT_TYPES` and a branch to `build_protocol_client` (see [ADR-002]({% link adr/ADR-002-facade-and-forwardable.md %}))

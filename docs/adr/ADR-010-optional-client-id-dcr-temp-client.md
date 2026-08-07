@@ -44,7 +44,9 @@ client = Safire::Client.new({
 })
 ```
 
-Flow methods that require `client_id` (`authorization_url`, `request_access_token`, `request_backend_token`) validate its presence at call time and raise `ConfigurationError` if absent.
+Flow methods that require `client_id` (`authorization_url`,
+`request_access_token`, `refresh_token`, and `request_backend_token`) validate
+its presence at call time and raise `ConfigurationError` if absent.
 
 ### 2026-07-04 amendment: UDAP certificate-backed temp clients
 

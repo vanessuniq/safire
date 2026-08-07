@@ -27,7 +27,7 @@ security boundary and can hide production misconfiguration.
 
 ## Decision
 
-For SMART configuration and HTTP redirects, HTTPS is enforced at **two layers**.
+For client configuration and HTTP redirects, HTTPS is enforced at **two layers**.
 Both layers use the same explicit local-development opt-in:
 
 **Layer 1 — `ClientConfig` URI validation:** all URI attributes (`base_url`, `redirect_uri`, `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`) must use `https://`, except when `allow_insecure_localhost: true` is configured and the host is `localhost` or `127.0.0.1`.

@@ -35,14 +35,19 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   signed endpoint claim precedence
 - **Protocol-Aware Client Facade** — `Safire::Client.new(..., protocol: :udap)`
   exposes UDAP discovery while rejecting SMART-only `client_type:` values
-- **Demo Workflow** — Sinatra demo supports protocol-aware server setup and a
-  UDAP Discovery screen with signed metadata trust status
 - **UDAP Dynamic Client Registration** — certificate-backed STU2 new
   registration, modification, and cancellation via signed software statements;
   includes metadata validation, signed endpoint precedence, community-scoped
   discovery, certification envelope handling, RFC 7591-shaped registration
   response parsing, and cancellation confirmation through an empty
   `grant_types` response
+
+### Demo Application
+
+- **Protocol-Aware Workflows** — Sinatra demo supports protocol-aware server
+  setup, SMART discovery, registration, authorization, and token workflows,
+  plus UDAP signed metadata discovery and the registration/cancellation
+  lifecycle
 
 ---
 

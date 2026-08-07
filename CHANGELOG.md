@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to the packaged Safire gem will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -12,32 +12,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Safire::Client#register_client` and `Safire::Client#cancel_registration` now
   support the UDAP Security STU2 Dynamic Client Registration lifecycle when
   initialized with `protocol: :udap`. Safire performs discovery-bound
-  registration, validates `signed_metadata`, checks `UdapMetadata#valid?`, signs
-  a fresh X.509-backed `software_statement`, posts the fixed UDAP envelope with
-  optional `certifications`, accepts new-registration `201` and update-style
-  `200` registration responses with a valid `client_id`, confirms cancellation
-  responses through an empty `grant_types` array, and preserves UDAP
-  registration error codes such as `invalid_software_statement` and
-  `unapproved_software_statement`.
+  registration against authoritative signed endpoints, checks structural DCR
+  capability, posts the fixed UDAP envelope with optional certification or
+  endorsement JWTs, accepts new-registration `201` and update-style `200`
+  responses with a valid `client_id`, and confirms cancellation through a
+  successful response containing a valid `client_id` and an empty `grant_types`
+  array. OAuth-style failures preserve UDAP error codes such as
+  `invalid_software_statement` and `unapproved_software_statement`.
 - `Safire::Protocols::UdapRegistrationMetadata` validates and normalizes
   caller-controlled UDAP Security STU2 registration and cancellation metadata
   before software-statement signing. It enforces exact grant shapes, HTTPS
   redirect and logo URIs, required `mailto:` contact data, protocol-owned
   fields, JSON-compatible extensions, and immutable canonical output. An
   explicit `allow_insecure_localhost: true` option permits development-only
-  HTTP loopback URIs without allowing remote HTTP.
-- Safire can construct UDAP Security STU2 X.509-backed software statements for
-  Dynamic Client Registration. The signing foundation produces compact JWS
-  values with minimal `alg`/`x5c` headers, exact `iss`/`sub`/`aud` claims, a
-  five-minute lifetime, fresh `jti`, RSA/EC algorithm negotiation constrained
-  by discovery and key type, and local certificate/key/SAN consistency checks.
-  The UDAP registration protocol flow now uses this signing foundation internally.
-- `Safire::ClientConfig` accepts a leaf-first, issuer-ordered
-  `certificate_chain` of PEM strings or `OpenSSL::X509::Certificate` instances
-  as the client signing identity foundation for UDAP Dynamic Client
-  Registration. Configured chains must be non-empty; certificate objects are
-  stored as DER snapshots, and the chain is masked alongside private keys and
-  client secrets in configuration output.
+  HTTP loopback URIs without allowing remote HTTP. Registration software
+  statements use minimal `alg`/`x5c` headers, exact `iss`/`sub`/`aud` claims, a
+  five-minute lifetime, fresh `jti`, key-compatible algorithm negotiation, and
+  local certificate/key/SAN checks. `ClientConfig` accepts and masks the
+  non-empty, leaf-first `certificate_chain` of PEM strings or
+  `OpenSSL::X509::Certificate` instances required for UDAP registration.
 - UDAP Security STU2 discovery is now available with
   `Safire::Client.new(..., protocol: :udap).server_metadata`. Safire fetches
   `/.well-known/udap`, supports community-scoped discovery via `community:`, accepts
@@ -58,34 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validates.
 - `UdapMetadata#signed_metadata_valid?` allows explicit cryptographic re-validation
   against caller-provided trust anchors and revocation material.
-- The Sinatra demo includes a protocol-aware UDAP Discovery workflow with
-  community-scoped discovery, signed metadata validation status, and configurable
-  UDAP trust material.
-- The Sinatra demo now separates UDAP server trust policy from UDAP client
-  signing credential configuration, documents the signing environment variables
-  used by UDAP registration workflows, stores SMART and UDAP client
-  identifiers separately, and opts local SMART demo callbacks into Safire's
-  loopback-only HTTP development policy.
-- The Sinatra demo includes a UDAP Dynamic Client Registration lifecycle screen
-  with prepopulated client metadata, certificate-backed software-statement
-  signing, community and certification inputs, opt-in grant-matched
-  certification JWT file loading, filtered registration results, manual
-  `udap_client_id` entry for externally registered clients, persistence of the
-  UDAP client URI and community needed for cancellation, duplicate registration
-  prevention, CSRF-protected lifecycle actions, cancellation confirmation,
-  home-page entry points for unregistered UDAP servers, and a development-only
-  HTTP loopback policy aligned with SMART demo registration.
-- The Sinatra demo HTML-escapes SMART metadata and token responses and redacts
-  signing material, client secrets, token fields, unknown response fields, and
-  structurally unexpected values from displayed UDAP registration and
-  cancellation responses.
-- `bin/demo` now prepares the ignored Sinatra demo `.env` file before boot,
-  filling absent local-only session secrets, SMART asymmetric demo credentials,
-  UDAP client signing credentials, and grant-specific sample self-signed
-  certification JWTs while preserving existing nonblank values. Generated
-  certifications are submitted only when explicitly selected in the demo, and
-  legacy, expired, malformed, or signing-key-mismatched managed samples are
-  regenerated without replacing caller-managed custom files.
 - `Safire::Errors::DiscoveryError` accepts a `label:` keyword argument (default:
   `'SMART configuration'`) and exposes it as a readable attribute so callers can
   identify which protocol's discovery failed.

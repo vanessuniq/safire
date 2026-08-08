@@ -53,9 +53,23 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 ## Planned Features
 
-### UDAP Security
+### v0.5.0 — UDAP JWT Client Authentication and B2B Authorization
 
-- **UDAP JWT Client Auth** — B2B and consumer-facing authorization flows
+- **UDAP Authentication Tokens** — certificate-backed JWT client authentication
+  for token endpoint requests, using authoritative signed discovery metadata
+- **B2B Client Credentials** — headless system-to-system authorization with the
+  STU2 `hl7-b2b` authorization extension and discovery-constrained scopes,
+  signing algorithms, and extension support
+
+### v0.6.0 — UDAP Authorization Code Flows
+
+- **Consumer-Facing Authorization** — UDAP authorization code flow with state,
+  PKCE, Authentication Tokens, code exchange, and refresh support
+- **Interactive B2B Authorization** — authorization code flow for B2B clients,
+  including local-user authorization and UDAP client authentication
+
+### v0.7.0 — UDAP Tiered OAuth
+
 - **Tiered OAuth** — identity chaining for multi-system access
 
 ### Quality and Compliance
@@ -99,5 +113,5 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 | ActiveSupport | ≥ 7.1, < 9 |
 | Rails (optional) | ≥ 7.1 |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 2.0.0 (STU2 discovery and Dynamic Client Registration lifecycle implemented; auth flows planned) |
+| UDAP Security | 2.0.0 (STU2 discovery and Dynamic Client Registration lifecycle implemented; JWT client authentication and authorization flows planned) |
 | FHIR | R4, R4B |

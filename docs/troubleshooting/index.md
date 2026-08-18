@@ -61,7 +61,13 @@ end
 
 ### SMART discovery
 
-SMART clients fetch `/.well-known/smart-configuration` lazily when metadata or an auth flow needs it. A `DiscoveryError` means the SMART metadata endpoint returned an HTTP error, did not return a JSON object, or a token request needed discovery but the response did not include `token_endpoint`.
+SMART clients fetch `/.well-known/smart-configuration` lazily when metadata or an auth flow needs it. A `DiscoveryError` means the SMART metadata endpoint returned an HTTP error, did not provide a usable JSON object, or a token request needed discovery but the response did not include `token_endpoint`.
+
+Discovery parses valid raw JSON-object strings even when an incorrect or missing
+response content type prevents Faraday from decoding the body. That tolerance
+does not make the server response conformant. Malformed JSON, JSON arrays or
+scalars, and adapter-provided Hashes with ambiguous normalized keys, cycles, or
+non-JSON-compatible values are treated as unusable JSON-object responses.
 
 ```ruby
 begin

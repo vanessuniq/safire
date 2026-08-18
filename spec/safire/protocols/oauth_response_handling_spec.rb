@@ -79,12 +79,34 @@ RSpec.describe Safire::Protocols::OAuthResponseHandling do
 
     it 'rejects a non-object JSON value' do
       expect { handler.parse_registration(%w[not an object]) }
-        .to raise_error(Safire::Errors::RegistrationError, /not a JSON object/)
+        .to raise_error(Safire::Errors::RegistrationError, /not a usable JSON object/)
     end
 
     it 'rejects a malformed JSON body that was not parsed by middleware' do
       expect { handler.parse_registration('{not-json') }
-        .to raise_error(Safire::Errors::RegistrationError, /not a JSON object/)
+        .to raise_error(Safire::Errors::RegistrationError, /not a usable JSON object/)
+    end
+
+    it 'rejects normalized-key collisions instead of selecting a client_id value' do
+      body = { 'client_id' => 'string-client', client_id: 'symbol-client' }
+
+      expect { handler.parse_registration(body) }
+        .to raise_error(Safire::Errors::RegistrationError, /not a usable JSON object/)
+    end
+
+    it 'rejects recursive adapter-supplied Hash bodies without leaking a Ruby exception' do
+      body = { 'client_id' => 'client-123' }
+      body['metadata'] = body
+
+      expect { handler.parse_registration(body) }
+        .to raise_error(Safire::Errors::RegistrationError, /not a usable JSON object/)
+    end
+
+    it 'rejects non-JSON-compatible adapter-supplied values' do
+      body = { 'client_id' => 'client-123', 'generated_at' => Time.now }
+
+      expect { handler.parse_registration(body) }
+        .to raise_error(Safire::Errors::RegistrationError, /not a usable JSON object/)
     end
   end
 
@@ -179,6 +201,47 @@ RSpec.describe Safire::Protocols::OAuthResponseHandling do
       faraday_error = instance_double(
         Faraday::Error,
         response: { status: 400, body: ['invalid_request'] }
+      )
+
+      error = handler.build_oauth_error(faraday_error, Safire::Errors::RegistrationError)
+
+      expect(error.status).to eq(400)
+      expect(error.error_code).to be_nil
+      expect(error.error_description).to be_nil
+    end
+
+    it 'returns a status-only error for a normalized-key collision' do
+      faraday_error = instance_double(
+        Faraday::Error,
+        response: {
+          status: 400,
+          body: { 'error' => 'string-error', error: 'symbol-error' }
+        }
+      )
+
+      error = handler.build_oauth_error(faraday_error, Safire::Errors::RegistrationError)
+
+      expect(error.status).to eq(400)
+      expect(error.error_code).to be_nil
+      expect(error.error_description).to be_nil
+    end
+
+    it 'returns a status-only error for a recursive adapter-supplied Hash body' do
+      body = { 'error' => 'invalid_request' }
+      body['details'] = body
+      faraday_error = instance_double(Faraday::Error, response: { status: 400, body: })
+
+      error = handler.build_oauth_error(faraday_error, Safire::Errors::RegistrationError)
+
+      expect(error.status).to eq(400)
+      expect(error.error_code).to be_nil
+      expect(error.error_description).to be_nil
+    end
+
+    it 'returns a status-only error for non-JSON-compatible adapter values' do
+      faraday_error = instance_double(
+        Faraday::Error,
+        response: { status: 400, body: { 'error' => 'invalid_request', 'generated_at' => Time.now } }
       )
 
       error = handler.build_oauth_error(faraday_error, Safire::Errors::RegistrationError)

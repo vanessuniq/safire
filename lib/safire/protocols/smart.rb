@@ -344,11 +344,12 @@ module Safire
       end
 
       def parse_discovery_body(body)
-        return body if body.is_a?(Hash)
+        parsed = JSONResponseParsing.parse_object(body)
+        return parsed if parsed
 
         raise Errors::DiscoveryError.new(
           endpoint: well_known_endpoint,
-          error_description: 'response is not a JSON object'
+          error_description: 'response is not a usable JSON object'
         )
       end
 

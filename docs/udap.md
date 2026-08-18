@@ -45,6 +45,12 @@ client = Safire::Client.new(
 `signed_metadata` JWT, and merges authoritative signed endpoint claims over
 their unsigned JSON counterparts before returning `UdapMetadata`.
 
+Discovery accepts an already parsed Hash or a raw JSON-object body. A valid raw
+object remains usable when an incorrect or missing response content type causes
+Faraday to leave it as a String, although the server response is still
+non-conformant at the HTTP layer. Malformed JSON and valid non-object JSON raise
+`DiscoveryError` before signed-metadata validation.
+
 ### Server trust and revocation
 
 Production discovery requires caller-supplied trust anchors plus an explicit
@@ -127,6 +133,7 @@ an existing metadata object against another trust policy. Metadata returned by
 |-----------|-----------------|
 | `404 Not Found` | Raises `DiscoveryError`; clients treat the server as not supporting UDAP workflows |
 | `204 No Content` | Raises `DiscoveryError` before body parsing; no UDAP workflow is available for that community |
+| Malformed or non-object JSON | Raises `DiscoveryError` before signed-metadata validation |
 | Invalid `signed_metadata` | Raises `DiscoveryError` after validation warnings |
 | Malformed DER in JOSE `x5c` | Raises `CertificateError` |
 | Invalid `community:` | Raises `ConfigurationError` before HTTP |

@@ -58,6 +58,41 @@ RSpec.describe Safire::Protocols::Udap do
       instance_double(Safire::Protocols::UdapSignedMetadataValidator, signed_endpoint_claims: signed_claims)
     end
 
+    it 'parses a raw JSON object when the response content type is incorrect' do
+      stub_udap(content_type: 'text/plain')
+      allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(validator_double)
+
+      expect(udap.server_metadata.token_endpoint).to eq(valid_metadata['token_endpoint'])
+    end
+
+    it 'raises DiscoveryError for an ambiguous adapter-supplied Hash' do
+      response_body = valid_metadata.merge(token_endpoint: 'https://other.example.com/token')
+      response = instance_double(Faraday::Response, status: 200, body: response_body)
+      allow(udap.instance_variable_get(:@http_client)).to receive(:get).and_return(response)
+
+      expect { udap.server_metadata }
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a usable JSON object/)
+    end
+
+    it 'raises DiscoveryError for a recursive adapter-supplied Hash' do
+      response_body = valid_metadata.dup
+      response_body['metadata'] = response_body
+      response = instance_double(Faraday::Response, status: 200, body: response_body)
+      allow(udap.instance_variable_get(:@http_client)).to receive(:get).and_return(response)
+
+      expect { udap.server_metadata }
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a usable JSON object/)
+    end
+
+    it 'raises DiscoveryError for non-JSON-compatible adapter values' do
+      response_body = valid_metadata.merge('generated_at' => Time.now)
+      response = instance_double(Faraday::Response, status: 200, body: response_body)
+      allow(udap.instance_variable_get(:@http_client)).to receive(:get).and_return(response)
+
+      expect { udap.server_metadata }
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a usable JSON object/)
+    end
+
     it 'passes the insecure-localhost policy to the HTTP client' do
       allow(Safire::HTTPClient).to receive(:new).and_call_original
 
@@ -327,7 +362,8 @@ RSpec.describe Safire::Protocols::Udap do
       end
 
       it 'raises DiscoveryError' do
-        expect { udap.server_metadata }.to raise_error(Safire::Errors::DiscoveryError, /not a JSON object/)
+        expect { udap.server_metadata }
+          .to raise_error(Safire::Errors::DiscoveryError, /not a usable JSON object/)
       end
     end
 

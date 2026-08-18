@@ -44,6 +44,12 @@ metadata = client.server_metadata
 
 `server_metadata` returns a `Safire::Protocols::SmartMetadata` object with typed accessors for all fields. See [Metadata Fields and Validation]({% link smart-on-fhir/discovery/metadata.md %}) for the full field reference and validation rules.
 
+Safire accepts either an already parsed Hash or a raw JSON-object body. This
+keeps discovery usable when a server sends valid JSON with an incorrect or
+missing content type and Faraday therefore leaves the body as a String. The
+server response is still non-conformant at the HTTP layer. Malformed JSON and
+valid JSON arrays, scalars, booleans, or `null` raise `DiscoveryError`.
+
 ---
 
 ## Error Handling
@@ -57,7 +63,7 @@ rescue Safire::Errors::DiscoveryError => e
     puts 'FHIR server does not support SMART App Launch'
   when /timeout/i
     puts 'Discovery request timed out'
-  when /expected JSON object/
+  when /not a usable JSON object/
     puts 'Server returned invalid SMART configuration'
   else
     puts "Discovery failed: #{e.message}"

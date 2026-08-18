@@ -60,7 +60,7 @@ config = Safire::ClientConfig.new(
 ### `DiscoveryError`: Invalid SMART configuration format
 
 ```
-Safire::Errors::DiscoveryError: ... response is not a JSON object
+Safire::Errors::DiscoveryError: ... response is not a usable JSON object
 ```
 
 The server returned an HTML error page, a JSON array, or malformed JSON. Inspect the raw response:
@@ -69,7 +69,14 @@ The server returned an HTML error page, a JSON array, or malformed JSON. Inspect
 curl https://fhir.example.com/.well-known/smart-configuration
 ```
 
-The response must be a JSON object (`{...}`) with at least `authorization_endpoint` and `token_endpoint`.
+The response body must be a JSON object (`{...}`). Safire can parse a valid raw
+JSON-object string when an incorrect or missing response content type leaves it
+undecoded, but that HTTP response is still non-conformant.
+
+Missing metadata fields are handled separately from body parsing.
+`server_metadata` returns a `SmartMetadata` object, and `metadata.valid?` is the
+explicit structural diagnostic. An authorization or token operation raises only
+when an endpoint or capability required by that operation is unavailable.
 
 ---
 

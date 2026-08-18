@@ -98,7 +98,9 @@ The module accepts already-received response bodies. It does not send HTTP
 requests, select endpoints, log response values, or apply protocol-specific
 policy.
 
-Registration success responses are normalized to string-keyed hashes and must
+Registration success responses delegate JSON-object parsing to the private,
+protocol-neutral `JSONResponseParsing` collaborator. Raw JSON strings and
+already parsed Hashes are normalized to new, deeply string-keyed hashes and must
 contain a non-blank string `client_id`, as required by RFC 7591. Missing
 `client_id` responses continue to report only the received field names. A
 present but blank or non-string `client_id` raises `RegistrationError` with a
@@ -106,9 +108,14 @@ structural error description. This intentionally hardens SMART registration:
 valid RFC 7591 responses are unchanged, while malformed identifiers that were
 previously accepted through `present?` now fail closed.
 
-Malformed or non-object OAuth error bodies produce an error containing the HTTP
-status only. Parsed JSON objects preserve their protocol error codes, including
-UDAP-specific values such as `invalid_software_statement`.
+Malformed, non-object, ambiguous, or non-JSON-compatible OAuth error bodies
+produce an error containing the HTTP status only. Parsed JSON objects preserve
+their protocol error codes, including UDAP-specific values such as
+`invalid_software_statement`. Symbol/string key collisions and the other Ruby
+structure guards apply only to adapter-supplied or directly passed Hashes;
+`JSON.parse` and Faraday's JSON middleware produce string-keyed Hashes. The
+guards prevent local normalization from silently overwriting ambiguous values,
+not collisions in JSON received on the wire.
 
 ### Amendment consequences
 
@@ -118,6 +125,8 @@ UDAP-specific values such as `invalid_software_statement`.
   construction or endpoint policy
 - response key normalization makes direct and middleware-parsed hashes behave
   consistently
+- strict adapter-Hash validation makes response translation total for cyclic or
+  non-JSON-compatible Ruby values
 - malformed successful registrations fail before an invalid identifier reaches
   application state
 

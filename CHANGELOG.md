@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- SMART and UDAP discovery now accept valid raw JSON-object response bodies even
+  when incorrect or missing response content types leave them undecoded by the
+  HTTP adapter. Malformed and non-object JSON continue to raise protocol-specific
+  `DiscoveryError` failures.
+- Shared discovery, registration, and OAuth error parsing now rejects ambiguous
+  symbol/string key collisions, recursive structures, and non-JSON-compatible
+  adapter-provided Hash values instead of risking silent normalization or
+  unexpected type errors. Valid response behavior is unchanged.
+
 ## [0.4.0] - 2026-08-07
 
 ### Added

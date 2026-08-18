@@ -125,6 +125,15 @@ end
 
 A 204 response means the server has no UDAP workflows for that community. `Protocols::Udap` raises `DiscoveryError` before the body is parsed, with a descriptive message that identifies the community when one was requested.
 
+SMART and UDAP discovery both require a JSON object but do not depend on the
+HTTP adapter having already decoded it. A shared protocol-neutral parser accepts
+an already parsed Hash or a raw JSON-object string, then deeply normalizes keys
+without mutating adapter-owned data. This allows Safire to interoperate when a
+server sends valid JSON with an incorrect or missing content type; the response
+is still non-conformant at the HTTP layer. Malformed JSON, non-object JSON, and
+ambiguous or non-JSON-compatible adapter Hashes raise the protocol's existing
+`DiscoveryError`.
+
 ---
 
 ## Consequences
@@ -136,6 +145,8 @@ A 204 response means the server has no UDAP workflows for that community. `Proto
 - Callers control when discovery happens — supports application-level caching patterns (see [Advanced Examples]({{ site.baseurl }}/advanced/#metadata-caching))
 - `client_type=` mutation preserves cached SMART metadata — no re-discovery
 - UDAP community-and-trust-policy cache allows a single client instance to serve multiple communities without serving stale signed metadata
+- Discovery parsing is independent of response content-type middleware while
+  still failing closed on unusable object data
 
 **Trade-offs:**
 - Discovery errors surface at first use (e.g. `authorization_url`), not at construction — callers must handle `Errors::DiscoveryError` in their flow logic rather than at the `new` call site

@@ -31,6 +31,12 @@ Option B lets the caller decide what to do: they can check the return value, obs
 
 There is also a clear boundary: **the caller controls the config** (configuration errors should raise — the caller can fix them); **the server controls the response** (compliance violations should warn — the caller cannot fix a remote server).
 
+This caller/server distinction is a useful default, but it is not sufficient
+for security-sensitive runtime decisions. ADR-015 refines the boundary: remote
+data raises when its defect makes the requested client operation unsafe,
+impossible, or unconfirmed. Complete structural conformance remains an explicit
+warn-and-return-false diagnostic when the operation does not depend on it.
+
 ---
 
 ## Decision
@@ -71,5 +77,5 @@ Configuration validation (`ClientConfig#validate!`, `Smart#validate!`) raises `C
 
 **Trade-offs:**
 - Callers who do not call `token_response_valid?` get no compliance signal at all — non-compliant responses are silently accepted; this is intentional (opt-in, not opt-out)
-- The distinction between "warn + return false" and "raise" must be maintained consistently — new validation methods should follow the same rule: server behaviour → warn; caller configuration → raise
+- The distinction between "warn + return false" and "raise" must be maintained consistently. New validation methods follow ADR-015: explicit conformance diagnostics warn, while client obligations and security or operation-readiness failures raise.
 - `token_response_valid?` accepts a `flow:` keyword argument (`:app_launch` default, `:backend_services`) that adjusts which fields are required and what the warning messages say. For example, `token_type` must be `"Bearer"` (App Launch spec) or `"bearer"` (Backend Services spec), and `expires_in` is RECOMMENDED for App Launch but REQUIRED for Backend Services. Callers opt in to the stricter backend-services validation by passing `flow: :backend_services`

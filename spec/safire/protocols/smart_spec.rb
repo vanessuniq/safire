@@ -246,6 +246,17 @@ RSpec.describe Safire::Protocols::Smart do
       expect(metadata.capabilities).to eq(smart_metadata_body['capabilities'])
     end
 
+    it 'parses a raw JSON object when the response content type is incorrect' do
+      stub_request(:get, well_known_url).to_return(
+        status: 200,
+        body: smart_metadata_body.to_json,
+        headers: { 'Content-Type' => 'text/plain' }
+      )
+
+      expect(described_class.new(config).server_metadata.token_endpoint)
+        .to eq(smart_metadata_body['token_endpoint'])
+    end
+
     it 'raises on 404' do
       stub_request(:get, well_known_url).to_return(status: 404)
       expect { described_class.new(config).server_metadata }
@@ -263,7 +274,38 @@ RSpec.describe Safire::Protocols::Smart do
         status: 200, body: '[]', headers: { 'Content-Type' => 'application/json' }
       )
       expect { described_class.new(config).server_metadata }
-        .to raise_error(Safire::Errors::DiscoveryError, /response is not a JSON object/)
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a usable JSON object/)
+    end
+
+    it 'raises DiscoveryError for an ambiguous adapter-supplied Hash' do
+      smart = described_class.new(config)
+      response_body = smart_metadata_body.merge(token_endpoint: 'https://other.example.com/token')
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(smart.instance_variable_get(:@http_client)).to receive(:get).and_return(response)
+
+      expect { smart.server_metadata }
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a usable JSON object/)
+    end
+
+    it 'raises DiscoveryError for a recursive adapter-supplied Hash' do
+      smart = described_class.new(config)
+      response_body = smart_metadata_body.dup
+      response_body['metadata'] = response_body
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(smart.instance_variable_get(:@http_client)).to receive(:get).and_return(response)
+
+      expect { smart.server_metadata }
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a usable JSON object/)
+    end
+
+    it 'raises DiscoveryError for non-JSON-compatible adapter values' do
+      smart = described_class.new(config)
+      response_body = smart_metadata_body.merge('generated_at' => Time.now)
+      response = instance_double(Faraday::Response, body: response_body)
+      allow(smart.instance_variable_get(:@http_client)).to receive(:get).and_return(response)
+
+      expect { smart.server_metadata }
+        .to raise_error(Safire::Errors::DiscoveryError, /response is not a usable JSON object/)
     end
 
     it 'handles base_url with or without trailing slash' do

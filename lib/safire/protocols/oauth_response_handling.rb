@@ -23,7 +23,7 @@ module Safire
 
       def parse_registration_response(body)
         response = json_object(body)
-        raise Errors::RegistrationError.new(error_description: 'response is not a JSON object') unless response
+        raise Errors::RegistrationError.new(error_description: 'response is not a usable JSON object') unless response
 
         client_id = response['client_id']
         return response if client_id.is_a?(String) && client_id.present?
@@ -38,10 +38,7 @@ module Safire
       end
 
       def json_object(body)
-        parsed = body.is_a?(String) ? JSON.parse(body) : body
-        parsed.deep_stringify_keys if parsed.is_a?(Hash)
-      rescue JSON::ParserError
-        nil
+        JSONResponseParsing.parse_object(body)
       end
     end
   end

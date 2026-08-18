@@ -62,7 +62,7 @@ module Safire
       # @param verify_chain [Boolean] when +false+, skips X.509 chain validation (dev/test only)
       # @return [Safire::Protocols::UdapMetadata] parsed UDAP metadata with authoritative signed endpoint claims
       # @raise [Safire::Errors::DiscoveryError] if the server returns an HTTP error, a 204 response,
-      #   a body that is not a JSON object, or if +signed_metadata+ JWT validation fails
+      #   a body that is not a usable JSON object, or if +signed_metadata+ JWT validation fails
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
       #   or a redirect to a non-HTTPS URL
       # @raise [Safire::Errors::ConfigurationError] if +community+ is not a URI
@@ -521,11 +521,12 @@ module Safire
       end
 
       def parse_discovery_body(body, endpoint)
-        return body if body.is_a?(Hash)
+        parsed = JSONResponseParsing.parse_object(body)
+        return parsed if parsed
 
         raise Errors::DiscoveryError.new(
           endpoint: endpoint,
-          error_description: 'response is not a JSON object',
+          error_description: 'response is not a usable JSON object',
           label: 'UDAP metadata'
         )
       end

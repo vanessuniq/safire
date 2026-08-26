@@ -77,9 +77,9 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
       .to_return(status:, body: body.to_json, headers: { 'Content-Type' => 'application/json' })
   end
 
-  def decoded_software_statement
+  def decoded_software_statement(algorithm: 'RS256')
     jwt = JSON.parse(registration_requests.last)['software_statement']
-    JWT.decode(jwt, certificate.public_key, true, algorithms: ['RS256'], verify_expiration: false).first
+    JWT.decode(jwt, certificate.public_key, true, algorithms: [algorithm], verify_expiration: false).first
   end
 
   before do
@@ -127,6 +127,49 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
     stub_registration_response(status: 200)
 
     expect(client.register_client(registration_metadata, client_uri:)['client_id']).to eq('udap-client-123')
+  end
+
+  it 'signs with an advertised RSA alternative when non-conformant metadata omits RS256' do
+    stub_udap_discovery(
+      body: udap_metadata.merge('registration_endpoint_jwt_signing_alg_values_supported' => ['RS384'])
+    )
+    stub_registration_response
+    allow(Safire.logger).to receive(:warn)
+
+    client.register_client(registration_metadata, client_uri:)
+
+    expect(decoded_software_statement(algorithm: 'RS384')['scope']).to eq('system/Patient.rs')
+    expect(Safire.logger).to have_received(:warn).with(/RS256.*may proceed/i).once
+  end
+
+  context 'with an EC P-256 signing identity' do
+    let(:private_key) { OpenSSL::PKey::EC.generate('prime256v1') }
+
+    it 'signs with an advertised EC alternative when non-conformant metadata omits RS256' do
+      stub_udap_discovery(
+        body: udap_metadata.merge('registration_endpoint_jwt_signing_alg_values_supported' => ['ES256'])
+      )
+      stub_registration_response
+      allow(Safire.logger).to receive(:warn)
+
+      client.register_client(registration_metadata, client_uri:)
+
+      expect(decoded_software_statement(algorithm: 'ES256')['scope']).to eq('system/Patient.rs')
+      expect(Safire.logger).to have_received(:warn).with(/RS256.*may proceed/i).once
+    end
+  end
+
+  it 'warns and sends an unadvertised wildcard during the v0.4.1 compatibility phase' do
+    stub_udap_discovery(body: udap_metadata.merge('scopes_supported' => ['system/Patient.rs']))
+    stub_registration_response
+    allow(Safire.logger).to receive(:warn)
+
+    client.register_client(registration_metadata.merge(scope: 'system/*.rs'), client_uri:)
+
+    expect(decoded_software_statement['scope']).to eq('system/*.rs')
+    expect(Safire.logger).to have_received(:warn)
+      .with(/wildcard.*not advertised exactly.*v0\.5\.0/i).once
+    expect(WebMock).to have_requested(:post, registration_endpoint)
   end
 
   it 'cancels registration with a signed empty grant_types claim' do

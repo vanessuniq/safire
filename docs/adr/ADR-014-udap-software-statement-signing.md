@@ -81,10 +81,14 @@ key, and advertised by the server. Without an explicit algorithm, Safire chooses
 the first key-compatible advertised algorithm, preferring `RS256` over `RS384`
 for RSA keys because `RS256` is the STU2 baseline.
 
-Protocol orchestration separately requires every DCR-capable server to advertise
-mandatory `RS256` support before Safire signs with any compatible advertised
-algorithm. This enforces the server baseline independently from the configured
-client key type.
+Protocol orchestration requires the advertised value to be a non-empty array of
+algorithm names. A malformed or empty value makes safe algorithm selection
+impossible and raises `DiscoveryError`. Because STU2 requires every FHIR server
+to support `RS256`, Safire warns when it is absent. The warning diagnoses the
+server baseline without blocking an otherwise interoperable request: the
+builder may still select another advertised, Safire-supported,
+key-compatible algorithm. A valid advertisement with no usable intersection
+raises `ConfigurationError`.
 
 ### Validate local signing identity, not server trust
 

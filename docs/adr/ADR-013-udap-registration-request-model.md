@@ -41,6 +41,11 @@ construction. Invalid input raises `Safire::Errors::ValidationError` with the
 failing attribute and a value-free reason. The class does not inherit from
 `Entity` and does not use the discovery layer's warn-and-return-false contract.
 
+Registration orchestration constructs this value object once, before discovery
+or other network activity. Scope diagnostics and software-statement signing
+consume the same immutable instance; Safire does not independently normalize
+the caller's raw Hash at multiple stages.
+
 Top-level string and symbol keys are normalized to strings. Supplying both forms
 of one key is rejected rather than allowing insertion order to decide which
 value is signed. The value object and its canonical internal hash are frozen,
@@ -94,6 +99,7 @@ regular expression.
 ## Consequences
 
 - Signing code can consume one canonical, already validated metadata hash.
+- Invalid caller metadata fails before discovery, signing, or POSTing.
 - Caller mutations cannot change metadata between validation and signing.
 - Protocol-owned claims cannot be shadowed through caller input.
 - Plain HTTP remains impossible for remote hosts; local HTTP requires a literal

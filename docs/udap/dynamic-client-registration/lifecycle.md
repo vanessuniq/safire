@@ -103,7 +103,7 @@ Both lifecycle methods raise the same Safire error families:
 
 | Error | Meaning |
 |-------|---------|
-| `Safire::Errors::DiscoveryError` | UDAP discovery failed, signed metadata was not trusted, metadata was structurally non-conformant for DCR, or the server did not advertise usable UDAP DCR capability |
+| `Safire::Errors::DiscoveryError` | UDAP discovery or signed-metadata trust failed, or a DCR profile, endpoint, algorithm, or certification-requirement value could not be used safely |
 | `Safire::Errors::ValidationError` | Caller metadata or `certifications:` failed local validation before signing |
 | `Safire::Errors::ConfigurationError` | Signing configuration is missing or incompatible |
 | `Safire::Errors::CertificateError` | The private key, certificate chain, validity period, or `client_uri` SAN check failed |

@@ -314,10 +314,14 @@ The registration screen supports:
 - `client_credentials` registration for system access
 - `authorization_code` registration with the demo callback URI, logo URI, and
   Safire-generated `response_types: ["code"]`
+- editable scopes prepopulated from the selected server; when none are
+  configured, the operator must enter the access this demo client intends to
+  request before registration
 - optional `community`, pasted certification or endorsement JWTs, and explicit
   selection of grant-matched JWTs from the configured file
-- persistence of the returned `client_id`, exact client URI, and optional
-  community so cancellation uses the original registration identity
+- persistence of the returned `client_id`, effective registration scope, exact
+  client URI, and optional community so cancellation uses the original
+  registration context
 - cancellation only when the server confirms the same returned `client_id`
 
 The page displays only allowlisted registration metadata fields. Unknown fields

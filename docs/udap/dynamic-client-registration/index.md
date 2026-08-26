@@ -52,10 +52,10 @@ Applications that select signing identities dynamically may instead pass
 `register_client` or `cancel_registration` call. Per-call values override the
 configured defaults without mutating the client.
 
-Before posting, Safire requires structurally conformant discovery metadata,
-the `udap_dcr` profile, a usable signed `registration_endpoint`, and mandatory
-`RS256` support in
-`registration_endpoint_jwt_signing_alg_values_supported`. See
+Before posting, Safire requires trusted discovery, the `udap_dcr` profile, a
+usable authoritative `registration_endpoint`, and a non-empty array of
+registration signing algorithms. Call `metadata.valid?` separately when an
+application needs a full structural conformance diagnostic. See
 [Registration Metadata]({% link udap/dynamic-client-registration/registration-metadata.md %})
 for caller input and grant rules.
 
@@ -105,6 +105,14 @@ same `client_uri` and trust community requests modification. The authorization
 server may preserve the existing `client_id` or issue a replacement; use the
 identifier returned by the latest accepted response.
 
+In v0.4.1, Safire warns but still submits when a requested wildcard scope is not
+advertised exactly in `scopes_supported`. Non-wildcard SMART FHIR scopes are
+quiet when a broader advertised scope covers them; any remaining unconfirmed
+tokens appear in one warning. Missing or malformed scope metadata also warns
+rather than blocks. Registration and modification will require exact wildcard
+advertisement in v0.5.0, while the authorization server remains responsible for
+the scopes it grants.
+
 ## Communities and Certifications
 
 Pass `community:` when the authorization server participates in multiple UDAP
@@ -153,11 +161,10 @@ URIs.
 
 Safire performs the following sequence for every registration lifecycle call:
 
-1. Discovers and cryptographically validates community-scoped UDAP metadata.
-2. Runs `UdapMetadata#valid?` because DCR is about to act on the discovered
-   registration endpoint.
-3. Verifies the DCR profile and mandatory registration algorithm advertisement.
-4. Validates caller metadata and certification shape.
+1. Validates and snapshots caller metadata and certification input.
+2. Discovers and cryptographically validates community-scoped UDAP metadata.
+3. Checks the focused DCR profile, endpoint, algorithm, and certification fields.
+4. Reports scope-advertisement uncertainty according to the release policy above.
 5. Signs a fresh five-minute software statement with a fresh `jti`.
 6. POSTs the fixed UDAP request envelope to the authoritative signed endpoint.
 7. Parses the RFC 7591-shaped response into a string-keyed `Hash`.
@@ -181,7 +188,7 @@ the software statement.
 
 | Error | When raised |
 |-------|-------------|
-| `Safire::Errors::DiscoveryError` | Discovery or `signed_metadata` validation fails, metadata is structurally non-conformant for DCR, or required DCR capability is absent |
+| `Safire::Errors::DiscoveryError` | Discovery or `signed_metadata` validation fails, or a DCR profile, endpoint, algorithm, or certification-requirement value cannot be used safely |
 | `Safire::Errors::ValidationError` | Caller metadata or certification input is invalid before signing |
 | `Safire::Errors::ConfigurationError` | Signing configuration or algorithm selection is missing or incompatible |
 | `Safire::Errors::CertificateError` | The client key, certificate chain, validity period, ordering, or URI SAN cannot support signing |

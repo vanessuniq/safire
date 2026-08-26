@@ -122,6 +122,18 @@ RSpec.describe UdapRegistrationPresenter do
     expect(presenter.logo_uri).to eq('https://override.example.com/logo.gif')
   end
 
+  it 'leaves scope empty when the server has no configured scopes' do
+    server.scopes = []
+
+    expect(build_presenter.scope).to eq('')
+  end
+
+  it 'preserves a submitted blank scope for validation feedback' do
+    presenter = build_presenter(params: { 'scope' => '   ' })
+
+    expect(presenter.scope).to eq('   ')
+  end
+
   it 'falls back to the generated demo logo URI when no logo env is configured' do
     presenter = build_presenter(env: env.except('UDAP_CLIENT_LOGO_URI'))
 

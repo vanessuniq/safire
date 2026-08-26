@@ -68,6 +68,33 @@ Parsing a valid raw JSON object allows interoperability when an HTTP adapter did
 not decode the body because the server sent an incorrect or missing content
 type. Safire's tolerance does not make that server response conformant.
 
+UDAP DCR uses focused readiness rather than calling `UdapMetadata#valid?` as an
+operational gate. Safire requires trusted discovery, an advertised `udap_dcr`
+profile, a usable authoritative registration endpoint, usable registration
+algorithm metadata, and type-safe certification requirements. Other structural
+conformance checks remain available through the explicit `valid?` diagnostic.
+
+In v0.4.1, requested UDAP registration scopes are diagnostic only. Requested
+tokens containing a literal `*` are classified first and compared by exact
+membership in `scopes_supported`; narrower recognized SMART FHIR scopes may be
+covered by broader advertised scopes. Unrecognized syntax uses exact membership.
+Missing, malformed, or insufficient advertisements produce separate aggregated
+warnings while the server remains authoritative for negotiation. Registration
+and modification move to exact wildcard enforcement in v0.5.0; cancellation
+remains warning-only so an existing registration can still be removed.
+
+For warning suppression only, compatible advertised FHIR permission fragments
+may collectively cover a requested permission set. STU2 does not guarantee that
+the server accepts the combined token, so this permissive inference must not be
+reused as a hard-failure decision without a separate normative rule.
+
+Scope diagnostics log only the requested scope category and count, never the
+raw token values. SMART v2 scopes may carry FHIR search constraints, and opaque
+custom scopes may encode equally sensitive application context in forms Safire
+cannot safely redact. Count-and-category logging preserves the operational and
+migration signal without copying caller-controlled authorization details into
+application logs.
+
 ## Operation Matrix
 
 This matrix covers the public protocol operations currently implemented by the
@@ -83,8 +110,8 @@ This matrix covers the public protocol operations currently implemented by the
 | SMART `register_client` | Missing or unsafe registration endpoint; OAuth error; malformed response or missing/invalid client ID | SMART metadata diagnostics remain explicit | Registration policy and issued credentials |
 | SMART `token_response_valid?` | None; this is not an operational gate | Warns and returns `false` for response conformance defects | Caller decides whether a failed diagnostic is acceptable |
 | UDAP `server_metadata` | Transport/HTTP/204 failure; non-object JSON; failed signed-metadata signature, chain, revocation, issuer, time, or endpoint validation | `UdapMetadata#valid?` is caller-invoked | Supported communities, profiles, and capabilities |
-| UDAP `register_client` | Untrusted discovery; unusable DCR capability; invalid client metadata, certification shape, signing identity, or response; server rejection | Full metadata validation is temporarily a gate until ALIGN-2 narrows it to DCR readiness | Registration policy, certification acceptance, and issued client ID |
-| UDAP `cancel_registration` | The registration gates above plus a response that does not positively confirm the client ID and empty grants | Full metadata validation is temporarily a gate until ALIGN-2; ALIGN-2 adds warning-only scope compatibility for lifecycle-safe cleanup | Cancellation policy and confirmation response |
+| UDAP `register_client` | Untrusted discovery; unusable DCR profile, endpoint, algorithm, or certification-requirement metadata; invalid client metadata, signing identity, or response; server rejection | Missing RS256 and unconfirmed scope support warn; `UdapMetadata#valid?` remains caller-invoked | Registration policy, scope and certification acceptance, and issued client ID |
+| UDAP `cancel_registration` | The registration gates above plus a response that does not positively confirm the client ID and empty grants | Scope compatibility remains warning-only for lifecycle-safe cleanup; `UdapMetadata#valid?` remains caller-invoked | Cancellation policy and confirmation response |
 
 SMART cancellation and UDAP authorization, token, refresh, backend-token, and
 token-response operations are not implemented. They raise

@@ -492,12 +492,13 @@ RSpec.describe Safire::Protocols::Udap do
   describe '#register_client' do
     let(:registration_endpoint) { 'https://fhir.example.com/signed-register' }
     let(:client_uri) { 'https://client.example.com/app' }
+    let(:scope) { 'system/Patient.rs' }
     let(:client_metadata) do
       {
         client_name: 'Example Backend Service',
         contacts: ['mailto:security@example.com'],
         grant_types: ['client_credentials'],
-        scope: 'system/Patient.rs'
+        scope:
       }
     end
     let(:registration_response) do
@@ -525,7 +526,12 @@ RSpec.describe Safire::Protocols::Udap do
         signed_endpoint_claims: registration_signed_claims
       )
     end
-    let(:registration_metadata) { instance_double(Safire::Protocols::UdapRegistrationMetadata) }
+    let(:registration_metadata) do
+      instance_double(
+        Safire::Protocols::UdapRegistrationMetadata,
+        to_h: { 'scope' => client_metadata.fetch(:scope) }
+      )
+    end
     let(:software_statement) { instance_double(Safire::Protocols::UdapSoftwareStatement, to_jwt: 'header.payload.sig') }
 
     def stub_registration_discovery_for_community(community)
@@ -543,6 +549,7 @@ RSpec.describe Safire::Protocols::Udap do
       allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(registration_validator)
       allow(Safire::Protocols::UdapRegistrationMetadata).to receive(:new).and_return(registration_metadata)
       allow(Safire::Protocols::UdapSoftwareStatement).to receive(:new).and_return(software_statement)
+      allow(Safire.logger).to receive(:warn)
       stub_request(:post, registration_endpoint)
         .to_return(status: 201, body: registration_response.to_json, headers: { 'Content-Type' => 'application/json' })
     end
@@ -591,7 +598,18 @@ RSpec.describe Safire::Protocols::Udap do
         client_metadata,
         operation: :register,
         allow_insecure_localhost: false
+      ).once
+    end
+
+    it 'validates caller metadata before discovery' do
+      allow(Safire::Protocols::UdapRegistrationMetadata).to receive(:new).and_raise(
+        Safire::Errors::ValidationError.new(attribute: :scope, reason: 'must be a non-blank string')
       )
+
+      expect { udap.register_client(client_metadata, client_uri:) }
+        .to raise_error(Safire::Errors::ValidationError, /scope/)
+      expect(WebMock).not_to have_requested(:get, well_known_url)
+      expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
     end
 
     context 'when insecure localhost is enabled in config' do
@@ -672,16 +690,16 @@ RSpec.describe Safire::Protocols::Udap do
       end)
     end
 
-    it 'raises DiscoveryError when discovered metadata is structurally non-conformant' do
+    it 'does not gate registration on unrelated structural conformance defects' do
       stub_udap(
         body: registration_discovery_body.merge(
-          'registration_endpoint_jwt_signing_alg_values_supported' => []
+          'udap_versions_supported' => %w[1 2],
+          'token_endpoint_auth_methods_supported' => %w[private_key_jwt client_secret_basic],
+          'grant_types_supported' => %w[client_credentials authorization_code]
         )
       )
 
-      expect { udap.register_client(client_metadata, client_uri:) }
-        .to raise_error(Safire::Errors::DiscoveryError, /structurally conformant/)
-      expect(WebMock).not_to have_requested(:post, registration_endpoint)
+      expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
     end
 
     it 'raises DiscoveryError when metadata omits the required UDAP DCR profile' do
@@ -692,14 +710,25 @@ RSpec.describe Safire::Protocols::Udap do
       )
 
       expect { udap.register_client(client_metadata, client_uri:) }
-        .to raise_error(Safire::Errors::DiscoveryError, /structurally conformant/)
+        .to raise_error(Safire::Errors::DiscoveryError, /does not advertise UDAP Dynamic Client Registration/)
       expect(WebMock).not_to have_requested(:post, registration_endpoint)
     end
 
-    it 'raises DiscoveryError when conformant metadata does not expose usable DCR capability' do
+    it 'raises DiscoveryError when the UDAP profile metadata has an unusable type' do
+      stub_udap(
+        body: registration_discovery_body.merge(
+          'udap_profiles_supported' => 'udap_dcr'
+        )
+      )
+
+      expect { udap.register_client(client_metadata, client_uri:) }
+        .to raise_error(Safire::Errors::DiscoveryError, /does not advertise UDAP Dynamic Client Registration/)
+      expect(WebMock).not_to have_requested(:post, registration_endpoint)
+    end
+
+    it 'raises DiscoveryError when metadata does not expose usable DCR capability' do
       discovered = instance_double(
         Safire::Protocols::UdapMetadata,
-        valid?: true,
         supports_dynamic_registration?: false
       )
       stub_udap
@@ -710,17 +739,174 @@ RSpec.describe Safire::Protocols::Udap do
       expect(WebMock).not_to have_requested(:post, registration_endpoint)
     end
 
-    it 'raises DiscoveryError when the server omits mandatory RS256 registration signing support' do
+    it 'raises DiscoveryError when the authoritative registration endpoint is unusable' do
+      allow(registration_validator).to receive(:signed_endpoint_claims).and_return(
+        registration_signed_claims.merge('registration_endpoint' => 42)
+      )
+
+      expect { udap.register_client(client_metadata, client_uri:) }
+        .to raise_error(Safire::Errors::DiscoveryError, /does not advertise UDAP Dynamic Client Registration/)
+      expect(WebMock).not_to have_requested(:post, registration_endpoint)
+    end
+
+    [nil, [], 'RS256', ['RS256', nil]].each do |algorithms|
+      it "raises DiscoveryError when registration signing algorithms are #{algorithms.inspect}" do
+        stub_udap(
+          body: registration_discovery_body.merge(
+            'registration_endpoint_jwt_signing_alg_values_supported' => algorithms
+          )
+        )
+
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::DiscoveryError, /signing algorithm metadata must be a non-empty array/)
+        expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+        expect(WebMock).not_to have_requested(:post, registration_endpoint)
+      end
+    end
+
+    it 'warns and uses a compatible advertised algorithm when RS256 is missing' do
+      stub_udap(
+        body: registration_discovery_body.merge(
+          'registration_endpoint_jwt_signing_alg_values_supported' => ['RS384']
+        )
+      )
+
+      expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+      expect(Safire.logger).to have_received(:warn).with(/does not advertise.*RS256.*may proceed/i).once
+      expect(Safire::Protocols::UdapSoftwareStatement).to have_received(:new).with(
+        hash_including(supported_algorithms: ['RS384'])
+      )
+    end
+
+    it 'passes an advertised EC alternative to the signing boundary when RS256 is missing' do
+      stub_udap(
+        body: registration_discovery_body.merge(
+          'registration_endpoint_jwt_signing_alg_values_supported' => ['ES256']
+        )
+      )
+
+      expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+      expect(Safire.logger).to have_received(:warn).with(/does not advertise.*RS256.*may proceed/i).once
+      expect(Safire::Protocols::UdapSoftwareStatement).to have_received(:new).with(
+        hash_including(supported_algorithms: ['ES256'])
+      )
+    end
+
+    it 'preserves ConfigurationError when no advertised algorithm is usable by the signing identity' do
+      error = Safire::Errors::ConfigurationError.new(
+        invalid_attribute: :supported_algorithms,
+        invalid_value: ['ES384'],
+        valid_values: %w[RS256 RS384]
+      )
       stub_udap(
         body: registration_discovery_body.merge(
           'registration_endpoint_jwt_signing_alg_values_supported' => ['ES384']
         )
       )
+      allow(Safire::Protocols::UdapSoftwareStatement).to receive(:new).and_raise(error)
 
       expect { udap.register_client(client_metadata, client_uri:) }
-        .to raise_error(Safire::Errors::DiscoveryError, /RS256/)
-      expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+        .to raise_error(Safire::Errors::ConfigurationError)
       expect(WebMock).not_to have_requested(:post, registration_endpoint)
+    end
+
+    context 'when evaluating requested scopes' do
+      it 'does not warn for a requested wildcard advertised exactly by the server' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => ['system/*.rs'])
+        )
+        client_metadata[:scope] = 'system/*.rs'
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+        udap.register_client(client_metadata, client_uri:)
+
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+
+      it 'warns distinctly and proceeds for an unadvertised requested wildcard in v0.4.1' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => ['system/Patient.rs'])
+        )
+        client_metadata[:scope] = 'system/*.rs'
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+        expect(Safire.logger).to have_received(:warn)
+          .with(/wildcard scope count=1.*no exact advertisement.*v0\.5\.0/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
+        expect(WebMock).to have_requested(:post, registration_endpoint)
+      end
+
+      it 'requires exact advertisement for a requested v1 permission wildcard' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => ['system/*.cruds'])
+        )
+        client_metadata[:scope] = 'system/Patient.*'
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/Patient.*')
+
+        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+        expect(Safire.logger).to have_received(:warn)
+          .with(/wildcard scope count=1.*no exact advertisement/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(%r{system/Patient\.\*})
+      end
+
+      it 'does not warn when advertised FHIR scope coverage proves a non-wildcard request' do
+        udap.register_client(client_metadata, client_uri:)
+
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+
+      it 'aggregates uncovered non-wildcard scopes without logging their values' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => ['system/Observation.r'])
+        )
+        constrained_scope = 'system/Observation.rs?patient.identifier=mrn-123'
+        requested_scope = "#{constrained_scope} custom:tenant-a #{constrained_scope} custom:study-c"
+        client_metadata[:scope] = requested_scope
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => requested_scope)
+
+        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+        expect(Safire.logger).to have_received(:warn)
+          .with(/non-wildcard scope count=3.*server-side scope negotiation/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(/mrn-123|tenant-a|study-c/)
+      end
+
+      [nil, [], 'system/*.rs', ['system/*.rs', nil]].each do |advertised_scopes|
+        it "warns and proceeds when scopes_supported is #{advertised_scopes.inspect}" do
+          stub_udap(
+            body: registration_discovery_body.merge('scopes_supported' => advertised_scopes)
+          )
+
+          expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+          expect(Safire.logger).to have_received(:warn)
+            .with(/non-wildcard scope count=1.*coverage cannot be confirmed.*missing, empty, or malformed/i).once
+          expect(Safire.logger).not_to have_received(:warn).with(%r{system/Patient\.rs})
+        end
+      end
+
+      it 'warns distinctly when a wildcard cannot be checked against malformed scope metadata' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => nil)
+        )
+        client_metadata[:scope] = 'system/*.rs'
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+        expect(Safire.logger).to have_received(:warn)
+          .with(/wildcard scope count=1.*cannot be confirmed.*missing, empty, or malformed.*v0\.5\.0/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
+      end
+
+      it 'does not treat wildcard lookalike text as a requested wildcard' do
+        client_metadata[:scope] = 'urn:example:wildcard'
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => 'urn:example:wildcard')
+
+        udap.register_client(client_metadata, client_uri:)
+
+        expect(Safire.logger).to have_received(:warn).with(/non-wildcard scope count=1/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(/urn:example:wildcard/)
+        expect(Safire.logger).not_to have_received(:warn).with(/requested wildcard/i)
+      end
     end
 
     context 'when the community requires certifications' do
@@ -757,9 +943,38 @@ RSpec.describe Safire::Protocols::Udap do
       end
     end
 
+    it 'treats an explicitly empty certification-requirement array as no requirement' do
+      stub_udap(
+        body: registration_discovery_body.merge('udap_certifications_required' => [])
+      )
+
+      expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+      expect(Safire::Protocols::UdapSoftwareStatement).to have_received(:new)
+    end
+
+    [
+      'https://policy.example/cert',
+      [nil],
+      { 'certification' => 'https://policy.example/cert' }
+    ].each do |required_certifications|
+      it "raises DiscoveryError when required certification metadata is #{required_certifications.inspect}" do
+        stub_udap(
+          body: registration_discovery_body.merge(
+            'udap_certifications_required' => required_certifications
+          )
+        )
+
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::DiscoveryError, /udap_certifications_required.*array of strings/)
+        expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+        expect(WebMock).not_to have_requested(:post, registration_endpoint)
+      end
+    end
+
     it 'raises ValidationError for malformed certification collections' do
       expect { udap.register_client(client_metadata, client_uri:, certifications: ['not-a-jwt']) }
         .to raise_error(Safire::Errors::ValidationError, /compact JWS/)
+      expect(WebMock).not_to have_requested(:get, well_known_url)
       expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
     end
 
@@ -864,11 +1079,12 @@ RSpec.describe Safire::Protocols::Udap do
   describe '#cancel_registration' do
     let(:registration_endpoint) { 'https://fhir.example.com/signed-register' }
     let(:client_uri) { 'https://client.example.com/app' }
+    let(:scope) { 'system/Patient.rs' }
     let(:client_metadata) do
       {
         client_name: 'Example Backend Service',
         contacts: ['mailto:security@example.com'],
-        scope: 'system/Patient.rs'
+        scope:
       }
     end
     let(:cancellation_response) do
@@ -896,7 +1112,12 @@ RSpec.describe Safire::Protocols::Udap do
         signed_endpoint_claims: registration_signed_claims
       )
     end
-    let(:registration_metadata) { instance_double(Safire::Protocols::UdapRegistrationMetadata) }
+    let(:registration_metadata) do
+      instance_double(
+        Safire::Protocols::UdapRegistrationMetadata,
+        to_h: { 'scope' => client_metadata.fetch(:scope) }
+      )
+    end
     let(:software_statement) { instance_double(Safire::Protocols::UdapSoftwareStatement, to_jwt: 'header.payload.sig') }
 
     before do
@@ -904,6 +1125,7 @@ RSpec.describe Safire::Protocols::Udap do
       allow(Safire::Protocols::UdapSignedMetadataValidator).to receive(:new).and_return(registration_validator)
       allow(Safire::Protocols::UdapRegistrationMetadata).to receive(:new).and_return(registration_metadata)
       allow(Safire::Protocols::UdapSoftwareStatement).to receive(:new).and_return(software_statement)
+      allow(Safire.logger).to receive(:warn)
       stub_request(:post, registration_endpoint)
         .to_return(status: 202, body: cancellation_response.to_json, headers: { 'Content-Type' => 'application/json' })
     end
@@ -986,6 +1208,20 @@ RSpec.describe Safire::Protocols::Udap do
       expect(WebMock).to(have_requested(:post, registration_endpoint).with do |request|
         JSON.parse(request.body)['certifications'] == certifications
       end)
+    end
+
+    it 'warns but still permits lifecycle cleanup when a cancellation wildcard is no longer advertised' do
+      stub_udap(
+        body: registration_discovery_body.merge('scopes_supported' => ['system/Patient.rs'])
+      )
+      client_metadata[:scope] = 'system/*.rs'
+      allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+      expect(udap.cancel_registration(client_metadata, client_uri:)).to eq(cancellation_response)
+      expect(Safire.logger).to have_received(:warn)
+        .with(/wildcard scope count=1.*cancellation.*remains warning-only/i).once
+      expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
+      expect(WebMock).to have_requested(:post, registration_endpoint)
     end
 
     [

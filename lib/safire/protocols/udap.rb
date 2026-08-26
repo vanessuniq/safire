@@ -91,10 +91,11 @@ module Safire
 
       # Dynamically registers or modifies a UDAP client using STU2 Dynamic Client Registration.
       #
-      # UDAP registration is discovery-bound: Safire first discovers and validates
-      # UDAP metadata, then posts a fixed request envelope to the discovered
-      # +registration_endpoint+. The caller-provided metadata is validated and signed
-      # into the +software_statement+ JWT; it is not duplicated at the top level.
+      # UDAP registration is discovery-bound: Safire validates caller metadata,
+      # discovers trusted UDAP metadata, checks the fields required by DCR, then
+      # posts a fixed request envelope to the discovered +registration_endpoint+.
+      # Caller metadata is signed into the +software_statement+ JWT; it is not
+      # duplicated at the top level.
       #
       # Calling this method again with the same +client_uri+ and community requests
       # modification of the existing registration. Safire accepts both 201 Created
@@ -118,8 +119,8 @@ module Safire
       #   leaf-first client signing certificate chain; defaults to configuration
       # @param jwt_algorithm [String, nil] optional explicit registration signing algorithm
       # @return [Hash] registration response from the authorization server
-      # @raise [Safire::Errors::DiscoveryError] when UDAP discovery is unavailable,
-      #   structurally non-conformant for registration, or does not advertise UDAP DCR
+      # @raise [Safire::Errors::DiscoveryError] when UDAP discovery is unavailable or
+      #   untrusted, or required DCR capability metadata cannot be used safely
       # @raise [Safire::Errors::ValidationError] when caller metadata or certifications are invalid
       # @raise [Safire::Errors::ConfigurationError] when signing configuration is missing or incompatible
       # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
@@ -179,8 +180,8 @@ module Safire
       #   leaf-first client signing certificate chain; defaults to configuration
       # @param jwt_algorithm [String, nil] optional explicit registration signing algorithm
       # @return [Hash] cancellation response from the authorization server
-      # @raise [Safire::Errors::DiscoveryError] when UDAP discovery is unavailable,
-      #   structurally non-conformant for registration, or does not advertise UDAP DCR
+      # @raise [Safire::Errors::DiscoveryError] when UDAP discovery is unavailable or
+      #   untrusted, or required DCR capability metadata cannot be used safely
       # @raise [Safire::Errors::ValidationError] when caller metadata or certifications are invalid
       # @raise [Safire::Errors::ConfigurationError] when signing configuration is missing or incompatible
       # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
@@ -226,19 +227,17 @@ module Safire
       def prepare_registration_request(metadata, operation:, client_uri:, community:, trusted_anchors:, crls:,
                                        revocation_checker:, verify_chain:, certifications:, private_key:,
                                        certificate_chain:, jwt_algorithm:)
+        registration_metadata = build_registration_metadata(metadata, operation:)
+        certifications = normalize_certifications!(certifications)
         community = normalize_community(community)
         discovered = registration_server_metadata(
-          community:,
-          trusted_anchors:,
-          crls:,
-          revocation_checker:,
-          verify_chain:
+          community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:
         )
-        certifications = validate_certifications!(certifications, discovered)
-        software_statement = registration_software_statement(
-          metadata,
+        validate_required_certifications!(certifications, discovered, community:)
+        validate_registration_scopes!(registration_metadata, discovered, operation:)
+        software_statement = build_software_statement(
+          registration_metadata,
           discovered,
-          operation:,
           client_uri:,
           private_key:,
           certificate_chain:,
@@ -255,13 +254,6 @@ module Safire
       end
 
       def validate_registration_discovery!(metadata, community:)
-        unless metadata.valid?
-          registration_discovery_error!(
-            'UDAP metadata is not structurally conformant for Dynamic Client Registration',
-            community
-          )
-        end
-
         return if metadata.supports_dynamic_registration?
 
         registration_discovery_error!(
@@ -272,11 +264,17 @@ module Safire
 
       def validate_registration_signing_algorithms!(metadata, community:)
         algorithms = metadata.registration_endpoint_jwt_signing_alg_values_supported
+        unless algorithms.is_a?(Array) && algorithms.any? && algorithms.all?(String)
+          registration_discovery_error!(
+            'registration signing algorithm metadata must be a non-empty array of strings',
+            community
+          )
+        end
         return if algorithms.include?(MANDATORY_REGISTRATION_ALGORITHM)
 
-        registration_discovery_error!(
-          "server does not advertise mandatory #{MANDATORY_REGISTRATION_ALGORITHM} registration signing support",
-          community
+        Safire.logger.warn(
+          '[UDAP] registration metadata does not advertise the required RS256 baseline; ' \
+          'registration may proceed only with another advertised, supported, key-compatible algorithm'
         )
       end
 
@@ -288,16 +286,98 @@ module Safire
         )
       end
 
-      def validate_certifications!(certifications, metadata)
-        normalized = normalize_certifications!(certifications)
-        required = Array(metadata.udap_certifications_required)
-        return normalized if required.empty? || normalized.present?
+      def validate_required_certifications!(certifications, metadata, community:)
+        required = metadata.udap_certifications_required
+        unless required.nil? || (required.is_a?(Array) && required.all?(String))
+          registration_discovery_error!(
+            'udap_certifications_required must be an array of strings when present',
+            community
+          )
+        end
+        return if required.blank? || certifications.present?
 
         raise Errors::ValidationError.new(
           attribute: :certifications,
           reason: 'must not be nil or empty when UDAP metadata advertises required certification URIs: ' \
                   "#{required.join(', ')}"
         )
+      end
+
+      def validate_registration_scopes!(registration_metadata, discovered, operation:)
+        wildcards, non_wildcards = registration_scope_groups(registration_metadata)
+        advertised = discovered.scopes_supported
+
+        unless usable_scope_advertisement?(advertised)
+          return warn_unconfirmed_scopes(wildcards, non_wildcards, operation:)
+        end
+
+        coverage = UdapScopeCoverage.new(advertised)
+        unadvertised_wildcards = wildcards.reject { |scope| coverage.advertised_exactly?(scope) }
+        warn_unadvertised_wildcards(unadvertised_wildcards, operation:)
+        uncovered = coverage.uncovered_non_wildcards_for_warning(non_wildcards)
+        warn_uncovered_non_wildcards(uncovered)
+      end
+
+      def registration_scope_groups(registration_metadata)
+        requested = registration_metadata.to_h.fetch('scope').split.uniq
+        requested.partition { |scope| UdapScopeCoverage.requested_wildcard?(scope) }
+      end
+
+      def warn_unconfirmed_scopes(wildcards, non_wildcards, operation:)
+        warn_unconfirmed_wildcards(wildcards, operation:)
+        warn_unconfirmed_non_wildcards(non_wildcards)
+      end
+
+      def usable_scope_advertisement?(scopes)
+        scopes.is_a?(Array) && scopes.any? && scopes.all? { |scope| scope.is_a?(String) && scope.present? }
+      end
+
+      def warn_unadvertised_wildcards(scopes, operation:)
+        return if scopes.empty?
+
+        Safire.logger.warn(
+          "[UDAP] #{scope_warning_summary(scopes, 'wildcard')}; no exact advertisement in " \
+          "scopes_supported; #{scope_warning_lifecycle(operation)}"
+        )
+      end
+
+      def warn_unconfirmed_wildcards(scopes, operation:)
+        return if scopes.empty?
+
+        Safire.logger.warn(
+          "[UDAP] #{scope_warning_summary(scopes, 'wildcard')}; exact advertisement cannot be confirmed " \
+          "because scopes_supported is missing, empty, or malformed; #{scope_warning_lifecycle(operation)}"
+        )
+      end
+
+      def warn_uncovered_non_wildcards(scopes)
+        return if scopes.empty?
+
+        Safire.logger.warn(
+          "[UDAP] #{scope_warning_summary(scopes, 'non-wildcard')}; coverage is not listed or locally proven " \
+          'by scopes_supported; proceeding with server-side scope negotiation'
+        )
+      end
+
+      def warn_unconfirmed_non_wildcards(scopes)
+        return if scopes.empty?
+
+        Safire.logger.warn(
+          "[UDAP] #{scope_warning_summary(scopes, 'non-wildcard')}; coverage cannot be confirmed because " \
+          'scopes_supported is missing, empty, or malformed; proceeding with server-side scope negotiation'
+        )
+      end
+
+      def scope_warning_summary(scopes, category)
+        "requested #{category} scope count=#{scopes.length}"
+      end
+
+      def scope_warning_lifecycle(operation)
+        if operation == :cancel
+          return 'cancellation proceeds and remains warning-only so existing access can be removed'
+        end
+
+        'registration proceeds in v0.4.1, but registration and modification will fail in v0.5.0'
       end
 
       def normalize_certifications!(certifications)
@@ -313,28 +393,19 @@ module Safire
         certifications.map { |entry| entry.dup.freeze }.freeze
       end
 
+      def build_registration_metadata(metadata, operation:)
+        UdapRegistrationMetadata.new(
+          metadata,
+          operation:,
+          allow_insecure_localhost: @allow_insecure_localhost
+        )
+      end
+
       def compact_jws?(value)
         return false unless value.is_a?(String) && value.present?
 
         parts = value.split('.', -1)
         parts.length == 3 && parts.all? { |part| Safire::Protocols::COMPACT_JWS_SEGMENT.match?(part) }
-      end
-
-      def registration_software_statement(metadata, discovered, operation:, client_uri:,
-                                          private_key:, certificate_chain:, jwt_algorithm:)
-        registration_metadata = UdapRegistrationMetadata.new(
-          metadata,
-          operation:,
-          allow_insecure_localhost: @allow_insecure_localhost
-        )
-        build_software_statement(
-          registration_metadata,
-          discovered,
-          client_uri:,
-          private_key:,
-          certificate_chain:,
-          jwt_algorithm:
-        )
       end
 
       def build_software_statement(metadata, discovered, client_uri:, private_key:, certificate_chain:, jwt_algorithm:)

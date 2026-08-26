@@ -11,6 +11,7 @@ RSpec.describe FhirServer do
       udap_client_id: 'udap-client-456',
       udap_client_uri: 'https://client.example.com',
       udap_community: 'https://community.example.org/udap',
+      udap_scope: 'system/Patient.rs',
       scopes: %w[openid profile]
     }
   end
@@ -119,7 +120,8 @@ RSpec.describe FhirServer do
         'client_id' => 'client-123',
         'udap_client_id' => 'udap-client-456',
         'udap_client_uri' => 'https://client.example.com',
-        'udap_community' => 'https://community.example.org/udap'
+        'udap_community' => 'https://community.example.org/udap',
+        'udap_scope' => 'system/Patient.rs'
       )
     end
   end

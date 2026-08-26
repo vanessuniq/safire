@@ -316,9 +316,11 @@ class SafireDemo < Sinatra::Base
     @udap_registration_presenter = build_udap_registration_presenter
     if @server.udap_client_id.present?
       @udap_registration_presenter = build_udap_registration_presenter(error: duplicate_udap_registration_error)
+    elsif @udap_registration_presenter.scope.blank?
+      @udap_registration_presenter = build_udap_registration_presenter(error: missing_udap_registration_scope_error)
     else
       registration = perform_udap_registration
-      persist_udap_registration!(registration['client_id'])
+      persist_udap_registration!(registration)
       @udap_registration_presenter = build_udap_registration_presenter(
         registration_response: registration,
         form_params: {}
@@ -848,15 +850,30 @@ class SafireDemo < Sinatra::Base
     )
   end
 
+  def missing_udap_registration_scope_error
+    Safire::Errors::ValidationError.new(
+      attribute: :scope,
+      reason: 'must describe the access this demo client intends to request'
+    )
+  end
+
   def parse_list_param(value)
     value.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
   end
 
-  def persist_udap_registration!(client_id)
-    @server.udap_client_id = client_id
+  def persist_udap_registration!(registration)
+    @server.udap_client_id = registration.fetch('client_id')
     @server.udap_client_uri = udap_registration_client_uri
     @server.udap_community = udap_registration_community
+    @server.udap_scope = effective_udap_registration_scope(registration)
     @server.save
+  end
+
+  def effective_udap_registration_scope(registration)
+    returned_scope = registration['scope']
+    return returned_scope.strip if returned_scope.is_a?(String) && returned_scope.present?
+
+    @udap_registration_presenter.scope.strip
   end
 
   def clear_udap_registration_if_confirmed!(expected_client_id, response)
@@ -865,6 +882,7 @@ class SafireDemo < Sinatra::Base
     @server.udap_client_id = nil
     @server.udap_client_uri = nil
     @server.udap_community = nil
+    @server.udap_scope = nil
     @server.save
   end
 
@@ -873,7 +891,8 @@ class SafireDemo < Sinatra::Base
 
     {
       'client_uri' => @server.udap_client_uri,
-      'community' => @server.udap_community
+      'community' => @server.udap_community,
+      'scope' => @server.udap_scope.presence || @server.scopes.join(' ')
     }
   end
 

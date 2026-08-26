@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   symbol/string key collisions, recursive structures, and non-JSON-compatible
   adapter-provided Hash values instead of risking silent normalization or
   unexpected type errors. Valid response behavior is unchanged.
+- UDAP Dynamic Client Registration now validates and snapshots caller metadata
+  before discovery, then gates only on trusted DCR profile, endpoint, algorithm,
+  and certification-requirement values. Unrelated discovery conformance defects
+  remain available through `UdapMetadata#valid?` without blocking an otherwise
+  usable registration request.
+- UDAP registration warns when a server omits the STU2 `RS256` baseline and can
+  negotiate another advertised, supported, key-compatible algorithm. In the
+  v0.4.1 compatibility phase, missing or insufficient `scopes_supported`
+  metadata produces aggregated warnings while registration, modification, and
+  lifecycle-safe cancellation continue; exact wildcard advertisement becomes a
+  registration requirement in v0.5.0.
 
 ## [0.4.0] - 2026-08-07
 

@@ -36,9 +36,10 @@ registration = client.register_client(
 
 For UDAP, the registration endpoint is always discovery-bound. Safire raises
 `DiscoveryError` before POSTing when discovery fails, `signed_metadata` cannot
-be validated, `UdapMetadata#valid?` reports structural non-conformance, the
-server does not advertise `udap_dcr`, or the server does not publish
-mandatory `RS256` registration signing support:
+be validated, the server does not advertise usable `udap_dcr` capability, or
+the registration algorithm and certification-requirement fields cannot be used
+safely. Full structural conformance remains an explicit
+`UdapMetadata#valid?` diagnostic and is not an automatic DCR gate:
 
 ```ruby
 registration = udap_client.register_client(
@@ -48,6 +49,15 @@ registration = udap_client.register_client(
   crls:            [ca_crl]
 )
 ```
+
+A missing `RS256` advertisement produces a warning because STU2 requires that
+server baseline, but Safire can proceed with another advertised, supported,
+key-compatible algorithm. Missing, malformed, or insufficient
+`scopes_supported` also warns in v0.4.1 instead of blocking DCR. Requested
+wildcards are checked by exact membership; narrower non-wildcard SMART FHIR
+scopes may be covered by broader advertised scopes. Registration and
+modification will reject unadvertised wildcard requests in v0.5.0, while
+cancellation remains warning-only.
 
 ### `ValidationError`: UDAP registration metadata or certifications are invalid
 

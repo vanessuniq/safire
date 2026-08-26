@@ -336,7 +336,7 @@ module Safire
         return if scopes.empty?
 
         Safire.logger.warn(
-          "[UDAP] requested wildcard scope(s) #{scopes.join(', ')} are not advertised exactly in " \
+          "[UDAP] #{scope_warning_summary(scopes, 'wildcard')}; no exact advertisement in " \
           "scopes_supported; #{scope_warning_lifecycle(operation)}"
         )
       end
@@ -345,7 +345,7 @@ module Safire
         return if scopes.empty?
 
         Safire.logger.warn(
-          "[UDAP] requested wildcard scope(s) #{scopes.join(', ')} cannot be confirmed as advertised exactly " \
+          "[UDAP] #{scope_warning_summary(scopes, 'wildcard')}; exact advertisement cannot be confirmed " \
           "because scopes_supported is missing, empty, or malformed; #{scope_warning_lifecycle(operation)}"
         )
       end
@@ -354,8 +354,8 @@ module Safire
         return if scopes.empty?
 
         Safire.logger.warn(
-          '[UDAP] requested non-wildcard scope(s) are not listed or locally covered by scopes_supported: ' \
-          "#{scopes.join(', ')}; proceeding with server-side scope negotiation"
+          "[UDAP] #{scope_warning_summary(scopes, 'non-wildcard')}; coverage is not listed or locally proven " \
+          'by scopes_supported; proceeding with server-side scope negotiation'
         )
       end
 
@@ -363,9 +363,13 @@ module Safire
         return if scopes.empty?
 
         Safire.logger.warn(
-          '[UDAP] cannot confirm requested non-wildcard scope coverage because scopes_supported is missing, ' \
-          "empty, or malformed: #{scopes.join(', ')}; proceeding with server-side scope negotiation"
+          "[UDAP] #{scope_warning_summary(scopes, 'non-wildcard')}; coverage cannot be confirmed because " \
+          'scopes_supported is missing, empty, or malformed; proceeding with server-side scope negotiation'
         )
+      end
+
+      def scope_warning_summary(scopes, category)
+        "requested #{category} scope count=#{scopes.length}"
       end
 
       def scope_warning_lifecycle(operation)

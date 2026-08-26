@@ -832,7 +832,8 @@ RSpec.describe Safire::Protocols::Udap do
 
         expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
         expect(Safire.logger).to have_received(:warn)
-          .with(%r{wildcard.*system/\*\.rs.*not advertised exactly.*v0\.5\.0}i).once
+          .with(/wildcard scope count=1.*no exact advertisement.*v0\.5\.0/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
         expect(WebMock).to have_requested(:post, registration_endpoint)
       end
 
@@ -845,7 +846,8 @@ RSpec.describe Safire::Protocols::Udap do
 
         expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
         expect(Safire.logger).to have_received(:warn)
-          .with(%r{wildcard.*system/Patient\.\*.*not advertised exactly}i).once
+          .with(/wildcard scope count=1.*no exact advertisement/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(%r{system/Patient\.\*})
       end
 
       it 'does not warn when advertised FHIR scope coverage proves a non-wildcard request' do
@@ -854,14 +856,19 @@ RSpec.describe Safire::Protocols::Udap do
         expect(Safire.logger).not_to have_received(:warn)
       end
 
-      it 'aggregates uncovered non-wildcard scopes in deterministic request order' do
-        requested_scope = 'custom:b custom:a custom:b custom:c'
+      it 'aggregates uncovered non-wildcard scopes without logging their values' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => ['system/Observation.r'])
+        )
+        constrained_scope = 'system/Observation.rs?patient.identifier=mrn-123'
+        requested_scope = "#{constrained_scope} custom:tenant-a #{constrained_scope} custom:study-c"
         client_metadata[:scope] = requested_scope
         allow(registration_metadata).to receive(:to_h).and_return('scope' => requested_scope)
 
         expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
         expect(Safire.logger).to have_received(:warn)
-          .with(/non-wildcard.*custom:b, custom:a, custom:c.*server-side scope negotiation/i).once
+          .with(/non-wildcard scope count=3.*server-side scope negotiation/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(/mrn-123|tenant-a|study-c/)
       end
 
       [nil, [], 'system/*.rs', ['system/*.rs', nil]].each do |advertised_scopes|
@@ -872,7 +879,8 @@ RSpec.describe Safire::Protocols::Udap do
 
           expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
           expect(Safire.logger).to have_received(:warn)
-            .with(/cannot confirm.*scope coverage.*scopes_supported.*missing, empty, or malformed/i).once
+            .with(/non-wildcard scope count=1.*coverage cannot be confirmed.*missing, empty, or malformed/i).once
+          expect(Safire.logger).not_to have_received(:warn).with(%r{system/Patient\.rs})
         end
       end
 
@@ -885,7 +893,8 @@ RSpec.describe Safire::Protocols::Udap do
 
         expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
         expect(Safire.logger).to have_received(:warn)
-          .with(/wildcard.*cannot be confirmed.*scopes_supported.*missing, empty, or malformed.*v0\.5\.0/i).once
+          .with(/wildcard scope count=1.*cannot be confirmed.*missing, empty, or malformed.*v0\.5\.0/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
       end
 
       it 'does not treat wildcard lookalike text as a requested wildcard' do
@@ -894,7 +903,8 @@ RSpec.describe Safire::Protocols::Udap do
 
         udap.register_client(client_metadata, client_uri:)
 
-        expect(Safire.logger).to have_received(:warn).with(/non-wildcard.*urn:example:wildcard/i).once
+        expect(Safire.logger).to have_received(:warn).with(/non-wildcard scope count=1/i).once
+        expect(Safire.logger).not_to have_received(:warn).with(/urn:example:wildcard/)
         expect(Safire.logger).not_to have_received(:warn).with(/requested wildcard/i)
       end
     end
@@ -1209,7 +1219,8 @@ RSpec.describe Safire::Protocols::Udap do
 
       expect(udap.cancel_registration(client_metadata, client_uri:)).to eq(cancellation_response)
       expect(Safire.logger).to have_received(:warn)
-        .with(%r{wildcard.*system/\*\.rs.*cancellation.*remains warning-only}i).once
+        .with(/wildcard scope count=1.*cancellation.*remains warning-only/i).once
+      expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
       expect(WebMock).to have_requested(:post, registration_endpoint)
     end
 

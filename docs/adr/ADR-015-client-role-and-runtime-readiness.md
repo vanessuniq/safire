@@ -88,6 +88,13 @@ may collectively cover a requested permission set. STU2 does not guarantee that
 the server accepts the combined token, so this permissive inference must not be
 reused as a hard-failure decision without a separate normative rule.
 
+Scope diagnostics log only the requested scope category and count, never the
+raw token values. SMART v2 scopes may carry FHIR search constraints, and opaque
+custom scopes may encode equally sensitive application context in forms Safire
+cannot safely redact. Count-and-category logging preserves the operational and
+migration signal without copying caller-controlled authorization details into
+application logs.
+
 ## Operation Matrix
 
 This matrix covers the public protocol operations currently implemented by the

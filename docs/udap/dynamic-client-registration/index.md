@@ -108,10 +108,12 @@ identifier returned by the latest accepted response.
 In v0.4.1, Safire warns but still submits when a requested wildcard scope is not
 advertised exactly in `scopes_supported`. Non-wildcard SMART FHIR scopes are
 quiet when a broader advertised scope covers them; any remaining unconfirmed
-tokens appear in one warning. Missing or malformed scope metadata also warns
-rather than blocks. Registration and modification will require exact wildcard
-advertisement in v0.5.0, while the authorization server remains responsible for
-the scopes it grants.
+tokens produce one warning. Scope warnings report only the scope category and
+count because constrained SMART scopes and opaque custom scopes may contain
+sensitive values that do not belong in application logs. Missing or malformed
+scope metadata also warns rather than blocks. Registration and modification
+will require exact wildcard advertisement in v0.5.0, while the authorization
+server remains responsible for the scopes it grants.
 
 ## Communities and Certifications
 

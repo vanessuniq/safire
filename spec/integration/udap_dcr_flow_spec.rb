@@ -168,7 +168,8 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
 
     expect(decoded_software_statement['scope']).to eq('system/*.rs')
     expect(Safire.logger).to have_received(:warn)
-      .with(/wildcard.*not advertised exactly.*v0\.5\.0/i).once
+      .with(/wildcard scope count=1.*no exact advertisement.*v0\.5\.0/i).once
+    expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
     expect(WebMock).to have_requested(:post, registration_endpoint)
   end
 

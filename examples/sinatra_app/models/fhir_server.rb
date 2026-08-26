@@ -23,6 +23,7 @@ class FhirServer
     udap_client_id
     udap_client_uri
     udap_community
+    udap_scope
     client_secret
     scopes
     protocols

@@ -24,13 +24,12 @@ class UdapRegistrationPresenter
   FILTERED_VALUE = '[FILTERED]'
   DEFAULT_CLIENT_NAME = 'Safire Demo App'
   DEFAULT_CONTACTS = 'mailto:admin@example.com'
-  DEFAULT_SCOPE = 'system/*.rs'
   DEMO_LOGO_PATH = '/safire-demo-logo.png'
   CERTIFICATIONS_FILE_ENV = 'UDAP_CLIENT_CERTIFICATIONS_FILE'
   APP_ROOT = File.expand_path('..', __dir__)
 
   private_constant :GRANT_TYPES, :DISPLAYABLE_RESPONSE_FIELDS, :FILTERED_VALUE,
-                   :DEFAULT_CLIENT_NAME, :DEFAULT_CONTACTS, :DEFAULT_SCOPE,
+                   :DEFAULT_CLIENT_NAME, :DEFAULT_CONTACTS,
                    :DEMO_LOGO_PATH, :CERTIFICATIONS_FILE_ENV, :APP_ROOT
 
   attr_reader :server, :registration_response, :cancellation_response,
@@ -107,7 +106,9 @@ class UdapRegistrationPresenter
   end
 
   def scope
-    param('scope').presence || server.scopes.join(' ').presence || DEFAULT_SCOPE
+    return param('scope').to_s if param_supplied?('scope')
+
+    server.scopes.join(' ')
   end
 
   def community
@@ -170,6 +171,10 @@ class UdapRegistrationPresenter
 
   def param(name)
     @params[name] || @params[name.to_sym]
+  end
+
+  def param_supplied?(name)
+    @params.key?(name) || @params.key?(name.to_sym)
   end
 
   def env_value(name)

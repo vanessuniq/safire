@@ -18,7 +18,8 @@ RSpec.describe SafireDemo do
       client_id: nil,
       udap_client_id: 'stored-udap-client',
       udap_client_uri: 'http://localhost:4567',
-      udap_community: 'https://community.example.org/udap'
+      udap_community: 'https://community.example.org/udap',
+      udap_scope: 'system/Patient.rs'
     )
   end
   let(:malicious_udap_server) do
@@ -69,7 +70,7 @@ RSpec.describe SafireDemo do
   end
 
   def build_server(id, protocols:, client_id: 'client-123', udap_client_id: nil,
-                   udap_client_uri: nil, udap_community: nil, name: nil)
+                   udap_client_uri: nil, udap_community: nil, udap_scope: nil, name: nil)
     FhirServer.new(
       id: id,
       name: name || id.tr('-', ' ').split.map(&:capitalize).join(' '),
@@ -78,6 +79,7 @@ RSpec.describe SafireDemo do
       udap_client_id: udap_client_id,
       udap_client_uri: udap_client_uri,
       udap_community: udap_community,
+      udap_scope: udap_scope,
       scopes: %w[openid profile],
       protocols: protocols
     )
@@ -124,13 +126,13 @@ RSpec.describe SafireDemo do
     )
   end
 
-  def expect_system_access_registration_request
+  def expect_system_access_registration_request(scope: 'system/*.rs')
     expect(udap_client).to have_received(:register_client).with(
       hash_including(
         client_name: 'Safire Demo App',
         contacts: ['mailto:admin@example.com'],
         grant_types: ['client_credentials'],
-        scope: 'system/*.rs'
+        scope:
       ),
       client_uri: 'http://localhost:4567',
       community: 'https://community.example.org/udap',
@@ -141,7 +143,11 @@ RSpec.describe SafireDemo do
 
   def expect_stored_context_cancellation_request
     expect(udap_client).to have_received(:cancel_registration).with(
-      hash_including(client_name: 'Safire Demo App', contacts: ['mailto:admin@example.com'], scope: 'openid profile'),
+      hash_including(
+        client_name: 'Safire Demo App',
+        contacts: ['mailto:admin@example.com'],
+        scope: 'system/Patient.rs'
+      ),
       client_uri: 'http://localhost:4567',
       community: 'https://community.example.org/udap',
       certifications: nil,
@@ -643,19 +649,32 @@ RSpec.describe SafireDemo do
       response = form_response(
         :post,
         '/demo/udap-only/udap-registration',
-        params: registration_params,
+        params: registration_params.merge(scope: 'system/Patient.rs'),
         env: { 'HTTP_HOST' => 'localhost:4567' }
       )
 
       expect(response.status).to eq(200)
       expect_local_udap_client_configuration
-      expect_system_access_registration_request
+      expect_system_access_registration_request(scope: 'system/Patient.rs')
       expect(udap_server.udap_client_id).to eq('new-udap-client')
       expect(udap_server.udap_client_uri).to eq('http://localhost:4567')
       expect(udap_server.udap_community).to eq('https://community.example.org/udap')
+      expect(udap_server.udap_scope).to eq('system/*.rs')
       expect(udap_server).to have_received(:save)
       expect(response.body).to include('new-udap-client')
       expect_response_to_hide_registration_artifacts(response)
+    end
+
+    it 'persists the requested scope when the registration response omits it' do
+      allow(udap_client).to receive(:register_client).and_return(registration_response.except('scope'))
+
+      form_response(
+        :post,
+        '/demo/udap-only/udap-registration',
+        params: registration_params.merge(scope: 'system/Observation.r')
+      )
+
+      expect(udap_server.udap_scope).to eq('system/Observation.r')
     end
 
     it 'rejects direct registration posts when a UDAP client id is already stored' do
@@ -670,6 +689,19 @@ RSpec.describe SafireDemo do
       expect(udap_client).not_to have_received(:register_client)
       expect(registered_udap_server.udap_client_id).to eq('stored-udap-client')
       expect(response.body).to include('cancel the existing registration before registering again')
+    end
+
+    it 'rejects an empty scope before invoking Safire registration' do
+      response = form_response(
+        :post,
+        '/demo/udap-only/udap-registration',
+        params: registration_params.merge(scope: '   ')
+      )
+
+      expect(response.status).to eq(200)
+      expect(udap_client).not_to have_received(:register_client)
+      expect(response.body).to include('Scope')
+      expect(response.body).to include('must describe the access this demo client intends to request')
     end
 
     it 'submits authorization-code metadata with conditional client fields' do
@@ -795,6 +827,7 @@ RSpec.describe SafireDemo do
       expect(registered_udap_server.udap_client_id).to be_nil
       expect(registered_udap_server.udap_client_uri).to be_nil
       expect(registered_udap_server.udap_community).to be_nil
+      expect(registered_udap_server.udap_scope).to be_nil
       expect(registered_udap_server).to have_received(:save)
       expect(response.body).to include('Registration cancelled')
       expect_response_to_hide_registration_artifacts(response)
@@ -857,6 +890,7 @@ RSpec.describe SafireDemo do
       expect(registered_udap_server.udap_client_id).to eq('stored-udap-client')
       expect(registered_udap_server.udap_client_uri).to eq('http://localhost:4567')
       expect(registered_udap_server.udap_community).to eq('https://community.example.org/udap')
+      expect(registered_udap_server.udap_scope).to eq('system/Patient.rs')
       expect(response.body).to include('different client id')
     end
 

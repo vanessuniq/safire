@@ -261,6 +261,8 @@ RSpec.describe Safire::Protocols::UdapRegistrationMetadata do
   end
 
   describe 'authorization-code metadata' do
+    before { allow(Safire.logger).to receive(:warn) }
+
     it 'requires redirect_uris' do
       input.delete(:redirect_uris)
 
@@ -303,16 +305,41 @@ RSpec.describe Safire::Protocols::UdapRegistrationMetadata do
       expect_validation_error(:logo_uri, 'absolute HTTPS URI') { metadata }
     end
 
-    it 'requires a supported image extension' do
-      input[:logo_uri] = 'https://app.example.com/logo.svg'
+    it 'rejects a relative logo URI' do
+      input[:logo_uri] = '/logo.png'
 
-      expect_validation_error(:logo_uri, 'PNG, JPEG, JPG, or GIF') { metadata }
+      expect_validation_error(:logo_uri, 'absolute HTTPS URI') { metadata }
     end
 
-    it 'accepts a case-insensitive image extension before a query string' do
-      input[:logo_uri] = 'https://app.example.com/logo.JPEG?version=2'
+    it 'rejects a malformed logo URI' do
+      input[:logo_uri] = 'https://exa mple.com/logo.png'
 
-      expect(metadata.to_h['logo_uri']).to eq(input[:logo_uri])
+      expect_validation_error(:logo_uri, 'absolute HTTPS URI') { metadata }
+    end
+
+    %w[png jpg jpeg gif].each do |extension|
+      it "accepts a #{extension.upcase} path suffix without a format warning" do
+        input[:logo_uri] = "https://app.example.com/logo.#{extension.upcase}?version=2"
+
+        expect(metadata.to_h['logo_uri']).to eq(input[:logo_uri])
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+
+    [
+      'https://app.example.com/logo',
+      'https://app.example.com/logo?format=png',
+      'https://app.example.com/logo.svg'
+    ].each do |logo_uri|
+      it "accepts #{logo_uri} with a value-free format warning" do
+        warnings = []
+        allow(Safire.logger).to receive(:warn) { |message| warnings << message }
+        input[:logo_uri] = logo_uri
+
+        expect(metadata.to_h['logo_uri']).to eq(logo_uri)
+        expect(warnings).to contain_exactly(match(/logo_uri.*format.*cannot be verified locally/i))
+        expect(warnings.join).not_to include(logo_uri)
+      end
     end
   end
 

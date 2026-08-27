@@ -129,6 +129,24 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
     expect(client.register_client(registration_metadata, client_uri:)['client_id']).to eq('udap-client-123')
   end
 
+  it 'reports a 202 registration as pending after exactly one POST even when its body looks usable' do
+    stub_udap_discovery
+    stub_registration_response(status: 202)
+
+    expect { client.register_client(registration_metadata, client_uri:) }
+      .to raise_error(Safire::Errors::RegistrationError, /did not confirm completion.*pending processing/)
+    expect(registration_requests.length).to eq(1)
+  end
+
+  it 'does not retry when a successful response cannot identify the committed registration' do
+    stub_udap_discovery
+    stub_registration_response(status: 201, body: { 'client_name' => 'Example Backend Service' })
+
+    expect { client.register_client(registration_metadata, client_uri:) }
+      .to raise_error(Safire::Errors::RegistrationError, /missing client_id/)
+    expect(registration_requests.length).to eq(1)
+  end
+
   it 'signs with an advertised RSA alternative when non-conformant metadata omits RS256' do
     stub_udap_discovery(
       body: udap_metadata.merge('registration_endpoint_jwt_signing_alg_values_supported' => ['RS384'])
@@ -218,7 +236,7 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
     stub_registration_response(body: { 'client_id' => 'udap-client-123', 'grant_types' => ['client_credentials'] })
 
     expect { client.cancel_registration(cancellation_metadata, client_uri:) }
-      .to raise_error(Safire::Errors::RegistrationError, /empty grant_types/)
+      .to raise_error(Safire::Errors::RegistrationError, /did not confirm cancellation.*empty grant_types/)
   end
 
   it 'raises DiscoveryError before POST when the server does not advertise UDAP DCR' do

@@ -993,7 +993,7 @@ RSpec.describe Safire::Protocols::Udap do
       end
     end
 
-    context 'when the server returns an unsupported 2xx response' do
+    context 'when the server returns a pending 202 response' do
       before do
         stub_request(:post, registration_endpoint)
           .to_return(
@@ -1003,9 +1003,14 @@ RSpec.describe Safire::Protocols::Udap do
           )
       end
 
-      it 'raises RegistrationError before parsing the body as a successful registration' do
-        expect { udap.register_client(client_metadata, client_uri:) }
-          .to raise_error(Safire::Errors::RegistrationError, /unexpected registration response status/)
+      it 'reports an unconfirmed pending outcome without treating the body as completed registration' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          udap.register_client(client_metadata, client_uri:)
+        end
+
+        expect(error.status).to eq(202)
+        expect(error.error_description).to match(/did not confirm completion.*pending processing/)
+        expect(WebMock).to have_requested(:post, registration_endpoint).once
       end
     end
 
@@ -1049,16 +1054,19 @@ RSpec.describe Safire::Protocols::Udap do
       end
     end
 
-    context 'when the success response is malformed' do
-      before do
-        stub_request(:post, registration_endpoint)
-          .to_return(status: 201, body: { 'client_name' => 'Example' }.to_json,
-                     headers: { 'Content-Type' => 'application/json' })
-      end
+    [200, 201].each do |status|
+      context "when a #{status} success response is malformed" do
+        before do
+          stub_request(:post, registration_endpoint)
+            .to_return(status:, body: { 'client_name' => 'Example' }.to_json,
+                       headers: { 'Content-Type' => 'application/json' })
+        end
 
-      it 'raises RegistrationError before returning the response' do
-        expect { udap.register_client(client_metadata, client_uri:) }
-          .to raise_error(Safire::Errors::RegistrationError, /missing client_id/)
+        it 'raises RegistrationError after exactly one request' do
+          expect { udap.register_client(client_metadata, client_uri:) }
+            .to raise_error(Safire::Errors::RegistrationError, /missing client_id/)
+          expect(WebMock).to have_requested(:post, registration_endpoint).once
+        end
       end
     end
 
@@ -1239,9 +1247,12 @@ RSpec.describe Safire::Protocols::Udap do
             )
         end
 
-        it 'raises RegistrationError' do
+        it 'reports that the cancellation outcome is unconfirmed' do
           expect { udap.cancel_registration(client_metadata, client_uri:) }
-            .to raise_error(Safire::Errors::RegistrationError, /empty grant_types/)
+            .to raise_error(
+              Safire::Errors::RegistrationError,
+              /cancellation response did not confirm cancellation.*empty grant_types/
+            )
         end
       end
     end

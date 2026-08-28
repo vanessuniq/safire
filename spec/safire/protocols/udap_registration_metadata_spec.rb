@@ -467,6 +467,15 @@ RSpec.describe Safire::Protocols::UdapRegistrationMetadata do
       expect(metadata.to_h).not_to include('redirect_uris', 'logo_uri', 'response_types')
     end
 
+    it 'discards a non-string logo_uri before emitting diagnostics' do
+      allow(Safire.logger).to receive(:warn)
+      input[:logo_uri] = [nil]
+
+      expect { metadata }.not_to raise_error
+      expect(metadata.to_h).not_to include('logo_uri')
+      expect(Safire.logger).not_to have_received(:warn)
+    end
+
     it 'rejects caller-supplied grant_types' do
       input[:grant_types] = []
 

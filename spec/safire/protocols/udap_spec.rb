@@ -1014,6 +1014,23 @@ RSpec.describe Safire::Protocols::Udap do
       end
     end
 
+    context 'when the server returns another unconfirmed 2xx response' do
+      before do
+        stub_request(:post, registration_endpoint)
+          .to_return(status: 204)
+      end
+
+      it 'reports the completed response statuses expected by the high-level API' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          udap.register_client(client_metadata, client_uri:)
+        end
+
+        expect(error.status).to eq(204)
+        expect(error.error_description).to match(/did not confirm completion.*HTTP 200 or 201/)
+        expect(WebMock).to have_requested(:post, registration_endpoint).once
+      end
+    end
+
     context 'when the server returns a UDAP registration error' do
       before do
         stub_request(:post, registration_endpoint).to_return(

@@ -263,7 +263,7 @@ module Safire
 
       def warn_if_logo_format_unverifiable(metadata)
         logo_uri = metadata['logo_uri']
-        return unless logo_uri && !recognized_image_path?(logo_uri)
+        return unless logo_uri.is_a?(String) && !recognized_image_path?(logo_uri)
 
         Safire.logger.warn(
           '[UDAP] logo_uri image format cannot be verified locally from its URI path; ' \

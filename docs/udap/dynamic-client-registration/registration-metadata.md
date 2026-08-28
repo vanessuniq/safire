@@ -53,7 +53,7 @@ and `to_h` returns a defensive copy.
 | `grant_types` | Required for registration; must match one supported grant profile |
 | `scope` | Required non-blank, space-delimited OAuth scope string |
 | `redirect_uris` | Required only with `authorization_code`; every value uses HTTPS by default |
-| `logo_uri` | Required only with `authorization_code`; uses HTTPS by default and must reference PNG, JPEG/JPG, or GIF content |
+| `logo_uri` | Required only with `authorization_code`; uses HTTPS by default, and the caller must ensure it references PNG, JPEG/JPG, or GIF content (not locally verifiable by Safire) |
 | `response_types` | Generated as `["code"]` for `authorization_code` |
 | `token_endpoint_auth_method` | Generated as `"private_key_jwt"` |
 

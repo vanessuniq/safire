@@ -34,9 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Safire does not dereference caller-supplied logo URLs during validation.
 - UDAP registration returns metadata only for completed `200`/`201` outcomes;
   `202 Accepted` is reported as pending rather than treated as completed.
-  Cancellation errors now distinguish an unconfirmed outcome from server
-  rejection. Safire never retries a registration lifecycle request
-  automatically when the authorization server may already have committed it.
+  Cancellation error messages now more clearly distinguish an unconfirmed
+  outcome from server rejection. Safire never retries registration lifecycle
+  requests automatically when the authorization server may already have
+  committed them.
 
 ## [0.4.0] - 2026-08-07
 

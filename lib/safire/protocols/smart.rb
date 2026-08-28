@@ -30,6 +30,12 @@ module Safire
       ].freeze
 
       WELL_KNOWN_PATH = '/.well-known/smart-configuration'.freeze
+      LEGACY_BACKEND_SCOPES = ['system/*.rs'].freeze
+      BACKEND_SCOPE_DEPRECATION_WARNING =
+        '[Safire] SMART Backend Services default scope is deprecated; pass scopes: or configure scopes explicitly. ' \
+        'Requests without scopes will raise ConfigurationError in v0.6.0.'.freeze
+
+      private_constant :LEGACY_BACKEND_SCOPES, :BACKEND_SCOPE_DEPRECATION_WARNING
 
       attr_reader(*ATTRIBUTES)
       attr_accessor :client_type
@@ -176,13 +182,16 @@ module Safire
       # Requests an access token using the client credentials grant (SMART Backend Services).
       #
       # Implements the SMART Backend Services Authorization flow per
-      # https://hl7.org/fhir/smart-app-launch/backend-services.html
+      # https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html
       #
       # No user interaction, redirect, or PKCE is involved. The client authenticates
       # exclusively via a signed JWT assertion (RS384 or ES384).
       #
-      # @param scopes [Array<String>, nil] scope override; uses configured scopes if nil,
-      #   falling back to +["system/*.rs"]+ when neither is provided
+      # @param scopes [Array<String>, nil] scope override; uses configured scopes if nil. For v0.4.x compatibility,
+      #   a blank resolved value emits a deprecation warning and falls back to +["system/*.rs"]+. This fallback
+      #   will be removed in v0.6.0, when missing scopes will raise {Safire::Errors::ConfigurationError}. Explicit
+      #   non-+system/+ scopes are submitted unchanged because SMART permits them when the caller establishes the
+      #   required context out of band.
       # @param private_key [OpenSSL::PKey] private key for JWT assertion; uses configured key if not provided.
       #   Required — must be present either in configuration or passed here.
       # @param kid [String] key ID for JWT assertion header; uses configured kid if not provided.
@@ -196,7 +205,7 @@ module Safire
       # @raise [Safire::Errors::TokenError] if the server returns an error or invalid response
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
       def request_backend_token(scopes: nil, private_key: self.private_key, kid: self.kid)
-        scopes ||= self.scopes.presence || ['system/*.rs']
+        scopes = resolve_backend_scopes(scopes)
         validate_client_id!
 
         Safire.logger.info('Requesting backend services access token (client_credentials grant)...')
@@ -425,6 +434,14 @@ module Safire
           grant_type: 'client_credentials',
           scope: [scopes].flatten.join(' ')
         }.merge(jwt_assertion_params(private_key:, kid:))
+      end
+
+      def resolve_backend_scopes(requested_scopes)
+        resolved_scopes = requested_scopes.nil? ? scopes : requested_scopes
+        return resolved_scopes if resolved_scopes.present?
+
+        Safire.logger.warn(BACKEND_SCOPE_DEPRECATION_WARNING)
+        LEGACY_BACKEND_SCOPES
       end
 
       def client_auth_params(private_key:, kid:)

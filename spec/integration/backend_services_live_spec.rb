@@ -14,9 +14,9 @@ require 'spec_helper'
 #   SAFIRE_LIVE_BACKEND_CLIENT_ID       — registered backend client ID
 #   SAFIRE_LIVE_BACKEND_KID             — key ID matching the registered JWKS
 #   SAFIRE_LIVE_BACKEND_PRIVATE_KEY_PEM — PEM-encoded RSA or EC private key (inline)
+#   SAFIRE_LIVE_BACKEND_SCOPES          — space-separated scopes registered for the client
 #
 # Optional:
-#   SAFIRE_LIVE_BACKEND_SCOPES          — space-separated scopes (default: 'system/*.rs')
 #   SAFIRE_LIVE_BACKEND_ALGORITHM       — JWT algorithm (default: 'RS384')
 #
 RSpec.describe 'SMART Backend Services Flow (Live Server)', :live, type: :integration do
@@ -24,7 +24,7 @@ RSpec.describe 'SMART Backend Services Flow (Live Server)', :live, type: :integr
   let(:client_id)   { ENV.fetch('SAFIRE_LIVE_BACKEND_CLIENT_ID', nil) }
   let(:kid)         { ENV.fetch('SAFIRE_LIVE_BACKEND_KID', nil) }
   let(:algorithm)   { ENV.fetch('SAFIRE_LIVE_BACKEND_ALGORITHM', 'RS384') }
-  let(:scopes)      { ENV.fetch('SAFIRE_LIVE_BACKEND_SCOPES', 'system/*.rs').split }
+  let(:scopes)      { ENV.fetch('SAFIRE_LIVE_BACKEND_SCOPES', nil)&.split }
   let(:private_key) do
     pem = ENV.fetch('SAFIRE_LIVE_BACKEND_PRIVATE_KEY_PEM', nil)
     OpenSSL::PKey.read(pem) if pem
@@ -73,6 +73,7 @@ RSpec.describe 'SMART Backend Services Flow (Live Server)', :live, type: :integr
       skip 'Set SAFIRE_LIVE_BACKEND_CLIENT_ID to run token exchange tests' unless client_id
       skip 'Set SAFIRE_LIVE_BACKEND_KID to run token exchange tests' unless kid
       skip 'Set SAFIRE_LIVE_BACKEND_PRIVATE_KEY_PEM to run token exchange tests' unless private_key
+      skip 'Set SAFIRE_LIVE_BACKEND_SCOPES to run token exchange tests' unless scopes.present?
     end
 
     it 'exchanges a JWT assertion for an access token on a real server' do

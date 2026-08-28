@@ -797,6 +797,10 @@ RSpec.describe Safire::Protocols::Smart do
   # ---------- Backend Token ----------
 
   describe '#request_backend_token' do
+    let(:scope_fallback_warning) do
+      '[Safire] SMART Backend Services default scope is deprecated; pass scopes: or configure scopes explicitly. ' \
+        'Requests without scopes will raise ConfigurationError in v0.6.0.'
+    end
     let(:backend_token_response) do
       { 'access_token' => 'backend_token_abc', 'token_type' => 'Bearer',
         'expires_in' => 300, 'scope' => 'system/Patient.rs system/Observation.rs' }
@@ -824,6 +828,8 @@ RSpec.describe Safire::Protocols::Smart do
 
     let(:backend_config) { Safire::ClientConfig.new(backend_config_attrs) }
 
+    before { allow(Safire.logger).to receive(:warn) }
+
     context 'with RSA private key and configured scopes' do
       before do
         stub_token_post(body_matcher: backend_assertion_matcher, status: 200, body: backend_token_response)
@@ -845,6 +851,7 @@ RSpec.describe Safire::Protocols::Smart do
             body['client_assertion_type'] == 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' &&
             body['client_assertion'].present?
         end)
+        expect(Safire.logger).not_to have_received(:warn)
       end
 
       it 'does not include an Authorization header' do
@@ -886,11 +893,48 @@ RSpec.describe Safire::Protocols::Smart do
 
         expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
           .with(body: hash_including('scope' => 'system/Patient.rs'))
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+
+    context 'with non-system scopes supported through out-of-band coordination' do
+      before do
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'user/Patient.rs patient/Observation.rs'),
+          status: 200,
+          body: backend_token_response.merge('scope' => 'user/Patient.rs patient/Observation.rs')
+        )
+      end
+
+      it 'submits the scopes unchanged without treating a permitted coordinated request as non-conformant' do
+        requested_scopes = %w[user/Patient.rs patient/Observation.rs]
+
+        described_class.new(backend_config).request_backend_token(scopes: requested_scopes)
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => requested_scopes.join(' ')))
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+
+    context 'with a blank scope override' do
+      it 'uses the legacy fallback and warns instead of sending an empty scope' do
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'system/*.rs'),
+          status: 200,
+          body: backend_token_response.merge('scope' => 'system/*.rs')
+        )
+
+        described_class.new(backend_config).request_backend_token(scopes: [])
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => 'system/*.rs'))
+        expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
       end
     end
 
     context 'when no scopes are configured and none provided' do
-      it 'defaults to system/*.rs scope' do
+      it 'uses the legacy system/*.rs scope and emits the exact deprecation warning' do
         stub_token_post(
           body_matcher: hash_including('scope' => 'system/*.rs'),
           status: 200,
@@ -901,6 +945,29 @@ RSpec.describe Safire::Protocols::Smart do
 
         expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
           .with(body: hash_including('scope' => 'system/*.rs'))
+        expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
+      end
+
+      it 'does not include credentials or token values in the warning' do
+        warnings = []
+        allow(Safire.logger).to receive(:warn) { |message| warnings << message }
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'system/*.rs'),
+          status: 200,
+          body: backend_token_response.merge('access_token' => 'sensitive-access-token')
+        )
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
+
+        described_class.new(cfg).request_backend_token
+
+        expect(warnings).to eq([scope_fallback_warning])
+        expect(warnings.join).not_to include(
+          'backend_client_id',
+          'backend-key-id',
+          rsa_private_key.to_pem,
+          'sensitive-access-token',
+          'client_assertion'
+        )
       end
     end
 

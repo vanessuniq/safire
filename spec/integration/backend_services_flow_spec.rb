@@ -55,9 +55,9 @@ RSpec.describe 'SMART Backend Services End-to-End Flow', type: :integration do
 
   # ---------- Helpers ----------
 
-  def stub_discovery
+  def stub_discovery(metadata: smart_metadata)
     stub_request(:get, "#{base_url}/.well-known/smart-configuration")
-      .to_return(status: 200, body: smart_metadata.to_json,
+      .to_return(status: 200, body: metadata.to_json,
                  headers: { 'Content-Type' => 'application/json' })
   end
 
@@ -165,7 +165,8 @@ RSpec.describe 'SMART Backend Services End-to-End Flow', type: :integration do
       expect(tokens['scope']).to eq('system/Patient.rs')
     end
 
-    it 'defaults to system/*.rs when no scopes are configured' do
+    it 'preserves the deprecated system/*.rs fallback when no scopes are configured' do
+      allow(Safire.logger).to receive(:warn)
       stub_token_post(
         body_matcher: hash_including('scope' => 'system/*.rs'),
         response_body: backend_token_response.merge('scope' => 'system/*.rs')
@@ -175,6 +176,25 @@ RSpec.describe 'SMART Backend Services End-to-End Flow', type: :integration do
 
       expect(WebMock).to have_requested(:post, token_endpoint)
         .with(body: hash_including('scope' => 'system/*.rs'))
+      expect(Safire.logger).to have_received(:warn).once
+    end
+
+    it 'submits an explicit wildcard that is absent from non-exhaustive discovery metadata' do
+      allow(Safire.logger).to receive(:warn)
+      stub_discovery(metadata: smart_metadata.merge('scopes_supported' => ['system/Patient.rs']))
+      stub_token_post(
+        body_matcher: hash_including('scope' => 'system/*.rs'),
+        response_body: backend_token_response.merge('scope' => 'system/*.rs')
+      )
+      config = Safire::ClientConfig.new(
+        backend_config_attrs.except(:token_endpoint).merge(scopes: ['system/*.rs'])
+      )
+
+      Safire::Client.new(config).request_backend_token
+
+      expect(WebMock).to have_requested(:post, token_endpoint)
+        .with(body: hash_including('scope' => 'system/*.rs'))
+      expect(Safire.logger).not_to have_received(:warn)
     end
   end
 

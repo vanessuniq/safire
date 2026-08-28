@@ -918,18 +918,42 @@ RSpec.describe Safire::Protocols::Smart do
     end
 
     context 'with a blank scope override' do
-      it 'uses the legacy fallback and warns instead of sending an empty scope' do
+      before do
         stub_token_post(
           body_matcher: hash_including('scope' => 'system/*.rs'),
           status: 200,
           body: backend_token_response.merge('scope' => 'system/*.rs')
         )
+      end
 
+      it 'uses the legacy fallback and warns instead of sending an empty array' do
         described_class.new(backend_config).request_backend_token(scopes: [])
 
         expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
           .with(body: hash_including('scope' => 'system/*.rs'))
         expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
+      end
+
+      it 'uses the legacy fallback when every requested entry is blank' do
+        described_class.new(backend_config).request_backend_token(scopes: [nil, '', '  '])
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => 'system/*.rs'))
+        expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
+      end
+
+      it 'removes blank entries and trims usable requested scopes' do
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'system/Patient.rs'),
+          status: 200,
+          body: backend_token_response.merge('scope' => 'system/Patient.rs')
+        )
+
+        described_class.new(backend_config).request_backend_token(scopes: ['', ' system/Patient.rs ', nil])
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => 'system/Patient.rs'))
+        expect(Safire.logger).not_to have_received(:warn)
       end
     end
 
@@ -968,6 +992,21 @@ RSpec.describe Safire::Protocols::Smart do
           'sensitive-access-token',
           'client_assertion'
         )
+      end
+
+      it 'uses the legacy fallback when every configured entry is blank' do
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'system/*.rs'),
+          status: 200,
+          body: backend_token_response.merge('scope' => 'system/*.rs')
+        )
+        cfg = Safire::ClientConfig.new(backend_config_attrs.merge(scopes: ['', '  ']))
+
+        described_class.new(cfg).request_backend_token
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => 'system/*.rs'))
+        expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
       end
     end
 

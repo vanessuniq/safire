@@ -437,11 +437,20 @@ module Safire
       end
 
       def resolve_backend_scopes(requested_scopes)
-        resolved_scopes = requested_scopes.nil? ? scopes : requested_scopes
+        configured_or_requested = requested_scopes.nil? ? scopes : requested_scopes
+        resolved_scopes = normalize_backend_scopes(configured_or_requested)
         return resolved_scopes if resolved_scopes.present?
 
         Safire.logger.warn(BACKEND_SCOPE_DEPRECATION_WARNING)
         LEGACY_BACKEND_SCOPES
+      end
+
+      def normalize_backend_scopes(scopes)
+        [scopes].flatten.filter_map do |scope|
+          next if scope.blank?
+
+          scope.is_a?(String) ? scope.strip : scope
+        end
       end
 
       def client_auth_params(private_key:, kid:)

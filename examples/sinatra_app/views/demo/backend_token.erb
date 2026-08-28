@@ -58,6 +58,7 @@
     <div class="form-actions">
       <form action="/demo/<%= @server.id %>/backend-token" method="post" style="display:inline;">
         <%= csrf_field %>
+        <input type="hidden" name="scopes" value="<%= h(@backend_scopes) %>">
         <button type="submit" class="btn btn-primary">Request New Token</button>
       </form>
       <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Back to Server</a>
@@ -72,11 +73,21 @@
     <form action="/demo/<%= @server.id %>/backend-token" method="post" class="demo-form">
       <%= csrf_field %>
       <div class="form-group">
-        <label for="scopes">Scopes <span class="optional">(optional)</span></label>
+        <label for="scopes">Scopes</label>
         <input type="text" id="scopes" name="scopes"
+               value="<%= h(@backend_scopes) %>"
                placeholder="system/Patient.rs system/Observation.rs"
+               required
+               <%= 'aria-invalid="true"' if @backend_scope_error %>
                class="form-input">
-        <p class="form-hint">Space or comma-separated. Defaults to <code>system/*.rs</code> when omitted.</p>
+        <% if @backend_scope_error %>
+          <p class="form-hint" role="alert"><%= h(@backend_scope_error) %></p>
+        <% else %>
+          <p class="form-hint">
+            Space or comma-separated system scopes registered for this client. This demo does not establish
+            out-of-band user or patient context.
+          </p>
+        <% end %>
       </div>
 
       <div class="form-actions">

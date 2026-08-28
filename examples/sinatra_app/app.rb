@@ -377,6 +377,7 @@ class SafireDemo < Sinatra::Base
       return
     end
 
+    @backend_scopes = backend_service_scopes(@server.scopes).join(' ')
     erb :'demo/backend_token'
   end
 
@@ -389,7 +390,14 @@ class SafireDemo < Sinatra::Base
     end
 
     begin
-      scopes = params[:scopes].to_s.strip.empty? ? ['system/*.rs'] : parse_scopes(params[:scopes])
+      @backend_scopes = params[:scopes].to_s.strip
+      scopes = parse_scopes(@backend_scopes)
+      @backend_scope_error = backend_scope_error(scopes)
+      if @backend_scope_error
+        status 422
+        return erb :'demo/backend_token'
+      end
+
       backend_client = build_backend_services_client(@server)
       @token_response = backend_client.request_backend_token(scopes: scopes)
       @valid = backend_client.token_response_valid?(@token_response, flow: :backend_services)
@@ -597,6 +605,21 @@ class SafireDemo < Sinatra::Base
 
   def parse_scopes(scopes_str)
     scopes_str.to_s.split(/[,\s]+/).map(&:strip).reject(&:empty?)
+  end
+
+  def backend_service_scopes(scopes)
+    Array(scopes).select { |scope| backend_service_scope?(scope) }
+  end
+
+  def backend_service_scope?(scope)
+    scope.to_s.start_with?('system/')
+  end
+
+  def backend_scope_error(scopes)
+    return 'Enter at least one scope before requesting a token.' if scopes.empty?
+    return if scopes.all? { |scope| backend_service_scope?(scope) }
+
+    'Enter only system/ scopes. This demo does not establish user or patient context out of band.'
   end
 
   def perform_registration

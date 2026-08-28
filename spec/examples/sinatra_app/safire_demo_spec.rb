@@ -487,6 +487,29 @@ RSpec.describe SafireDemo do
       }
     end
 
+    it 'prepopulates only configured system scopes' do
+      allow(Safire::Client).to receive(:new).and_return(metadata_client)
+      allow(smart_server).to receive(:scopes).and_return(%w[openid system/Patient.rs profile system/Observation.rs])
+
+      response = response_for(:get, '/demo/smart-only/backend-token')
+
+      expect(response.status).to eq(200)
+      expect(response.body).to include('name="scopes"')
+      expect(response.body).to include('value="system/Patient.rs system/Observation.rs"')
+      expect(response.body).not_to include('value="openid system/Patient.rs profile')
+    end
+
+    it 'leaves the scope input empty when only App Launch scopes are configured' do
+      allow(Safire::Client).to receive(:new).and_return(metadata_client)
+
+      response = response_for(:get, '/demo/smart-only/backend-token')
+
+      expect(response.status).to eq(200)
+      expect(response.body).to include('name="scopes"')
+      expect(response.body).to include('value=""')
+      expect(response.body).not_to include('value="openid profile"')
+    end
+
     it 'requests tokens with a backend-specific confidential asymmetric client' do
       allow(Safire::Client).to receive(:new).and_return(metadata_client, backend_client)
 
@@ -494,6 +517,7 @@ RSpec.describe SafireDemo do
 
       expect(response.status).to eq(200)
       expect(response.body).to include('system-token')
+      expect(response.body).to include('name="scopes" value="system/*.rs"')
       expect(backend_client).to have_received(:request_backend_token).with(scopes: ['system/*.rs'])
       expect(backend_client).to have_received(:token_response_valid?).with(backend_token_response,
                                                                            flow: :backend_services)
@@ -520,6 +544,36 @@ RSpec.describe SafireDemo do
       expect(response.status).to eq(200)
       expect(response.body).not_to include(unsafe_value)
       expect(response.body).to include('&lt;script&gt;alert')
+    end
+
+    it 'rejects an empty scope before constructing a token-request client' do
+      allow(Safire::Client).to receive(:new).and_return(metadata_client)
+
+      response = with_env(
+        'ASYMMETRIC_PRIVATE_KEY_PEM' => 'backend-private-key',
+        'ASYMMETRIC_KID' => 'backend-kid'
+      ) do
+        form_response(:post, '/demo/smart-only/backend-token', params: { scopes: ' , ' })
+      end
+
+      expect(response.status).to eq(422)
+      expect(response.body).to include('Enter at least one scope')
+      expect(Safire::Client).to have_received(:new).once
+    end
+
+    it 'rejects non-system scopes because the demo has no out-of-band context' do
+      allow(Safire::Client).to receive(:new).and_return(metadata_client)
+
+      response = with_env(
+        'ASYMMETRIC_PRIVATE_KEY_PEM' => 'backend-private-key',
+        'ASYMMETRIC_KID' => 'backend-kid'
+      ) do
+        form_response(:post, '/demo/smart-only/backend-token', params: { scopes: 'user/Patient.rs' })
+      end
+
+      expect(response.status).to eq(422)
+      expect(response.body).to include('Enter only system/ scopes')
+      expect(Safire::Client).to have_received(:new).once
     end
   end
 

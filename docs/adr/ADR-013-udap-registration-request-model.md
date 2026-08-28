@@ -62,6 +62,18 @@ Unknown and duplicate grant values are rejected. `redirect_uris`, `logo_uri`,
 and generated `response_types: ["code"]` apply only to authorization-code
 registration. Redirect and logo URIs require absolute HTTPS by default.
 
+The STU2 logo requirement has two different validation boundaries. Safire can
+prove locally that `logo_uri` is an absolute HTTPS URI, so malformed, relative,
+and insecure public values fail before signing. Safire cannot prove that the
+remote representation is PNG, JPG/JPEG, or GIF from a URI path alone. Familiar
+image suffixes remain a quiet heuristic; other usable URI paths produce a
+value-free warning and remain the caller's responsibility.
+
+Safire does not dereference `logo_uri` during validation. Fetching an untrusted
+caller-supplied URI would introduce SSRF, latency, redirect, and remote
+availability concerns into construction of an otherwise local value object,
+without reliably proving what the authorization server will later retrieve.
+
 For local development without TLS, callers may explicitly pass
 `allow_insecure_localhost: true`. This permits HTTP only on `localhost` and
 `127.0.0.1`; remote HTTP remains invalid. Safire warns only when the exception
@@ -104,6 +116,8 @@ regular expression.
 - Protocol-owned claims cannot be shadowed through caller input.
 - Plain HTTP remains impossible for remote hosts; local HTTP requires a literal
   boolean opt-in and produces a warning.
+- Logo media type remains a caller obligation when it cannot be established
+  from the URI path; Safire reports that uncertainty without fetching the URI.
 - Extension metadata remains forward-compatible without permitting arbitrary
   Ruby objects into a JWT payload.
 - Metadata validation remains independent of software-statement signing and the

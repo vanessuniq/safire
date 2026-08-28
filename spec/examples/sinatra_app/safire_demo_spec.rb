@@ -894,6 +894,31 @@ RSpec.describe SafireDemo do
       expect(response.body).to include('different client id')
     end
 
+    it 'preserves stored state when the server does not confirm cancellation' do
+      allow(udap_client).to receive(:cancel_registration).and_raise(
+        Safire::Errors::RegistrationError.new(
+          status: 202,
+          error_description: 'cancellation response did not confirm cancellation: expected an empty grant_types array'
+        )
+      )
+
+      response = form_response(
+        :post,
+        '/demo/registered-udap/udap-registration/cancel',
+        params: registration_params,
+        env: { 'HTTP_HOST' => 'localhost:4567' }
+      )
+
+      expect(response.status).to eq(200)
+      expect(registered_udap_server.udap_client_id).to eq('stored-udap-client')
+      expect(registered_udap_server.udap_client_uri).to eq('http://localhost:4567')
+      expect(registered_udap_server.udap_community).to eq('https://community.example.org/udap')
+      expect(registered_udap_server.udap_scope).to eq('system/Patient.rs')
+      expect(registered_udap_server).not_to have_received(:save)
+      expect(response.body).to include('did not confirm cancellation')
+      expect(response.body).not_to include('Registration cancelled.')
+    end
+
     it 'rejects registration and cancellation posts without a CSRF token' do
       registration = response_for(:post, '/demo/udap-only/udap-registration')
       cancellation = response_for(:post, '/demo/registered-udap/udap-registration/cancel')

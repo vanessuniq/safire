@@ -139,13 +139,24 @@ rescue Safire::Errors::RegistrationError => e
 end
 ```
 
-Either response is a server-side protocol error and should not be treated as a
-successful registration.
+Either response is unusable as a confirmed registration. Safire does not retry
+automatically: the authorization server may already have committed a
+registration or modification before returning a response Safire cannot safely
+consume. Use the server's registration-management mechanism or operator portal
+before submitting another request.
+
+UDAP assigns completed registration meanings to `201 Created` and the
+update-style `200 OK` response. Safire returns registration metadata only for
+those outcomes. A `202 Accepted` response means processing is pending under
+HTTP semantics and does not establish completion, even when its body contains a
+valid-looking `client_id`. Safire raises `RegistrationError` with
+`e.status == 202`; callers remain responsible for any server-specific status or
+management workflow.
 
 ### `RegistrationError`: UDAP cancellation response does not confirm cancellation
 
 ```
-Safire::Errors::RegistrationError: Client registration failed — HTTP 202 — cancellation response must include an empty grant_types array
+Safire::Errors::RegistrationError: Client registration failed — HTTP 202 — cancellation response did not confirm cancellation: expected an empty grant_types array
 ```
 
 UDAP registration cancellation is confirmed by the response body, not by a
@@ -164,9 +175,13 @@ cancellation = udap_client.cancel_registration(
 cancellation['grant_types'] # => []
 ```
 
-If the response status is not `2xx`, or if the body omits `grant_types`, returns
-a non-array value, or returns a non-empty array, treat it as a failed
-cancellation and investigate the authorization server response.
+A non-`2xx` response does not confirm cancellation; inspect any preserved OAuth
+error code and description to determine whether the server explicitly rejected
+the request. If a final `2xx` response omits `grant_types`, returns a non-array
+value, or returns a non-empty array, the outcome is unconfirmed rather than
+rejected. Safire does not retry automatically; preserve the stored registration
+state and inspect the authorization server before retrying or discarding the
+`client_id`.
 
 ---
 

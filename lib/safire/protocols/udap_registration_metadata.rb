@@ -3,10 +3,11 @@ require_relative '../uri_validation'
 
 module Safire
   module Protocols
-    # Validates and normalizes caller-controlled UDAP Dynamic Client
-    # Registration metadata before a software statement is signed.
+    # Validates and normalizes locally provable properties of caller-controlled
+    # UDAP Dynamic Client Registration metadata before a software statement is
+    # signed.
     #
-    # The object enforces the registration metadata rules from
+    # The object enforces locally provable registration metadata rules from
     # [UDAP Security STU2](https://hl7.org/fhir/us/udap-security/STU2/registration.html).
     # It preserves JSON-compatible RFC 7591 extension metadata while preventing
     # callers from overriding JWT claims, request envelope fields, or fixed
@@ -79,8 +80,8 @@ module Safire
       # @param allow_insecure_localhost [Boolean] permit HTTP redirect and logo
       #   URIs only on +localhost+ or +127.0.0.1+ for local development; this
       #   produces non-conformant UDAP registration metadata
-      # @raise [Safire::Errors::ValidationError] when input violates the STU2
-      #   registration metadata contract
+      # @raise [Safire::Errors::ValidationError] when input violates a locally
+      #   provable STU2 registration metadata requirement
       def initialize(input, operation: :register, allow_insecure_localhost: false)
         @operation = validate_operation(operation)
         @allow_insecure_localhost = validate_localhost_policy(allow_insecure_localhost)
@@ -95,7 +96,7 @@ module Safire
         validate_extensions!(normalized)
         generate_protocol_fields!(normalized)
         @metadata = deep_freeze(normalized)
-        warn_if_insecure_localhost_used(@metadata)
+        emit_diagnostics(@metadata)
         freeze
       end
 
@@ -208,9 +209,6 @@ module Safire
 
         logo_uri = metadata['logo_uri']
         fail_validation!(:logo_uri, 'must be an absolute HTTPS URI') unless allowed_registration_uri?(logo_uri)
-        return if image_uri?(logo_uri)
-
-        fail_validation!(:logo_uri, 'must reference a PNG, JPEG, JPG, or GIF resource')
       end
 
       def validate_authorization_fields_absent!(metadata)
@@ -258,6 +256,21 @@ module Safire
           (@allow_insecure_localhost && localhost_http_uri?(value))
       end
 
+      def emit_diagnostics(metadata)
+        warn_if_logo_format_unverifiable(metadata)
+        warn_if_insecure_localhost_used(metadata)
+      end
+
+      def warn_if_logo_format_unverifiable(metadata)
+        logo_uri = metadata['logo_uri']
+        return unless logo_uri.is_a?(String) && !recognized_image_path?(logo_uri)
+
+        Safire.logger.warn(
+          '[UDAP] logo_uri image format cannot be verified locally from its URI path; ' \
+          'the caller must ensure it references PNG, JPEG/JPG, or GIF content'
+        )
+      end
+
       def warn_if_insecure_localhost_used(metadata)
         return unless @allow_insecure_localhost
 
@@ -301,7 +314,7 @@ module Safire
         false
       end
 
-      def image_uri?(value)
+      def recognized_image_path?(value)
         path = Addressable::URI.parse(value).path.to_s
         IMAGE_PATH_PATTERN.match?(path)
       rescue Addressable::URI::InvalidURIError

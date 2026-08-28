@@ -53,7 +53,7 @@ and `to_h` returns a defensive copy.
 | `grant_types` | Required for registration; must match one supported grant profile |
 | `scope` | Required non-blank, space-delimited OAuth scope string |
 | `redirect_uris` | Required only with `authorization_code`; every value uses HTTPS by default |
-| `logo_uri` | Required only with `authorization_code`; uses HTTPS by default and references PNG, JPEG/JPG, or GIF content by path |
+| `logo_uri` | Required only with `authorization_code`; uses HTTPS by default, and the caller must ensure it references PNG, JPEG/JPG, or GIF content (not locally verifiable by Safire) |
 | `response_types` | Generated as `["code"]` for `authorization_code` |
 | `token_endpoint_auth_method` | Generated as `"private_key_jwt"` |
 
@@ -119,6 +119,16 @@ metadata = Safire::Protocols::UdapRegistrationMetadata.new(
 This option permits HTTP only on `localhost` and `127.0.0.1`, logs a warning
 when exercised, and produces non-conformant metadata that must not be used in
 production. Safire does not infer the application environment.
+
+Safire treats `.png`, `.jpg`, `.jpeg`, and `.gif` path suffixes as a quiet
+signal that a logo URI is shaped as expected. Extensionless, query-driven, and
+other usable URI paths are accepted with a warning because a path cannot prove
+the remote representation's media type. The warning does not include the URI.
+
+Safire does not fetch `logo_uri` during validation. Doing so would expose local
+metadata construction to SSRF, redirects, network latency, and remote
+availability. The caller remains responsible for ensuring that the URI
+actually resolves to PNG, JPG/JPEG, or GIF content as required by STU2.
 
 Callers cannot supply protocol-owned values:
 

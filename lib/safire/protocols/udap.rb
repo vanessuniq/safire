@@ -124,7 +124,8 @@ module Safire
       # @raise [Safire::Errors::ValidationError] when caller metadata or certifications are invalid
       # @raise [Safire::Errors::ConfigurationError] when signing configuration is missing or incompatible
       # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
-      # @raise [Safire::Errors::RegistrationError] when the server rejects registration or returns malformed success
+      # @raise [Safire::Errors::RegistrationError] when the server rejects registration,
+      #   returns an unconfirmed pending outcome, or returns a malformed completed response
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
       #   or a redirect to a non-HTTPS URL
       def register_client(metadata, client_uri:, community: nil, certifications: nil, trusted_anchors: [],
@@ -434,9 +435,16 @@ module Safire
       def validate_registration_response_status!(response)
         return if SUCCESSFUL_REGISTRATION_STATUSES.include?(response.status)
 
+        description =
+          if response.status == 202
+            'registration response did not confirm completion: HTTP 202 indicates pending processing'
+          else
+            'registration response did not confirm completion: expected HTTP 200 or 201'
+          end
+
         raise Errors::RegistrationError.new(
           status: response.status,
-          error_description: 'unexpected registration response status'
+          error_description: description
         )
       end
 
@@ -447,7 +455,7 @@ module Safire
 
         raise Errors::RegistrationError.new(
           status: response.status,
-          error_description: 'cancellation response must include an empty grant_types array'
+          error_description: 'cancellation response did not confirm cancellation: expected an empty grant_types array'
         )
       end
 

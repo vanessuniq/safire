@@ -28,6 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metadata produces aggregated warnings while registration, modification, and
   lifecycle-safe cancellation continue; exact wildcard advertisement becomes a
   registration requirement in v0.5.0.
+- UDAP authorization-code registration now rejects only locally provable
+  `logo_uri` defects. Usable HTTPS URLs whose PNG, JPG/JPEG, or GIF format
+  cannot be inferred from the path are accepted with a value-free warning;
+  Safire does not dereference caller-supplied logo URLs during validation.
+- UDAP registration returns metadata only for completed `200`/`201` outcomes;
+  `202 Accepted` is reported as pending rather than treated as completed.
+  Cancellation error messages now more clearly distinguish an unconfirmed
+  outcome from server rejection. Safire never retries registration lifecycle
+  requests automatically when the authorization server may already have
+  committed them.
 
 ## [0.4.0] - 2026-08-07
 

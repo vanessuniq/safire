@@ -37,9 +37,22 @@ registration = client.register_client(
 )
 ```
 
-Safire accepts new-registration `201 Created` responses and update-style `200`
-responses. Either response must be a JSON object with a non-blank string
-`client_id`.
+UDAP defines `201 Created` for completed new registration and an update-style
+`200 OK` response for modification. Safire returns registration metadata only
+for those completed outcomes, and either response must be a JSON object with a
+non-blank string `client_id`.
+
+Safire submits each registration or modification request once. It does not
+automatically retry after an unusable `200` or `201` response because the
+authorization server may already have committed the operation even though
+Safire cannot safely consume its response. Use the server's registration
+management mechanism or operator portal before submitting another request. A
+`202 Accepted` response represents pending processing under HTTP semantics,
+even when its body contains a valid-looking `client_id`. Safire reports that
+unconfirmed outcome through `RegistrationError` with `status == 202`; the
+application decides whether and how to use a server-specific status or
+management mechanism. Safire does not claim that STU2 requires clients to
+reject `202` responses.
 
 The authorization server identifies the registration from the software
 statement's client URI (`iss`) and certificate trust-community context, not from
@@ -94,8 +107,13 @@ Unlike registration, Safire does not require a specific success status such as
 `200` or `201` for cancellation, but the final HTTP response must still be a
 successful `2xx`. UDAP Security STU2 confirms cancellation through the response
 body: the response must contain a non-blank string `client_id` and an empty
-`grant_types` array. A final non-`2xx` status, or a non-empty, missing, or
-non-array `grant_types` value, raises `Safire::Errors::RegistrationError`.
+`grant_types` array. A final non-`2xx` status raises
+`Safire::Errors::RegistrationError` and preserves any OAuth error returned by
+the server. A final `2xx` response with a non-empty, missing, or non-array
+`grant_types` value also raises `RegistrationError`, but in that case the
+cancellation outcome is unconfirmed rather than rejected. Applications should
+preserve their local registration state and inspect the authorization server
+before retrying or discarding the stored `client_id`.
 
 ## Error Boundaries
 
@@ -107,7 +125,7 @@ Both lifecycle methods raise the same Safire error families:
 | `Safire::Errors::ValidationError` | Caller metadata or `certifications:` failed local validation before signing |
 | `Safire::Errors::ConfigurationError` | Signing configuration is missing or incompatible |
 | `Safire::Errors::CertificateError` | The private key, certificate chain, validity period, or `client_uri` SAN check failed |
-| `Safire::Errors::RegistrationError` | The registration endpoint returned an OAuth error response or a malformed success response |
+| `Safire::Errors::RegistrationError` | The registration endpoint returned an OAuth error, an unconfirmed pending outcome, or a malformed completed response |
 | `Safire::Errors::NetworkError` | The request failed at the transport layer |
 
 OAuth-style server errors preserve the server's `error` and

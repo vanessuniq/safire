@@ -19,7 +19,7 @@ Safire is a Ruby gem for healthcare client applications that implements [SMART A
 - Confidential Symmetric Client (`client_secret` + HTTP Basic Auth)
 - Confidential Asymmetric Client (`private_key_jwt` with RS384/ES384)
 - POST-Based Authorization
-- Backend Services (`client_credentials` grant, JWT assertion, no user interaction or PKCE; scope defaults to `system/*.rs`)
+- Backend Services (`client_credentials` grant, JWT assertion, no user interaction or PKCE; client-selected scopes)
 
 ### UDAP Security (STU2)
 
@@ -184,6 +184,12 @@ token_data = client.request_backend_token(
 # Validate the token response (flow: :backend_services also checks expires_in)
 client.token_response_valid?(token_data, flow: :backend_services)
 ```
+
+Configure scopes on the client or pass `scopes:` to each Backend Services
+request. The legacy `system/*.rs` fallback is deprecated in v0.4.x and will be
+removed in v0.6.0. Backend Services normally uses `system/` scopes. Safire
+preserves explicit non-system scopes because SMART permits them when context is
+established out of band.
 
 ---
 

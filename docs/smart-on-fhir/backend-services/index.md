@@ -19,7 +19,7 @@ System-to-system access token requests using the OAuth 2.0 `client_credentials` 
 
 ## Overview
 
-SMART Backend Services enables autonomous server-to-server FHIR access without involving a user. It is defined in the [SMART App Launch Backend Services](https://hl7.org/fhir/smart-app-launch/backend-services.html) specification.
+SMART Backend Services enables autonomous server-to-server FHIR access without involving a user. It is defined in the [SMART App Launch Backend Services](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html) specification.
 
 Instead of a redirect flow, the client:
 
@@ -46,7 +46,7 @@ Suitable for:
 | **Redirect URI** | Required | Not used |
 | **PKCE** | Required | Not used |
 | **Client auth** | Varies by `client_type:` | JWT assertion always |
-| **Scopes** | `patient/`, `user/`, `openid` | `system/` |
+| **Scopes** | `patient/`, `user/`, `openid` | Normally `system/` |
 | **Refresh token** | Usually issued | Not issued |
 | **`expires_in`** | Recommended | Required |
 
@@ -66,7 +66,9 @@ Backend services use the same RSA or EC key pair infrastructure as the confident
 
 ## Client Setup
 
-`redirect_uri` and `scopes` are optional for backend services clients. If `scopes` is omitted, Safire defaults to `["system/*.rs"]` when `request_backend_token` is called.
+`redirect_uri` is not used for Backend Services. The token request requires
+client-selected scopes, supplied either in `ClientConfig` or through the
+per-call `scopes:` keyword.
 
 ```ruby
 config = Safire::ClientConfig.new(
@@ -74,7 +76,7 @@ config = Safire::ClientConfig.new(
   client_id:   ENV['SMART_CLIENT_ID'],
   private_key: OpenSSL::PKey::RSA.new(ENV['SMART_PRIVATE_KEY_PEM']),
   kid:         ENV['SMART_KEY_ID'],
-  scopes:      ['system/Patient.rs', 'system/Observation.rs']  # optional
+  scopes:      ['system/Patient.rs', 'system/Observation.rs']
 )
 
 client = Safire::Client.new(config)
@@ -82,6 +84,18 @@ client = Safire::Client.new(config)
 
 {: .note }
 > `client_type:` is not used for backend services — `request_backend_token` always authenticates via JWT assertion regardless of `client_type`.
+
+{: .warning }
+> Safire v0.4.x retains a deprecated `system/*.rs` fallback when scopes are
+> absent. It logs a warning and will be removed in v0.6.0, when the same call
+> will raise `ConfigurationError`.
+
+{: .note }
+> Backend Services normally requests `system/` scopes. SMART does not prohibit
+> `user/` or `patient/` scopes when the client and authorization server establish
+> context out of band. Safire submits such explicit scopes unchanged because it
+> cannot verify that external context and the authorization server remains
+> responsible for accepting the request.
 
 ---
 

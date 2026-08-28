@@ -124,7 +124,10 @@ auth_data = client.authorization_url(
 ```
 
 {: .note }
-> **Backend Services:** `request_backend_token` does not raise this error — it defaults to `["system/*.rs"]` when no scopes are configured. Pass `scopes:` to override: `client.request_backend_token(scopes: ['system/Patient.rs'])`.
+> **Backend Services:** In v0.4.x, `request_backend_token` logs a deprecation
+> warning and uses `system/*.rs` when scopes are absent. Configure scopes or
+> pass `scopes:` explicitly now. Starting in v0.6.0, the same missing-scope
+> condition will raise `ConfigurationError`.
 
 ### State mismatch on callback
 

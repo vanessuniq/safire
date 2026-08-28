@@ -141,6 +141,7 @@ metadata = client.server_metadata
 
 if metadata.supports_backend_services?
   token_data = client.request_backend_token(
+    scopes:      ['system/Patient.rs'],
     private_key: private_key,
     kid:         kid
   )

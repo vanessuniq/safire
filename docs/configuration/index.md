@@ -51,7 +51,7 @@ flowchart TD
 | `kid` | String | No | — | Key ID matching the public key registered with the server |
 | `jwt_algorithm` | String | No | auto | SMART: `RS384` or `ES384`; UDAP registration: `RS256`, `RS384`, `ES256`, or `ES384`, constrained by the key and server metadata |
 | `jwks_uri` | String | No | — | SMART-only URL to the client's public JWKS, included as `jku` in SMART JWT assertions |
-| `scopes` | Array | No | — | Default scopes for authorization requests |
+| `scopes` | Array | No | — | Default scopes for authorization requests; SMART Backend Services normally uses `system/` scopes and requires explicit values unless passed per request (the v0.4.x fallback is deprecated) |
 | `authorization_endpoint` | String | No | — | Override the discovered authorization endpoint |
 | `token_endpoint` | String | No | — | Override the discovered token endpoint |
 

@@ -91,11 +91,12 @@ client = Safire::Client.new(config)
 > will raise `ConfigurationError`.
 
 {: .note }
-> Backend Services normally requests `system/` scopes. SMART does not prohibit
-> `user/` or `patient/` scopes when the client and authorization server establish
-> context out of band. Safire submits such explicit scopes unchanged because it
-> cannot verify that external context and the authorization server remains
-> responsible for accepting the request.
+> Backend Services normally requests `system/` scopes. The
+> [SMART STU2.2 scope requirements](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#scopes)
+> do not prohibit `user/` or `patient/` scopes when the client and authorization
+> server establish context out of band. Safire submits such explicit scopes
+> unchanged because it cannot verify that external context and the authorization
+> server remains responsible for accepting the request.
 
 ---
 

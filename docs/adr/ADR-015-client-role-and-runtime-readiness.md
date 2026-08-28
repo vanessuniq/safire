@@ -95,12 +95,14 @@ pass scopes explicitly; absent scopes become a runtime `ConfigurationError` in
 v0.6.0. SMART discovery `scopes_supported` is non-exhaustive and is not used as
 an exact allow-list for token requests.
 
-`system/` scopes are the normal Backend Services context. The SMART IG also
-states that `user/` and `patient/` scopes are not prohibited when context is
-established through out-of-band coordination. Safire therefore preserves and
-submits explicit non-system scopes without warning or rejection. The library
-cannot determine whether the caller completed that external coordination, and
-must not make a permitted healthy path noisy based on missing local evidence.
+`system/` scopes are the normal Backend Services context. The
+[SMART STU2.2 Backend Services scope requirements](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#scopes)
+also state that `user/` and `patient/` scopes are not prohibited when context
+is established through out-of-band coordination. Safire therefore preserves
+and submits explicit non-system scopes without warning or rejection. The
+library cannot determine whether the caller completed that external
+coordination, and must not make a permitted healthy path noisy based on missing
+local evidence.
 
 Scope diagnostics log only the requested scope category and count, never the
 raw token values. SMART v2 scopes may carry FHIR search constraints, and opaque

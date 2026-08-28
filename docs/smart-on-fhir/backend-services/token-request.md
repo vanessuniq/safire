@@ -42,10 +42,11 @@ token_data = client.request_backend_token(scopes: ['system/Patient.rs'])
 > configure scopes or pass `scopes:`; requests without either will raise
 > `ConfigurationError` in v0.6.0.
 
-Use `system/` scopes for the standard Backend Services flow. The SMART IG does
-not prohibit coordinated `user/` or `patient/` scopes, so Safire does not block
-or warn on them. It preserves explicit non-system scopes; the authorization
-server remains responsible for accepting the request.
+Use `system/` scopes for the standard Backend Services flow. The
+[SMART STU2.2 scope requirements](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#scopes)
+do not prohibit coordinated `user/` or `patient/` scopes, so Safire does not
+block or warn on them. It preserves explicit non-system scopes; the
+authorization server remains responsible for accepting the request.
 
 Safire posts to the token endpoint:
 

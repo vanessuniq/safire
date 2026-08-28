@@ -7,13 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Deprecated
-
-- SMART Backend Services requests without usable configured or per-call scopes
-  still use `system/*.rs` for v0.4.x compatibility, but now emit a deprecation warning.
-  Configure or pass scopes explicitly before v0.6.0, when missing scopes will
-  raise `ConfigurationError`.
-
 ### Changed
 
 - SMART and UDAP discovery now accept valid raw JSON-object response bodies even
@@ -45,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   outcome from server rejection. Safire never retries registration lifecycle
   requests automatically when the authorization server may already have
   committed them.
+
+### Deprecated
+
+- SMART Backend Services requests without usable configured or per-call scopes
+  still use `system/*.rs` for v0.4.x compatibility, but now emit a deprecation warning.
+  Configure or pass scopes explicitly before v0.6.0, when missing scopes will
+  raise `ConfigurationError`.
 
 ## [0.4.0] - 2026-08-07
 

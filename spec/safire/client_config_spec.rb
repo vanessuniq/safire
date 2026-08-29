@@ -58,6 +58,11 @@ RSpec.describe Safire::ClientConfig do
         .to raise_error(Safire::Errors::ConfigurationError, /invalid URIs/)
     end
 
+    it 'raises ConfigurationError when a URI value is not a string' do
+      expect { described_class.new(valid_attrs.merge(base_url: 123)) }
+        .to raise_error(Safire::Errors::ConfigurationError, /invalid URIs.*base_url/)
+    end
+
     it 'raises ConfigurationError when redirect_uri has no host' do
       expect { described_class.new(valid_attrs.merge(redirect_uri: 'justpath')) }
         .to raise_error(Safire::Errors::ConfigurationError, /invalid URIs/)
@@ -67,6 +72,21 @@ RSpec.describe Safire::ClientConfig do
   # ---------- HTTPS enforcement ----------
 
   describe 'HTTPS enforcement' do
+    %i[redirect_uri authorization_endpoint token_endpoint].each do |attribute|
+      it "rejects a fragment in #{attribute}" do
+        value = "https://example.com/#{attribute}#fragment"
+
+        expect { described_class.new(valid_attrs.merge(attribute => value)) }
+          .to raise_error(Safire::Errors::ConfigurationError, /invalid URIs.*#{attribute}/)
+      end
+    end
+
+    it 'does not apply the OAuth endpoint fragment rule to a generic JWKS URI' do
+      config = described_class.new(valid_attrs.merge(jwks_uri: 'https://example.com/jwks.json#key-set'))
+
+      expect(config.jwks_uri).to eq('https://example.com/jwks.json#key-set')
+    end
+
     context 'when base_url uses HTTP on a non-localhost host' do
       it 'raises ConfigurationError' do
         expect { described_class.new(valid_attrs.merge(base_url: 'http://fhir.example.com')) }

@@ -542,6 +542,17 @@ RSpec.describe Safire::Protocols::UdapSignedMetadataValidator do
       end
     end
 
+    context 'when an endpoint claim contains a fragment' do
+      let(:jwt) { build_udap_jwt(valid_payload.merge('token_endpoint' => "#{base_url}/token#part")) }
+
+      it 'returns nil and logs a warning' do
+        result = validator.signed_endpoint_claims(base_url:, verify_chain: false)
+
+        expect(result).to be_nil
+        expect(Safire.logger).to have_received(:warn).with(/token_endpoint.*HTTPS URL/)
+      end
+    end
+
     context 'when endpoint claims use HTTP localhost' do
       let(:jwt) do
         build_udap_jwt(

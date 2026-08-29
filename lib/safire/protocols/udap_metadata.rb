@@ -105,7 +105,7 @@ module Safire
       # - +udap_profiles_supported+ includes +"udap_dcr"+ and +"udap_authn"+
       # - +token_endpoint_auth_methods_supported+ must equal <tt>["private_key_jwt"]</tt> exactly (STU2 fixed value)
       # - +scopes_supported+, +grant_types_supported+, and both signing algorithm arrays each have at least one element
-      # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs
+      # - +token_endpoint+ and +registration_endpoint+ are absolute HTTPS URLs without fragments
       #   (or localhost HTTP URLs when explicitly enabled for development);
       #   +authorization_endpoint+ is validated by the same rule when present
       # - +signed_metadata+ is a compact-JWS string (three base64url-encoded dot-separated segments);
@@ -314,7 +314,9 @@ module Safire
         attrs = STRING_URL_ATTRIBUTES.dup
         attrs << :authorization_endpoint unless authorization_endpoint.nil?
         invalid = attrs.reject { |attr| valid_endpoint_url?(public_send(attr)) }
-        invalid.each { |attr| warn_noncompliance("#{attr} must be an absolute HTTPS URL") }
+        invalid.each do |attr|
+          warn_noncompliance("#{attr} must be an absolute HTTPS URL without a fragment component")
+        end
         invalid.empty?
       end
 
@@ -331,7 +333,11 @@ module Safire
       end
 
       def valid_endpoint_url?(value)
-        value.is_a?(String) && classify_uri(value, allow_insecure_localhost: @allow_insecure_localhost).nil?
+        value.is_a?(String) && classify_uri(
+          value,
+          allow_insecure_localhost: @allow_insecure_localhost,
+          allow_fragment: false
+        ).nil?
       end
 
       def conditional_presence_valid?

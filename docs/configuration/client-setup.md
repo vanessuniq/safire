@@ -211,6 +211,8 @@ raises `Safire::Errors::ConfigurationError` for invalid configuration URIs:
 
 - URIs must be well-formed (scheme + host required)
 - URIs must use `https` — required for SMART App Launch and UDAP discovery
+- OAuth `redirect_uri`, `authorization_endpoint`, and `token_endpoint` values
+  must not contain a fragment component
 - **Development exception:** `http` loopback URIs (`localhost` and `127.0.0.1`)
   are permitted only when `allow_insecure_localhost: true` is configured
 

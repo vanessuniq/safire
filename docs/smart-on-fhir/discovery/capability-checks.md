@@ -20,7 +20,13 @@ nav_order: 2
 
 ## Full Checks (`supports_*?`)
 
-These methods verify both the capability flag **and** any required associated fields. Use them to confirm the server is fully ready for a given mode.
+These methods verify both the capability flag **and** the presence of any
+required associated fields. They do not replace the HTTPS validation Safire
+performs when an operation uses a discovered endpoint.
+
+List-valued advertisements must use their documented array shape. A malformed
+scalar or an array containing non-string entries is treated as unsupported;
+call `valid?` to log the corresponding structural diagnostic.
 
 ```ruby
 # Launch modes — requires capability flag AND authorization_endpoint present

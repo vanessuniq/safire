@@ -55,6 +55,10 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 ### v0.5.0 — UDAP JWT Client Authentication and B2B Authorization
 
+- **UDAP Registration Wildcard Enforcement** — require exact
+  `scopes_supported` advertisement for requested wildcard scopes during new
+  registration and modification after the v0.4.1 warning period; cancellation
+  remains warning-only so metadata drift cannot strand an existing registration
 - **UDAP Authentication Tokens** — certificate-backed JWT client authentication
   for token endpoint requests, using authoritative signed discovery metadata
 - **B2B Client Credentials** — headless system-to-system authorization with the

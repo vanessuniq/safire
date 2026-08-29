@@ -141,10 +141,13 @@ an existing metadata object against another trust policy. Metadata returned by
 
 ## Dynamic Client Registration
 
-UDAP DCR is discovery-bound. Safire validates discovery metadata, signs
-caller-controlled registration metadata into a short-lived X.509-backed
-`software_statement`, and POSTs the fixed UDAP envelope to the authoritative
-signed `registration_endpoint`.
+UDAP DCR is discovery-bound. Safire validates `signed_metadata` and the focused
+profile, endpoint, algorithm, certification, and scope values needed by the
+request; full structural conformance remains available through the explicit
+`UdapMetadata#valid?` diagnostic. Safire then signs caller-controlled
+registration metadata into a short-lived X.509-backed `software_statement` and
+POSTs the fixed UDAP envelope to the authoritative signed
+`registration_endpoint`.
 
 ```ruby
 client = Safire::Client.new(

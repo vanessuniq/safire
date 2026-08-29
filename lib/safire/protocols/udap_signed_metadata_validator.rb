@@ -323,7 +323,7 @@ module Safire
           next unless payload.key?(claim)
           next if valid_endpoint_url?(payload[claim], allow_insecure_localhost:)
 
-          log_failure("'#{claim}' must be an absolute HTTPS URL")
+          log_failure("'#{claim}' must be an absolute HTTPS URL without a fragment component")
           valid = false
         end
         valid
@@ -334,7 +334,7 @@ module Safire
       end
 
       def valid_endpoint_url?(value, allow_insecure_localhost:)
-        value.is_a?(String) && classify_uri(value, allow_insecure_localhost:).nil?
+        value.is_a?(String) && classify_uri(value, allow_insecure_localhost:, allow_fragment: false).nil?
       end
 
       def normalize_base_url(base_url)

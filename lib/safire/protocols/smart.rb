@@ -50,7 +50,7 @@ module Safire
       end
 
       def authorization_endpoint
-        @authorization_endpoint ||= server_metadata.authorization_endpoint
+        @authorization_endpoint ||= discovered_authorization_endpoint
       end
 
       def token_endpoint
@@ -70,7 +70,7 @@ module Safire
       # @return [Safire::Protocols::SmartMetadata]
       #   Parsed SMART configuration metadata object.
       # @raise [Safire::Errors::DiscoveryError]
-      #   If the discovery request fails or the response is not a valid JSON object.
+      #   If the discovery request fails or the response is not a usable JSON object.
       def server_metadata
         return @server_metadata if @server_metadata
 
@@ -98,8 +98,10 @@ module Safire
       #   * :params [Hash] (POST only) authorization parameters to submit as the request body
       # @raise [Errors::ConfigurationError] if method is invalid, +client_id+/scopes are missing,
       #   or +redirect_uri+ / +authorization_endpoint+ are not configured or resolvable via discovery
+      # @raise [Errors::DiscoveryError] if a discovered +authorization_endpoint+ is not a usable
+      #   HTTPS URI; HTTP loopback endpoints require the explicit development policy
       def authorization_url(launch: nil, custom_scopes: nil, method: :get)
-        method = method.to_sym
+        method = method.to_sym if method.is_a?(String)
         custom_scopes ||= scopes
         validate_authorization_method(method)
         validate_client_id!
@@ -132,6 +134,7 @@ module Safire
       # @raise [Safire::Errors::ConfigurationError] if +client_id+ is missing,
       #   or if +private_key+/+kid+ are absent for +:confidential_asymmetric+
       # @raise [Safire::Errors::TokenError] if the request fails or response is invalid.
+      # @raise [Safire::Errors::DiscoveryError] if a discovered +token_endpoint+ is missing or unusable.
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error.
       def request_access_token(code:, code_verifier:, client_secret: self.client_secret,
                                private_key: self.private_key, kid: self.kid)
@@ -162,6 +165,7 @@ module Safire
       # @raise [Safire::Errors::ConfigurationError] if +client_id+ is missing,
       #   or if +private_key+/+kid+ are absent for +:confidential_asymmetric+
       # @raise [Safire::Errors::TokenError] if the refresh request fails or the response is invalid.
+      # @raise [Safire::Errors::DiscoveryError] if a discovered +token_endpoint+ is missing or unusable.
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error.
       def refresh_token(refresh_token:, scopes: nil, client_secret: self.client_secret,
                         private_key: self.private_key, kid: self.kid)
@@ -205,6 +209,7 @@ module Safire
       # @raise [Safire::Errors::ConfigurationError] if +client_id+, +private_key+, or +kid+ are missing
       # @raise [ArgumentError] if the signing key or JWT assertion configuration is invalid
       # @raise [Safire::Errors::TokenError] if the server returns an error or invalid response
+      # @raise [Safire::Errors::DiscoveryError] if a discovered +token_endpoint+ is missing or unusable
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
       def request_backend_token(scopes: nil, private_key: self.private_key, kid: self.kid)
         validate_client_id!
@@ -522,11 +527,36 @@ module Safire
 
       def discovered_token_endpoint
         endpoint = server_metadata.token_endpoint
-        return endpoint if endpoint.present?
+        return validate_discovered_endpoint!(endpoint, :token_endpoint) unless endpoint.nil?
 
         raise Errors::DiscoveryError.new(
           endpoint: well_known_endpoint,
           error_description: "response missing required field 'token_endpoint'"
+        )
+      end
+
+      def discovered_authorization_endpoint
+        endpoint = server_metadata.authorization_endpoint
+        return if endpoint.nil?
+
+        validate_discovered_endpoint!(endpoint, :authorization_endpoint)
+      end
+
+      def validate_discovered_endpoint!(endpoint, attribute)
+        error_description = case classify_uri(endpoint, allow_insecure_localhost:, allow_fragment: false)
+                            when :invalid
+                              "response field '#{attribute}' must be an absolute URI"
+                            when :fragment
+                              "response field '#{attribute}' must not include a fragment"
+                            when :non_https
+                              "response field '#{attribute}' must use HTTPS"
+                            else
+                              return endpoint
+                            end
+
+        raise Errors::DiscoveryError.new(
+          endpoint: well_known_endpoint,
+          error_description:
         )
       end
 
@@ -543,8 +573,9 @@ module Safire
       end
 
       def validate_registration_endpoint_https!(endpoint)
-        case classify_uri(endpoint, allow_insecure_localhost:)
-        when :invalid   then raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
+        case classify_uri(endpoint, allow_insecure_localhost:, allow_fragment: false)
+        when :invalid, :fragment
+          raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
         when :non_https then raise Errors::ConfigurationError.new(non_https_uri_attributes: [:registration_endpoint])
         end
       end

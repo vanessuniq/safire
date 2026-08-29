@@ -52,7 +52,7 @@ and `to_h` returns a defensive copy.
 | `contacts` | Required non-empty array of absolute URI strings, including at least one valid `mailto:` email address |
 | `grant_types` | Required for registration; must match one supported grant profile |
 | `scope` | Required non-blank, space-delimited OAuth scope string |
-| `redirect_uris` | Required only with `authorization_code`; every value uses HTTPS by default |
+| `redirect_uris` | Required only with `authorization_code`; every value uses HTTPS by default and contains no fragment component |
 | `logo_uri` | Required only with `authorization_code`; uses HTTPS by default, and the caller must ensure it references PNG, JPEG/JPG, or GIF content (not locally verifiable by Safire) |
 | `response_types` | Generated as `["code"]` for `authorization_code` |
 | `token_endpoint_auth_method` | Generated as `"private_key_jwt"` |
@@ -98,7 +98,8 @@ cancellation.to_h['grant_types'] # => []
 
 ## URI and Ownership Rules
 
-UDAP Security STU2 requires HTTPS for `redirect_uris` and `logo_uri`. Safire
+UDAP Security STU2 requires HTTPS for `redirect_uris` and `logo_uri`; OAuth
+redirect URIs must not contain fragment components. Safire
 enforces that requirement by default. For an HTTP loopback service used only in
 local development, applications may explicitly enable the narrow exception:
 

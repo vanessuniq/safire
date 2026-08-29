@@ -194,7 +194,7 @@ the software statement.
 | `Safire::Errors::ValidationError` | Caller metadata or certification input is invalid before signing |
 | `Safire::Errors::ConfigurationError` | Signing configuration or algorithm selection is missing or incompatible |
 | `Safire::Errors::CertificateError` | The client key, certificate chain, validity period, ordering, or URI SAN cannot support signing |
-| `Safire::Errors::RegistrationError` | The server rejects the request or returns a malformed lifecycle response |
+| `Safire::Errors::RegistrationError` | The server rejects the request or does not return a usable response that confirms the lifecycle outcome |
 | `Safire::Errors::NetworkError` | The request fails at the transport layer |
 
 Continue with [Software Statements]({% link udap/dynamic-client-registration/software-statement.md %})

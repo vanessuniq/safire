@@ -74,6 +74,18 @@ module Safire
 
       ATTRIBUTES = (REQUIRED_ATTRIBUTES | OPTIONAL_ATTRIBUTES).freeze
 
+      ARRAY_ATTRIBUTE_ELEMENT_TYPES = {
+        grant_types_supported: String,
+        token_endpoint_auth_methods_supported: String,
+        token_endpoint_auth_signing_alg_values_supported: String,
+        associated_endpoints: Hash,
+        scopes_supported: String,
+        response_types_supported: String,
+        capabilities: String,
+        code_challenge_methods_supported: String
+      }.freeze
+      private_constant :ARRAY_ATTRIBUTE_ELEMENT_TYPES
+
       # Supported asymmetric signing algorithms (required by SMART spec)
       SUPPORTED_ASYMMETRIC_ALGORITHMS = %w[RS384 ES384].freeze
 
@@ -83,17 +95,19 @@ module Safire
         super(metadata, ATTRIBUTES)
       end
 
-      # Checks whether the server's SMART metadata is valid according to SMART App Launch 2.2.0.
+      # Runs Safire's selected SMART App Launch 2.2.0 structural diagnostics.
       #
       # This is a user-callable helper. Safire performs discovery without automatically
       # asserting server compliance — it is the caller's responsibility to invoke this
-      # method when they wish to verify conformance.
+      # method when they wish to inspect these conformance signals. This helper is
+      # not a complete server certification suite.
       #
       # Checks performed:
       # - All required fields are present
       #   (token_endpoint, grant_types_supported, capabilities, code_challenge_methods_supported)
       # - Conditional fields present when their capability is advertised
       #   (issuer + jwks_uri for sso-openid-connect; authorization_endpoint for launch types)
+      # - Array-valued fields are arrays containing values of the documented type
       # - `code_challenge_methods_supported` includes 'S256'
       #   (SMART App Launch 2.2.0, §Conformance — SHALL be included)
       # - `code_challenge_methods_supported` does NOT include 'plain'
@@ -112,9 +126,10 @@ module Safire
           Safire.logger.warn("SMART metadata non-compliance: required field '#{attr}' is missing")
         end
 
+        array_fields_valid = validate_array_fields!
         pkce_valid = validate_pkce_methods!
 
-        missing_attrs.empty? && pkce_valid
+        missing_attrs.empty? && array_fields_valid && pkce_valid
       end
 
       # Launch type support checks - requires both capability and authorization_endpoint
@@ -139,16 +154,14 @@ module Safire
       # @return [Boolean] true if server has capability and auth methods not advertised or includes client_secret_basic
       def supports_symmetric_auth?
         capability?('client-confidential-symmetric') &&
-          (token_endpoint_auth_methods_supported.blank? ||
-           token_endpoint_auth_methods_supported.include?('client_secret_basic'))
+          auth_method_supported?('client_secret_basic')
       end
 
       # Checks if the server supports the SMART Backend Services workflow.
       # @return [Boolean] true if the server advertises the client_credentials grant type
       #   and supports private_key_jwt authentication (via {#supports_asymmetric_auth?})
       def supports_backend_services?
-        grant_types_supported.present? &&
-          grant_types_supported.include?('client_credentials') &&
+        array_includes?(:grant_types_supported, 'client_credentials') &&
           supports_asymmetric_auth?
       end
 
@@ -157,8 +170,7 @@ module Safire
       #   and has supported algorithms
       def supports_asymmetric_auth?
         capability?('client-confidential-asymmetric') &&
-          (token_endpoint_auth_methods_supported.blank? ||
-           token_endpoint_auth_methods_supported.include?('private_key_jwt')) &&
+          auth_method_supported?('private_key_jwt') &&
           asymmetric_signing_algorithms_supported.any?
       end
 
@@ -166,8 +178,11 @@ module Safire
       # If the server doesn't advertise algorithms, assumes it supports the required ones (RS384, ES384).
       # @return [Array<String>] list of supported algorithms
       def asymmetric_signing_algorithms_supported
-        server_algs = token_endpoint_auth_signing_alg_values_supported.presence
-        (server_algs || SUPPORTED_ASYMMETRIC_ALGORITHMS) & SUPPORTED_ASYMMETRIC_ALGORITHMS
+        server_algs = token_endpoint_auth_signing_alg_values_supported
+        return SUPPORTED_ASYMMETRIC_ALGORITHMS.dup if server_algs.nil? || server_algs == []
+        return [] unless array_of?(server_algs, String)
+
+        server_algs & SUPPORTED_ASYMMETRIC_ALGORITHMS
       end
 
       # Feature support checks
@@ -203,7 +218,39 @@ module Safire
       private
 
       def capability?(name)
-        capabilities&.include?(name)
+        array_includes?(:capabilities, name)
+      end
+
+      def array_includes?(attribute, value)
+        values = public_send(attribute)
+        array_of?(values, String) && values.include?(value)
+      end
+
+      def auth_method_supported?(method)
+        methods = token_endpoint_auth_methods_supported
+        methods.nil? || methods == [] || array_includes?(:token_endpoint_auth_methods_supported, method)
+      end
+
+      def validate_array_fields!
+        valid = true
+
+        ARRAY_ATTRIBUTE_ELEMENT_TYPES.each do |attribute, element_type|
+          value = public_send(attribute)
+          next if value.nil?
+          next if array_of?(value, element_type)
+
+          Safire.logger.warn(
+            "SMART metadata non-compliance: field '#{attribute}' must be an array containing only " \
+            "#{element_type == Hash ? 'objects' : 'strings'}"
+          )
+          valid = false
+        end
+
+        valid
+      end
+
+      def array_of?(value, element_type)
+        value.is_a?(Array) && value.all?(element_type)
       end
 
       def issuer_and_jwks_uri_required?
@@ -220,10 +267,9 @@ module Safire
       #
       # @return [Boolean] true if both conditions are satisfied
       def validate_pkce_methods!
-        methods = code_challenge_methods_supported
         valid = true
 
-        unless methods&.include?('S256')
+        unless array_includes?(:code_challenge_methods_supported, 'S256')
           Safire.logger.warn(
             "SMART metadata non-compliance: 'S256' is missing from code_challenge_methods_supported " \
             '(SMART App Launch 2.2.0 requires S256)'
@@ -231,7 +277,7 @@ module Safire
           valid = false
         end
 
-        if methods&.include?('plain')
+        if array_includes?(:code_challenge_methods_supported, 'plain')
           Safire.logger.warn(
             "SMART metadata non-compliance: 'plain' is present in code_challenge_methods_supported " \
             '(SMART App Launch 2.2.0 prohibits plain)'

@@ -42,13 +42,23 @@ metadata = client.server_metadata
 # => #<Safire::Protocols::SmartMetadata ...>
 ```
 
-`server_metadata` returns a `Safire::Protocols::SmartMetadata` object with typed accessors for all fields. See [Metadata Fields and Validation]({% link smart-on-fhir/discovery/metadata.md %}) for the full field reference and validation rules.
+`server_metadata` returns a `Safire::Protocols::SmartMetadata` object with
+readers for all fields. Values retain the shapes sent by the server; use
+`valid?` for the explicit structural diagnostic. See
+[Metadata Fields and Validation]({% link smart-on-fhir/discovery/metadata.md %})
+for the full field reference and validation rules.
 
 Safire accepts either an already parsed Hash or a raw JSON-object body. This
 keeps discovery usable when a server sends valid JSON with an incorrect or
 missing content type and Faraday therefore leaves the body as a String. The
 server response is still non-conformant at the HTTP layer. Malformed JSON and
 valid JSON arrays, scalars, booleans, or `null` raise `DiscoveryError`.
+
+Discovery readers preserve advertised endpoint values for inspection. Before
+an authorization or token operation uses a discovered endpoint, Safire requires
+an absolute HTTPS URI without a fragment component. HTTP loopback endpoints are
+accepted only with the explicit `allow_insecure_localhost: true` development
+policy; the fragment prohibition still applies.
 
 ---
 

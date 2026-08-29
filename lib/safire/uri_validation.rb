@@ -22,15 +22,19 @@ module Safire
     # 127.0.0.1 only when +allow_insecure_localhost+ is +true+. Any other scheme
     # (including non-HTTP schemes on localhost) returns +:non_https+.
     #
-    # @param value [String, nil] the URI string to classify
+    # @param value [Object] the URI value to classify
     # @param allow_insecure_localhost [Boolean] whether HTTP loopback URIs are accepted
-    # @return [:invalid, :non_https, nil]
-    def classify_uri(value, allow_insecure_localhost: false)
+    # @param allow_fragment [Boolean] whether a URI fragment component is accepted
+    # @return [:invalid, :fragment, :non_https, nil]
+    def classify_uri(value, allow_insecure_localhost: false, allow_fragment: true)
+      return :invalid unless value.is_a?(String)
+
       uri = Addressable::URI.parse(value)
       return :invalid unless parsed_uri_absolute?(uri)
-      return if allowed_uri?(uri, allow_insecure_localhost:)
+      return :non_https unless allowed_uri?(uri, allow_insecure_localhost:)
+      return :fragment if !allow_fragment && !uri.fragment.nil?
 
-      :non_https
+      nil
     rescue Addressable::URI::InvalidURIError
       :invalid
     end

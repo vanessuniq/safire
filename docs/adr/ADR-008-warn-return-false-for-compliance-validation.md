@@ -15,7 +15,10 @@ nav_order: 8
 
 Safire performs two different kinds of checks:
 
-1. **Configuration checks** — validating that the caller has provided a usable configuration (required attributes present, URIs well-formed and HTTPS). These run at construction time and represent programming errors if they fail.
+1. **Configuration checks** — validating that the caller has provided usable
+   configuration (required attributes present, URIs well-formed and HTTPS).
+   General checks run at construction time; flow-specific requirements run at
+   the operation boundary. They represent caller-correctable errors if they fail.
 
 2. **Compliance checks** — validating that a remote server's response conforms to the SMART App Launch 2.2.0 specification. These run at runtime and represent server behaviour, not caller behaviour.
 
@@ -58,12 +61,16 @@ end
 ```
 
 These methods:
+
 - Never raise an exception
 - Log one warning per violation (not a single combined message) so each issue is individually observable
-- Return `true` only when fully compliant; `false` as soon as any violation is found
+- Return `true` only when fully compliant and `false` when any violation is found
 - Are **user-callable** — they are not invoked automatically by `authorization_url` or `server_metadata`; callers opt in to compliance checking
 
-Configuration validation (`ClientConfig#validate!`, `Smart#validate!`) raises `ConfigurationError` — these are programming errors that must be fixed before the gem can function.
+Configuration validation in `ClientConfig` and protocol workflow-readiness
+checks raise typed Safire errors. These are caller-correctable failures or
+conditions that make the requested operation unsafe, impossible, or
+unconfirmed; ADR-015 owns the detailed boundary.
 
 ---
 

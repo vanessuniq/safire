@@ -32,7 +32,7 @@ Safire raises typed errors so you can handle each failure category separately:
 | `Safire::Errors::DiscoveryError` | SMART or UDAP metadata discovery failed (HTTP error, invalid JSON, missing SMART `token_endpoint` when required, or UDAP `signed_metadata` validation failure) |
 | `Safire::Errors::ValidationError` | Caller-controlled input is invalid before a request is sent, such as UDAP registration metadata or certification JWT shape |
 | `Safire::Errors::CertificateError` | UDAP `x5c` certificate data could not be parsed or the configured UDAP client certificate chain cannot support signing |
-| `Safire::Errors::RegistrationError` | Dynamic Client Registration failed (server error, 2xx response with a missing or invalid `client_id`, or UDAP cancellation response without an empty `grant_types` array) |
+| `Safire::Errors::RegistrationError` | Dynamic Client Registration was rejected or not confirmed (server error, pending UDAP registration, unusable response, or UDAP cancellation without final 2xx body confirmation) |
 | `Safire::Errors::TokenError` | Token exchange or refresh failed (OAuth error, missing fields) |
 | `Safire::Errors::NetworkError` | Transport-level failure (connection refused, timeout, blocked redirect) |
 
@@ -68,6 +68,15 @@ response content type prevents Faraday from decoding the body. That tolerance
 does not make the server response conformant. Malformed JSON, JSON arrays or
 scalars, and adapter-provided Hashes with ambiguous normalized keys, cycles, or
 non-JSON-compatible values are treated as unusable JSON-object responses.
+
+A usable JSON object with malformed SMART field types is still returned for
+interoperability. `SmartMetadata#valid?` logs the structural defects and returns
+`false`; capability helpers treat malformed list advertisements as unsupported
+instead of raising.
+
+Authorization and token operations raise `DiscoveryError` before use when a
+discovered endpoint is malformed or violates the HTTPS policy. HTTP loopback
+endpoints require `allow_insecure_localhost: true` and remain development-only.
 
 ```ruby
 begin

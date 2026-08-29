@@ -108,6 +108,7 @@ semantics.
 
 **Trade-offs:**
 
-- A structurally valid `UdapMetadata` object is not automatically cryptographically validated;
-  callers that require full STU2 conformance must also perform cryptographic validation of the
-  `signed_metadata` JWT after structural validation passes
+- A directly constructed `UdapMetadata` object is not automatically
+  cryptographically validated. `Safire::Client#server_metadata` validates
+  `signed_metadata` before returning the entity; callers that construct an
+  entity themselves must establish that trust separately.

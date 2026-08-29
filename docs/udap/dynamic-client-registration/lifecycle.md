@@ -108,12 +108,13 @@ Unlike registration, Safire does not require a specific success status such as
 successful `2xx`. UDAP Security STU2 confirms cancellation through the response
 body: the response must contain a non-blank string `client_id` and an empty
 `grant_types` array. A final non-`2xx` status raises
-`Safire::Errors::RegistrationError` and preserves any OAuth error returned by
-the server. A final `2xx` response with a non-empty, missing, or non-array
-`grant_types` value also raises `RegistrationError`, but in that case the
-cancellation outcome is unconfirmed rather than rejected. Applications should
-preserve their local registration state and inspect the authorization server
-before retrying or discarding the stored `client_id`.
+`Safire::Errors::RegistrationError`. Safire preserves an OAuth error when the
+server supplies one; otherwise it reports only that the response did not
+confirm cancellation. A final `2xx` response with a non-empty, missing, or
+non-array `grant_types` value also raises `RegistrationError`, but in that case
+the cancellation outcome is unconfirmed rather than rejected. Applications
+should preserve their local registration state and inspect the authorization
+server before retrying or discarding the stored `client_id`.
 
 ## Error Boundaries
 
@@ -125,7 +126,7 @@ Both lifecycle methods raise the same Safire error families:
 | `Safire::Errors::ValidationError` | Caller metadata or `certifications:` failed local validation before signing |
 | `Safire::Errors::ConfigurationError` | Signing configuration is missing or incompatible |
 | `Safire::Errors::CertificateError` | The private key, certificate chain, validity period, or `client_uri` SAN check failed |
-| `Safire::Errors::RegistrationError` | The registration endpoint returned an OAuth error, an unconfirmed pending outcome, or a malformed completed response |
+| `Safire::Errors::RegistrationError` | The registration endpoint returned an OAuth error or did not provide a usable response that confirms the lifecycle outcome |
 | `Safire::Errors::NetworkError` | The request failed at the transport layer |
 
 OAuth-style server errors preserve the server's `error` and

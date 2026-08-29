@@ -177,11 +177,12 @@ cancellation['grant_types'] # => []
 
 A non-`2xx` response does not confirm cancellation; inspect any preserved OAuth
 error code and description to determine whether the server explicitly rejected
-the request. If a final `2xx` response omits `grant_types`, returns a non-array
-value, or returns a non-empty array, the outcome is unconfirmed rather than
-rejected. Safire does not retry automatically; preserve the stored registration
-state and inspect the authorization server before retrying or discarding the
-`client_id`.
+the request. A non-`2xx` response without an OAuth error is reported as an
+unconfirmed outcome; Safire does not infer rejection from status alone. If a
+final `2xx` response omits `grant_types`, returns a non-array value, or returns a
+non-empty array, the outcome is also unconfirmed rather than rejected. Safire
+does not retry automatically; preserve the stored registration state and
+inspect the authorization server before retrying or discarding the `client_id`.
 
 ---
 

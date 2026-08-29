@@ -68,6 +68,18 @@ Parsing a valid raw JSON object allows interoperability when an HTTP adapter did
 not decode the body because the server sent an incorrect or missing content
 type. Safire's tolerance does not make that server response conformant.
 
+Metadata capability helpers type-check list-shaped advertisements before using
+membership semantics. A malformed list cannot assert a SMART capability or
+raise an unexpected type error. The complete structural assessment remains the
+caller's explicit `SmartMetadata#valid?` diagnostic rather than an automatic
+discovery failure.
+
+SMART discovery preserves metadata for inspection, but an operation validates
+its discovered authorization or token endpoint against Safire's HTTPS policy
+before use. This focused runtime stop protects authorization data and client
+credentials without promoting unrelated metadata defects into discovery
+failures.
+
 UDAP DCR uses focused readiness rather than calling `UdapMetadata#valid?` as an
 operational gate. Safire requires trusted discovery, an advertised `udap_dcr`
 profile, a usable authoritative registration endpoint, usable registration
@@ -111,28 +123,66 @@ cannot safely redact. Count-and-category logging preserves the operational and
 migration signal without copying caller-controlled authorization details into
 application logs.
 
+The classifications below were checked against the published
+[SMART App Launch STU2.2 conformance and discovery rules](https://hl7.org/fhir/smart-app-launch/STU2.2/conformance.html),
+[SMART App Launch workflow](https://hl7.org/fhir/smart-app-launch/STU2.2/app-launch.html),
+[SMART Backend Services profile](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html),
+[RFC 7591 Dynamic Client Registration](https://www.rfc-editor.org/rfc/rfc7591),
+[UDAP Security STU2 discovery](https://hl7.org/fhir/us/udap-security/STU2/discovery.html),
+and [UDAP Security STU2 registration](https://hl7.org/fhir/us/udap-security/STU2/registration.html).
+
 ## Operation Matrix
 
 This matrix covers the public protocol operations currently implemented by the
 `Safire::Client` facade.
 
-| Protocol operation | Runtime hard failures | Warning or explicit diagnostic | Server-owned decision |
-|--------------------|-----------------------|--------------------------------|-----------------------|
-| SMART `server_metadata` | Transport/HTTP failure or a body that cannot be used as a JSON object | `SmartMetadata#valid?` is caller-invoked | Advertised capabilities |
-| SMART `authorization_url` | Invalid method; missing client ID, scopes, redirect URI, or usable authorization endpoint | Metadata diagnostics remain explicit | User authorization, launch context, and granted scopes |
-| SMART `request_access_token` | Missing client credentials; unusable token endpoint; OAuth error; malformed token response or missing access token | `token_response_valid?` is caller-invoked | Code acceptance and issued token contents |
-| SMART `refresh_token` | Missing client credentials; unusable token endpoint; OAuth error; malformed token response or missing access token | `token_response_valid?` is caller-invoked | Refresh-token acceptance and issued scope |
-| SMART `request_backend_token` | Missing client ID or signing credentials; unusable token endpoint; OAuth error; malformed token response or missing access token | The v0.4.x missing-scope fallback warns; `token_response_valid?(flow: :backend_services)` is caller-invoked | Out-of-band context, client authentication, requested scope, and token issuance |
-| SMART `register_client` | Missing or unsafe registration endpoint; OAuth error; malformed response or missing/invalid client ID | SMART metadata diagnostics remain explicit | Registration policy and issued credentials |
-| SMART `token_response_valid?` | None; this is not an operational gate | Warns and returns `false` for response conformance defects | Caller decides whether a failed diagnostic is acceptable |
-| UDAP `server_metadata` | Transport/HTTP/204 failure; non-object JSON; failed signed-metadata signature, chain, revocation, issuer, time, or endpoint validation | `UdapMetadata#valid?` is caller-invoked | Supported communities, profiles, and capabilities |
-| UDAP `register_client` | Untrusted discovery; unusable DCR profile, endpoint, algorithm, or certification-requirement metadata; invalid client metadata, signing identity, or response; server rejection | Missing RS256 and unconfirmed scope support warn; `UdapMetadata#valid?` remains caller-invoked | Registration policy, scope and certification acceptance, and issued client ID |
-| UDAP `cancel_registration` | The registration gates above plus a response that does not positively confirm the client ID and empty grants | Scope compatibility remains warning-only for lifecycle-safe cleanup; `UdapMetadata#valid?` remains caller-invoked | Cancellation policy and confirmation response |
+| Operation | Client obligation | Required capability or input | Runtime hard failure | Runtime warning or negotiation | Explicit diagnostic | Server-owned decision |
+|-----------|-------------------|------------------------------|----------------------|--------------------------------|---------------------|-----------------------|
+| SMART `server_metadata` | Request and consume the well-known JSON object over a protected connection | FHIR base URL | Transport or HTTP failure; unusable JSON-object body | None | Caller may invoke `SmartMetadata#valid?` | Advertised endpoints and capabilities |
+| SMART `authorization_url` | Supply client ID, redirect URI, scopes, and launch context as applicable; Safire adds state and S256 PKCE | Usable authorization endpoint; caller selects GET or POST | Invalid request method; missing client ID, scopes, or redirect URI; missing, malformed, or insecure endpoint | None | Metadata capability helpers and `SmartMetadata#valid?` remain caller-invoked | User authorization, launch context, accepted request method, and granted scopes |
+| SMART `request_access_token` | Supply the authorization code, matching PKCE verifier, redirect URI, and client credentials required by the configured client type | Usable token endpoint | Missing credentials; invalid JWT assertion configuration; missing, malformed, or insecure endpoint; transport, OAuth, unusable response, or missing access-token failure | None | Caller may invoke `token_response_valid?` | Code acceptance and issued token contents |
+| SMART `refresh_token` | Supply the refresh token and authenticate the client; any requested scopes must not exceed the original grant | Usable token endpoint | Missing credentials; invalid JWT assertion configuration; missing, malformed, or insecure endpoint; transport, OAuth, unusable response, or missing access-token failure | None | Caller may invoke `token_response_valid?` | Refresh-token acceptance and issued scope |
+| SMART `request_backend_token` | Supply client ID, a registered signing identity, and explicit scope intent | Usable token endpoint and pre-authorized asymmetric client registration | Missing identity or signing credentials; invalid JWT assertion configuration; missing, malformed, or insecure endpoint; transport, OAuth, unusable response, or missing access-token failure | The v0.4.x legacy scope fallback warns; explicit scopes remain subject to server negotiation | Caller may invoke `token_response_valid?(flow: :backend_services)` | Out-of-band context, client authentication, requested scope, and token issuance |
+| SMART `register_client` | Supply RFC 7591 client metadata and any required initial access token | Explicit or discovered HTTPS registration endpoint | Missing or unsafe endpoint; transport or OAuth failure; unusable response or missing/invalid client ID | None | Discovery capability helpers and `SmartMetadata#valid?` remain caller-invoked | Registration policy, accepted metadata, and issued credentials |
+| SMART `token_response_valid?` | Choose whether to require the optional conformance diagnostic | Token-response Hash and selected flow | None; this method is not an operational gate | Logs each diagnosed response defect and returns `false` | This method is the explicit diagnostic | Caller decides how to handle a failed diagnostic |
+| UDAP `server_metadata` | Supply the intended community and production trust/revocation policy; validate signed metadata before any later workflow | UDAP well-known endpoint and a trusted signed-metadata chain | Transport, HTTP, or 204 outcome; unusable JSON object; failed signature, chain, revocation, issuer, time, or endpoint validation | None | Caller may invoke `UdapMetadata#valid?` or explicitly re-run `signed_metadata_valid?` | Community-specific profiles and capabilities |
+| UDAP `register_client` | Supply conformant metadata, client URI, certifications when required, and a matching private key/certificate chain | Trusted discovery; `udap_dcr`; authoritative registration endpoint; usable algorithm and certification-requirement metadata | Unsafe or unusable readiness data; invalid caller metadata or signing identity; transport or server rejection; pending or malformed completion response | Missing RS256 advertisement and unconfirmed scope support warn in v0.4.1 | Caller may invoke `UdapMetadata#valid?`; it is not a blanket gate | Registration policy, scope and certification acceptance, effective metadata, and issued client ID |
+| UDAP `cancel_registration` | Supply the same stable client URI and trust-community identity; preserve local state until cancellation is confirmed | Registration readiness above and an existing registration to remove | Registration hard failures above; any response that does not provide final 2xx body confirmation with the client ID and empty grants | Scope compatibility and malformed scope advertisements remain warning-only so cleanup can proceed | Caller may invoke `UdapMetadata#valid?`; it is not a blanket gate | Cancellation policy and the confirmation response |
 
 SMART cancellation and UDAP authorization, token, refresh, backend-token, and
 token-response operations are not implemented. They raise
 `NotImplementedError` through the shared protocol contract rather than implying
 runtime support.
+
+### Rules for Future Operations
+
+Every new public protocol operation must update the matrix and apply these
+questions in order:
+
+1. Which normative actor owns the requirement: client, authorization server,
+   resource server, or trust community?
+2. Does a failure prevent Safire from constructing a conformant request,
+   selecting a trusted endpoint, protecting credentials, or confirming the
+   operation's result? If so, fail before signing or network activity whenever
+   the condition is locally knowable.
+3. Can Safire still send a safe, conformant request while the server remains
+   authoritative for policy or negotiation? If so, preserve the request and use
+   a warning only when it gives the caller actionable information.
+4. Is the check broad server conformance rather than operation readiness? Keep
+   it in an explicit diagnostic and do not call it automatically.
+5. Is untrusted response data consumed by the operation? Validate its type and
+   shape before use, and translate failure into the protocol-specific Safire
+   error rather than leaking a Ruby implementation exception.
+6. Does an error prove rejection, or only an unavailable, malformed, pending,
+   or otherwise unconfirmed outcome? Use only the strongest description the
+   evidence supports.
+7. Does the implementation invent client intent, retry a possibly committed
+   operation, or log caller credentials or authorization details? If so, stop
+   and require an explicit, documented policy instead.
+
+Shared helpers may encode mechanism, such as JSON-object parsing or
+warning-only UDAP scope coverage, but must not silently promote a diagnostic
+inference into a hard-failure rule for another workflow.
 
 ## Consequences
 

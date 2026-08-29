@@ -20,7 +20,10 @@ nav_order: 1
 
 ## Field Reference
 
-`server_metadata` returns a `Safire::Protocols::SmartMetadata` object. All fields are accessible as typed readers.
+`server_metadata` returns a `Safire::Protocols::SmartMetadata` object. All
+fields are accessible through readers and retain the representation sent by the
+server. The types below describe the expected SMART metadata shapes; call
+`valid?` to diagnose malformed values.
 
 ### Always Required
 
@@ -85,7 +88,10 @@ metadata.user_access_brand_identifier      # => "example-brand"
 
 ## Validation
 
-`valid?` checks conformance with SMART App Launch 2.2.0 and logs a warning for each violation. It never raises — deciding whether to block on non-compliant metadata is the caller's responsibility.
+`valid?` checks Safire's selected SMART App Launch 2.2.0 structural diagnostics
+and logs a warning for each violation. It is not a complete server certification
+suite and never raises. Deciding whether to block on a failed diagnostic is the
+caller's responsibility.
 
 ```ruby
 if metadata.valid?
@@ -99,13 +105,21 @@ end
 **What `valid?` checks:**
 - All always-required fields are present
 - Conditional fields present when their capability is advertised
+- Array-valued fields are arrays containing values of the documented type
 - `code_challenge_methods_supported` includes `'S256'` (SHALL per SMART 2.2.0)
 - `code_challenge_methods_supported` does not include `'plain'` (SHALL NOT per SMART 2.2.0)
+
+Discovery does not fail solely because a usable JSON object contains a
+structurally nonconformant field. `valid?` reports that defect explicitly.
+Capability and algorithm helpers treat malformed list advertisements as
+unsupported rather than using scalar substring matching or raising an
+unexpected type error.
 
 Example warning output:
 
 ```
 WARN: SMART metadata non-compliance: required field 'authorization_endpoint' is missing
+WARN: SMART metadata non-compliance: field 'capabilities' must be an array containing only strings
 WARN: SMART metadata non-compliance: 'S256' is missing from code_challenge_methods_supported (SMART App Launch 2.2.0 requires S256)
 WARN: SMART metadata non-compliance: 'plain' is present in code_challenge_methods_supported (SMART App Launch 2.2.0 prohibits plain)
 ```

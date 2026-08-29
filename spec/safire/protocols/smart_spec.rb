@@ -340,6 +340,34 @@ RSpec.describe Safire::Protocols::Smart do
           .to raise_error(Safire::Errors::DiscoveryError, /token_endpoint/)
       end
     end
+
+    context 'when a discovered token_endpoint is unusable' do
+      it 'rejects a non-HTTPS endpoint without making a token request' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:token_endpoint))
+        stub_well_known(body: smart_metadata_body.merge('token_endpoint' => 'http://auth.example.com/token'))
+
+        expect { described_class.new(cfg).token_endpoint }
+          .to raise_error(Safire::Errors::DiscoveryError, /token_endpoint.*HTTPS/)
+        expect(WebMock).not_to have_requested(:post, 'http://auth.example.com/token')
+      end
+
+      it 'rejects a non-string endpoint with a typed discovery error' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:token_endpoint))
+        stub_well_known(body: smart_metadata_body.merge('token_endpoint' => 123))
+
+        expect { described_class.new(cfg).token_endpoint }
+          .to raise_error(Safire::Errors::DiscoveryError, /token_endpoint.*absolute URI/)
+      end
+
+      it 'allows an HTTP loopback endpoint only with the explicit development policy' do
+        cfg = Safire::ClientConfig.new(
+          config_attrs.except(:token_endpoint).merge(allow_insecure_localhost: true)
+        )
+        stub_well_known(body: smart_metadata_body.merge('token_endpoint' => 'http://localhost:9000/token'))
+
+        expect(described_class.new(cfg).token_endpoint).to eq('http://localhost:9000/token')
+      end
+    end
   end
 
   # ---------- Authorization URL ----------
@@ -461,6 +489,11 @@ RSpec.describe Safire::Protocols::Smart do
         expect { described_class.new(config).authorization_url(method: :patch) }
           .to raise_error(Safire::Errors::ConfigurationError, /method/)
       end
+
+      it 'raises ConfigurationError for a non-symbolizable value' do
+        expect { described_class.new(config).authorization_url(method: 123) }
+          .to raise_error(Safire::Errors::ConfigurationError, /method/)
+      end
     end
 
     context 'when redirect_uri is not configured' do
@@ -485,6 +518,26 @@ RSpec.describe Safire::Protocols::Smart do
         stub_well_known(body: smart_metadata_body.except('authorization_endpoint'))
         expect { described_class.new(cfg).authorization_url }
           .to raise_error(Safire::Errors::ConfigurationError, /authorization_endpoint/)
+      end
+    end
+
+    context 'when a discovered authorization_endpoint is unusable' do
+      it 'rejects a non-HTTPS endpoint before building an authorization request' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint))
+        stub_well_known(
+          body: smart_metadata_body.merge('authorization_endpoint' => 'http://auth.example.com/authorize')
+        )
+
+        expect { described_class.new(cfg).authorization_url }
+          .to raise_error(Safire::Errors::DiscoveryError, /authorization_endpoint.*HTTPS/)
+      end
+
+      it 'rejects a non-string endpoint with a typed discovery error' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint))
+        stub_well_known(body: smart_metadata_body.merge('authorization_endpoint' => 123))
+
+        expect { described_class.new(cfg).authorization_url }
+          .to raise_error(Safire::Errors::DiscoveryError, /authorization_endpoint.*absolute URI/)
       end
     end
   end

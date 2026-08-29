@@ -58,6 +58,11 @@ RSpec.describe Safire::ClientConfig do
         .to raise_error(Safire::Errors::ConfigurationError, /invalid URIs/)
     end
 
+    it 'raises ConfigurationError when a URI value is not a string' do
+      expect { described_class.new(valid_attrs.merge(base_url: 123)) }
+        .to raise_error(Safire::Errors::ConfigurationError, /invalid URIs.*base_url/)
+    end
+
     it 'raises ConfigurationError when redirect_uri has no host' do
       expect { described_class.new(valid_attrs.merge(redirect_uri: 'justpath')) }
         .to raise_error(Safire::Errors::ConfigurationError, /invalid URIs/)

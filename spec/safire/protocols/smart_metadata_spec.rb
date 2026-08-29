@@ -86,6 +86,86 @@ RSpec.describe Safire::Protocols::SmartMetadata do
         expect(Safire.logger).to have_received(:warn).with(/'S256' is missing from code_challenge_methods_supported/)
       end
     end
+
+    it 'warns and returns false for malformed array-valued metadata without raising' do
+      malformed = {
+        'grant_types_supported' => 'client_credentials',
+        'token_endpoint_auth_methods_supported' => 'private_key_jwt',
+        'token_endpoint_auth_signing_alg_values_supported' => 'RS384',
+        'associated_endpoints' => {},
+        'scopes_supported' => 'system/*.rs',
+        'response_types_supported' => 'code',
+        'capabilities' => 'client-confidential-asymmetric',
+        'code_challenge_methods_supported' => 'S256'
+      }
+      metadata = described_class.new(full_metadata.merge(malformed))
+      result = nil
+
+      expect { result = metadata.valid? }.not_to raise_error
+      expect(result).to be(false)
+      malformed.each_key do |attribute|
+        expect(Safire.logger).to have_received(:warn).with(/'#{attribute}'.*array/)
+      end
+    end
+
+    it 'warns and returns false when array-valued metadata contains malformed elements' do
+      data = full_metadata.merge(
+        'capabilities' => ['client-public', nil],
+        'associated_endpoints' => [{ 'url' => 'https://fhir.example.com' }, 'not-an-object']
+      )
+      metadata = described_class.new(data)
+
+      expect(metadata.valid?).to be(false)
+      expect(Safire.logger).to have_received(:warn).with(/'capabilities'.*array.*strings/)
+      expect(Safire.logger).to have_received(:warn).with(/'associated_endpoints'.*array.*objects/)
+    end
+  end
+
+  describe 'malformed capability metadata' do
+    it 'does not treat scalar capability and grant strings as advertised values' do
+      data = full_metadata.merge(
+        'capabilities' => 'client-public client-confidential-asymmetric authorize-post',
+        'grant_types_supported' => 'client_credentials'
+      )
+      metadata = described_class.new(data)
+
+      expect(metadata.supports_public_auth?).to be(false)
+      expect(metadata.supports_post_based_authorization?).to be(false)
+      expect(metadata.supports_backend_services?).to be(false)
+    end
+
+    it 'does not treat scalar authentication methods as advertised values' do
+      data = full_metadata.merge(
+        'token_endpoint_auth_methods_supported' => 'client_secret_basic private_key_jwt'
+      )
+      metadata = described_class.new(data)
+
+      expect(metadata.supports_symmetric_auth?).to be(false)
+      expect(metadata.supports_asymmetric_auth?).to be(false)
+    end
+
+    it 'returns no asymmetric algorithm intersection for a scalar advertisement' do
+      data = full_metadata.merge('token_endpoint_auth_signing_alg_values_supported' => 'RS384')
+      metadata = described_class.new(data)
+      algorithms = nil
+
+      expect { algorithms = metadata.asymmetric_signing_algorithms_supported }.not_to raise_error
+      expect(algorithms).to eq([])
+    end
+
+    it 'does not assert capabilities from arrays containing malformed elements' do
+      data = full_metadata.merge(
+        'capabilities' => ['client-public', nil],
+        'grant_types_supported' => ['client_credentials', nil],
+        'token_endpoint_auth_methods_supported' => ['private_key_jwt', nil],
+        'token_endpoint_auth_signing_alg_values_supported' => ['RS384', nil]
+      )
+      metadata = described_class.new(data)
+
+      expect(metadata.supports_public_auth?).to be(false)
+      expect(metadata.supports_backend_services?).to be(false)
+      expect(metadata.asymmetric_signing_algorithms_supported).to eq([])
+    end
   end
 
   describe '#supports_ehr_launch?' do

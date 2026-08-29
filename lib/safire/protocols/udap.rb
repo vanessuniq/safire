@@ -464,7 +464,7 @@ module Safire
 
         raise Errors::RegistrationError.new(
           status: response.status,
-          error_description: 'unexpected cancellation response status'
+          error_description: 'cancellation response did not confirm cancellation: expected a final 2xx status'
         )
       end
 

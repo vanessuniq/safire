@@ -61,6 +61,11 @@ RSpec.describe Safire::URIValidation do
     it 'returns :invalid for a malformed URI' do
       expect(host.classify_uri('https://exa mple.com')).to eq(:invalid)
     end
+
+    it 'returns :invalid for a non-string value without raising' do
+      expect { host.classify_uri(123) }.not_to raise_error
+      expect(host.classify_uri(123)).to eq(:invalid)
+    end
   end
 
   describe '#strict_https_uri?' do

@@ -1297,9 +1297,14 @@ RSpec.describe Safire::Protocols::Udap do
           )
       end
 
-      it 'raises RegistrationError even when the body confirms cancellation' do
-        expect { udap.cancel_registration(client_metadata, client_uri:) }
-          .to raise_error(Safire::Errors::RegistrationError, /unexpected cancellation response status/)
+      it 'reports an unconfirmed cancellation even when the body looks usable' do
+        error = capture_error(Safire::Errors::RegistrationError) do
+          udap.cancel_registration(client_metadata, client_uri:)
+        end
+
+        expect(error.status).to eq(304)
+        expect(error.error_description)
+          .to eq('cancellation response did not confirm cancellation: expected a final 2xx status')
       end
     end
 

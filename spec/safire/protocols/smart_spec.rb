@@ -920,26 +920,26 @@ RSpec.describe Safire::Protocols::Smart do
     context 'with a blank scope override' do
       before do
         stub_token_post(
-          body_matcher: hash_including('scope' => 'system/*.rs'),
+          body_matcher: hash_including('scope' => 'system/Patient.rs system/Observation.rs'),
           status: 200,
-          body: backend_token_response.merge('scope' => 'system/*.rs')
+          body: backend_token_response
         )
       end
 
-      it 'uses the legacy fallback and warns instead of sending an empty array' do
+      it 'uses configured scopes instead of sending an empty array' do
         described_class.new(backend_config).request_backend_token(scopes: [])
 
         expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
-          .with(body: hash_including('scope' => 'system/*.rs'))
-        expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
+          .with(body: hash_including('scope' => 'system/Patient.rs system/Observation.rs'))
+        expect(Safire.logger).not_to have_received(:warn)
       end
 
-      it 'uses the legacy fallback when every requested entry is blank' do
+      it 'uses configured scopes when every requested entry is blank' do
         described_class.new(backend_config).request_backend_token(scopes: [nil, '', '  '])
 
         expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
-          .with(body: hash_including('scope' => 'system/*.rs'))
-        expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
+          .with(body: hash_including('scope' => 'system/Patient.rs system/Observation.rs'))
+        expect(Safire.logger).not_to have_received(:warn)
       end
 
       it 'removes blank entries and trims usable requested scopes' do
@@ -1008,29 +1008,60 @@ RSpec.describe Safire::Protocols::Smart do
           .with(body: hash_including('scope' => 'system/*.rs'))
         expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
       end
+
+      it 'uses the legacy fallback when per-call and configured scopes are blank' do
+        stub_token_post(
+          body_matcher: hash_including('scope' => 'system/*.rs'),
+          status: 200,
+          body: backend_token_response.merge('scope' => 'system/*.rs')
+        )
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
+
+        described_class.new(cfg).request_backend_token(scopes: [nil, '', '  '])
+
+        expect(WebMock).to have_requested(:post, config_attrs[:token_endpoint])
+          .with(body: hash_including('scope' => 'system/*.rs'))
+        expect(Safire.logger).to have_received(:warn).with(scope_fallback_warning).once
+      end
     end
 
     context 'when client_id is not configured' do
       it 'raises ConfigurationError — client_id is required for JWT assertion claims' do
-        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:client_id))
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:client_id, :scopes))
+
         expect { described_class.new(cfg).request_backend_token }
           .to raise_error(Safire::Errors::ConfigurationError, /client_id/)
+        expect(Safire.logger).not_to have_received(:warn)
       end
     end
 
     context 'when private_key is missing' do
       it 'raises ConfigurationError' do
-        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:private_key))
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:private_key, :scopes))
+
         expect { described_class.new(cfg).request_backend_token }
           .to raise_error(Safire::Errors::ConfigurationError, /private_key/)
+        expect(Safire.logger).not_to have_received(:warn)
       end
     end
 
     context 'when kid is missing' do
       it 'raises ConfigurationError' do
-        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:kid))
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:kid, :scopes))
+
         expect { described_class.new(cfg).request_backend_token }
           .to raise_error(Safire::Errors::ConfigurationError, /kid/)
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+    end
+
+    context 'when a per-call private key is malformed' do
+      it 'raises before emitting the scope deprecation warning' do
+        cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
+
+        expect { described_class.new(cfg).request_backend_token(private_key: 'not a PEM key') }
+          .to raise_error(ArgumentError, /Invalid private key/)
+        expect(Safire.logger).not_to have_received(:warn)
       end
     end
 

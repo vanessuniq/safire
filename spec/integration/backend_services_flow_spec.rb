@@ -3,7 +3,7 @@ require 'spec_helper'
 RSpec.describe 'SMART Backend Services End-to-End Flow', type: :integration do
   #
   # Tests the SMART Backend Services (system-to-system) flow per
-  # https://hl7.org/fhir/smart-app-launch/backend-services.html
+  # https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html
   #
   # Flow:
   # 1. (Optional) Discovery: Fetch /.well-known/smart-configuration

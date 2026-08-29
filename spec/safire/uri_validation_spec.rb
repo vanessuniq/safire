@@ -14,6 +14,18 @@ RSpec.describe Safire::URIValidation do
       expect(host.classify_uri('https://example.com/path')).to be_nil
     end
 
+    it 'allows fragments unless the caller forbids them' do
+      expect(host.classify_uri('https://example.com/path#section')).to be_nil
+    end
+
+    it 'returns :fragment when a fragment is forbidden' do
+      expect(host.classify_uri('https://example.com/path#section', allow_fragment: false)).to eq(:fragment)
+    end
+
+    it 'treats an empty fragment component as a fragment' do
+      expect(host.classify_uri('https://example.com/path#', allow_fragment: false)).to eq(:fragment)
+    end
+
     it 'returns :non_https for HTTP on a remote host' do
       expect(host.classify_uri('http://example.com/path')).to eq(:non_https)
     end

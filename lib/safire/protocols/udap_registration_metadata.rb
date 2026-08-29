@@ -199,9 +199,9 @@ module Safire
         unless string_array?(redirects) && redirects.any?
           fail_validation!(:redirect_uris, 'must be a non-empty array of strings')
         end
-        return if redirects.all? { |redirect| allowed_registration_uri?(redirect) }
+        return if redirects.all? { |redirect| allowed_registration_uri?(redirect, allow_fragment: false) }
 
-        fail_validation!(:redirect_uris, 'must contain only absolute HTTPS URIs')
+        fail_validation!(:redirect_uris, 'must contain only absolute HTTPS URIs without fragment components')
       end
 
       def validate_logo_uri!(metadata)
@@ -251,9 +251,12 @@ module Safire
         @operation == :register
       end
 
-      def allowed_registration_uri?(value)
-        strict_https_uri?(value) ||
-          (@allow_insecure_localhost && localhost_http_uri?(value))
+      def allowed_registration_uri?(value, allow_fragment: true)
+        classify_uri(
+          value,
+          allow_insecure_localhost: @allow_insecure_localhost,
+          allow_fragment:
+        ).nil?
       end
 
       def emit_diagnostics(metadata)

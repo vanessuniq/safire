@@ -287,6 +287,12 @@ RSpec.describe Safire::Protocols::UdapRegistrationMetadata do
       expect_validation_error(:redirect_uris, 'absolute HTTPS URI') { metadata }
     end
 
+    it 'rejects a redirect URI containing a fragment' do
+      input[:redirect_uris] = ['https://app.example.com/callback#part']
+
+      expect_validation_error(:redirect_uris, 'absolute HTTPS URI') { metadata }
+    end
+
     it 'rejects HTTP localhost by default' do
       input[:redirect_uris] = ['http://localhost/callback']
 
@@ -315,6 +321,12 @@ RSpec.describe Safire::Protocols::UdapRegistrationMetadata do
       input[:logo_uri] = 'https://exa mple.com/logo.png'
 
       expect_validation_error(:logo_uri, 'absolute HTTPS URI') { metadata }
+    end
+
+    it 'does not apply the OAuth redirect fragment rule to logo_uri' do
+      input[:logo_uri] = 'https://app.example.com/logo.png#dark'
+
+      expect(metadata.to_h['logo_uri']).to eq(input[:logo_uri])
     end
 
     %w[png jpg jpeg gif].each do |extension|

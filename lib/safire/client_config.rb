@@ -107,7 +107,9 @@ module Safire
     SENSITIVE_ATTRIBUTES = %i[client_secret private_key certificate_chain].freeze
     URI_ATTRS = %i[base_url redirect_uri issuer authorization_endpoint token_endpoint jwks_uri].freeze
     OPTIONAL_URI_ATTRS = %i[redirect_uri authorization_endpoint token_endpoint jwks_uri].freeze
-    private_constant :CERTIFICATE_CHAIN_ENTRY_TYPES, :SENSITIVE_ATTRIBUTES, :URI_ATTRS, :OPTIONAL_URI_ATTRS
+    FRAGMENTLESS_URI_ATTRS = %i[redirect_uri authorization_endpoint token_endpoint].freeze
+    private_constant :CERTIFICATE_CHAIN_ENTRY_TYPES, :SENSITIVE_ATTRIBUTES, :URI_ATTRS, :OPTIONAL_URI_ATTRS,
+                     :FRAGMENTLESS_URI_ATTRS
 
     # @api private
     def inspect
@@ -215,8 +217,12 @@ module Safire
         value = send(attr)
         next if value.nil? && OPTIONAL_URI_ATTRS.include?(attr)
 
-        case classify_uri(value, allow_insecure_localhost:)
-        when :invalid   then invalid_uris << attr
+        case classify_uri(
+          value,
+          allow_insecure_localhost:,
+          allow_fragment: !FRAGMENTLESS_URI_ATTRS.include?(attr)
+        )
+        when :invalid, :fragment then invalid_uris << attr
         when :non_https then non_https_uris << attr
         end
       end

@@ -543,9 +543,11 @@ module Safire
       end
 
       def validate_discovered_endpoint!(endpoint, attribute)
-        error_description = case classify_uri(endpoint, allow_insecure_localhost:)
+        error_description = case classify_uri(endpoint, allow_insecure_localhost:, allow_fragment: false)
                             when :invalid
                               "response field '#{attribute}' must be an absolute URI"
+                            when :fragment
+                              "response field '#{attribute}' must not include a fragment"
                             when :non_https
                               "response field '#{attribute}' must use HTTPS"
                             else
@@ -571,8 +573,9 @@ module Safire
       end
 
       def validate_registration_endpoint_https!(endpoint)
-        case classify_uri(endpoint, allow_insecure_localhost:)
-        when :invalid   then raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
+        case classify_uri(endpoint, allow_insecure_localhost:, allow_fragment: false)
+        when :invalid, :fragment
+          raise Errors::ConfigurationError.new(invalid_uri_attributes: [:registration_endpoint])
         when :non_https then raise Errors::ConfigurationError.new(non_https_uri_attributes: [:registration_endpoint])
         end
       end

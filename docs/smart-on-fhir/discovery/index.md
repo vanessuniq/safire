@@ -56,8 +56,9 @@ valid JSON arrays, scalars, booleans, or `null` raise `DiscoveryError`.
 
 Discovery readers preserve advertised endpoint values for inspection. Before
 an authorization or token operation uses a discovered endpoint, Safire requires
-an absolute HTTPS URI. HTTP loopback endpoints are accepted only with the
-explicit `allow_insecure_localhost: true` development policy.
+an absolute HTTPS URI without a fragment component. HTTP loopback endpoints are
+accepted only with the explicit `allow_insecure_localhost: true` development
+policy; the fragment prohibition still applies.
 
 ---
 

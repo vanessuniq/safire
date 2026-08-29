@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unsupported instead of applying scalar substring semantics or raising an
   unexpected type error. Authorization and token operations now also apply the
   configured HTTPS/localhost policy to endpoints obtained through SMART
-  discovery before using them.
+  discovery before using them. OAuth authorization, token, registration, and
+  redirect endpoint URIs are rejected when they contain fragment components.
 - UDAP Dynamic Client Registration now validates and snapshots caller input
   before discovery, then gates only on trusted DCR profile, endpoint, algorithm,
   certification, and scope values needed by the request. Missing RS256

@@ -60,7 +60,8 @@ Registration accepts exactly one primary grant:
 
 Unknown and duplicate grant values are rejected. `redirect_uris`, `logo_uri`,
 and generated `response_types: ["code"]` apply only to authorization-code
-registration. Redirect and logo URIs require absolute HTTPS by default.
+registration. Redirect and logo URIs require absolute HTTPS by default, and
+redirect URIs must not contain fragment components.
 
 The STU2 logo requirement has two different validation boundaries. Safire can
 prove locally that `logo_uri` is an absolute HTTPS URI, so malformed, relative,

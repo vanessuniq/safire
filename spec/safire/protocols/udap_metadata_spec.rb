@@ -192,6 +192,13 @@ RSpec.describe Safire::Protocols::UdapMetadata do
           expect(m.valid?).to be(false)
           expect(Safire.logger).to have_received(:warn).with(/#{field} must be an absolute HTTPS URL/)
         end
+
+        it "returns false and logs a warning when #{field} contains a fragment" do
+          m = described_class.new(full_metadata.merge(field => 'https://fhir.example.com/endpoint#part'))
+
+          expect(m.valid?).to be(false)
+          expect(Safire.logger).to have_received(:warn).with(/#{field} must be an absolute HTTPS URL/)
+        end
       end
     end
 
@@ -223,6 +230,15 @@ RSpec.describe Safire::Protocols::UdapMetadata do
     context 'when authorization_endpoint is present but not an absolute HTTPS URL' do
       it 'returns false and logs a warning' do
         m = described_class.new(full_metadata.merge('authorization_endpoint' => 'http://fhir.example.com/auth'))
+
+        expect(m.valid?).to be(false)
+        expect(Safire.logger).to have_received(:warn).with(/authorization_endpoint must be an absolute HTTPS URL/)
+      end
+
+      it 'returns false when the endpoint contains a fragment' do
+        m = described_class.new(
+          full_metadata.merge('authorization_endpoint' => 'https://fhir.example.com/auth#part')
+        )
 
         expect(m.valid?).to be(false)
         expect(Safire.logger).to have_received(:warn).with(/authorization_endpoint must be an absolute HTTPS URL/)

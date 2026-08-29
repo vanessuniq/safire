@@ -79,9 +79,10 @@ explicit structural diagnostic. An authorization or token operation raises only
 when an endpoint or capability required by that operation is unavailable.
 
 A discovered `authorization_endpoint` or `token_endpoint` must also be an
-absolute HTTPS URI before Safire uses it. An invalid or insecure discovered
-endpoint raises `DiscoveryError`; HTTP loopback endpoints are accepted only
-with the explicit `allow_insecure_localhost: true` development policy.
+absolute HTTPS URI without a fragment component before Safire uses it. An
+invalid or insecure discovered endpoint raises `DiscoveryError`; HTTP loopback
+endpoints are accepted only with the explicit `allow_insecure_localhost: true`
+development policy.
 
 ---
 

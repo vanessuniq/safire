@@ -359,6 +359,14 @@ RSpec.describe Safire::Protocols::Smart do
           .to raise_error(Safire::Errors::DiscoveryError, /token_endpoint.*absolute URI/)
       end
 
+      it 'rejects an endpoint containing a fragment' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:token_endpoint))
+        stub_well_known(body: smart_metadata_body.merge('token_endpoint' => 'https://auth.example.com/token#part'))
+
+        expect { described_class.new(cfg).token_endpoint }
+          .to raise_error(Safire::Errors::DiscoveryError, /token_endpoint.*must not include a fragment/)
+      end
+
       it 'allows an HTTP loopback endpoint only with the explicit development policy' do
         cfg = Safire::ClientConfig.new(
           config_attrs.except(:token_endpoint).merge(allow_insecure_localhost: true)
@@ -538,6 +546,18 @@ RSpec.describe Safire::Protocols::Smart do
 
         expect { described_class.new(cfg).authorization_url }
           .to raise_error(Safire::Errors::DiscoveryError, /authorization_endpoint.*absolute URI/)
+      end
+
+      it 'rejects an endpoint containing a fragment' do
+        cfg = Safire::ClientConfig.new(config_attrs.except(:authorization_endpoint))
+        stub_well_known(
+          body: smart_metadata_body.merge(
+            'authorization_endpoint' => 'https://auth.example.com/authorize#part'
+          )
+        )
+
+        expect { described_class.new(cfg).authorization_url }
+          .to raise_error(Safire::Errors::DiscoveryError, /authorization_endpoint.*must not include a fragment/)
       end
     end
   end
@@ -1392,6 +1412,20 @@ RSpec.describe Safire::Protocols::Smart do
       it 'raises ConfigurationError' do
         expect { described_class.new(no_client_id_config).register_client(client_metadata) }
           .to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+      end
+    end
+
+    context 'when discovered registration_endpoint contains a fragment' do
+      let(:fragment_metadata) do
+        smart_metadata_body.merge('registration_endpoint' => 'https://fhir.example.com/register#part')
+      end
+
+      before { stub_well_known(body: fragment_metadata) }
+
+      it 'raises ConfigurationError without posting registration metadata' do
+        expect { described_class.new(no_client_id_config).register_client(client_metadata) }
+          .to raise_error(Safire::Errors::ConfigurationError, /registration_endpoint/)
+        expect(WebMock).not_to have_requested(:post, %r{/register})
       end
     end
 

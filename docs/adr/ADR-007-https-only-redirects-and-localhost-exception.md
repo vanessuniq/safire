@@ -30,7 +30,7 @@ security boundary and can hide production misconfiguration.
 For client configuration and HTTP redirects, HTTPS is enforced at **two layers**.
 Both layers use the same explicit local-development opt-in:
 
-**Layer 1 — `ClientConfig` URI validation:** all URI attributes (`base_url`, `redirect_uri`, `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`) must use `https://`, except when `allow_insecure_localhost: true` is configured and the host is `localhost` or `127.0.0.1`.
+**Layer 1 — `ClientConfig` URI validation:** all URI attributes (`base_url`, `redirect_uri`, `issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`) must use `https://`, except when `allow_insecure_localhost: true` is configured and the host is `localhost` or `127.0.0.1`. OAuth redirect, authorization, and token endpoint URIs must not contain a fragment component, as required by RFC 6749 Sections 3.1 and 3.2.
 
 **Layer 2 — `HttpsOnlyRedirects` Faraday middleware:** intercepts every 3xx response before `faraday-follow_redirects` follows it. If the redirect target is not HTTPS, and the local-development exception is not enabled for a loopback host, a `Safire::Errors::NetworkError` is raised immediately rather than following the redirect.
 
@@ -57,9 +57,9 @@ runtime concern.
 UDAP registration metadata applies the same secure default to its registration
 URI fields. The UDAP Security STU2 registration profile requires
 `redirect_uris` and `logo_uri` to use HTTPS.
-`URIValidation#strict_https_uri?` provides that default predicate, while
-`URIValidation#localhost_http_uri?` identifies the only local HTTP shape that
-can be accepted when a caller explicitly opts into development mode.
+`URIValidation#classify_uri` provides the shared HTTPS and fragment policy.
+UDAP redirect URIs reject fragment components; the rule is not applied to the
+presentation-oriented `logo_uri` field.
 
 `UdapRegistrationMetadata` uses the same explicit option name for non-TLS local
 redirect and logo URIs. It accepts only HTTP on `localhost` or `127.0.0.1`,

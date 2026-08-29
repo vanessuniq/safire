@@ -76,9 +76,10 @@ discovery failure.
 
 SMART discovery preserves metadata for inspection, but an operation validates
 its discovered authorization or token endpoint against Safire's HTTPS policy
-before use. This focused runtime stop protects authorization data and client
-credentials without promoting unrelated metadata defects into discovery
-failures.
+and rejects fragment components before use. This focused runtime stop protects
+authorization data and client credentials while enforcing the OAuth endpoint
+shape the operation consumes, without promoting unrelated metadata defects into
+discovery failures.
 
 UDAP DCR uses focused readiness rather than calling `UdapMetadata#valid?` as an
 operational gate. Safire requires trusted discovery, an advertised `udap_dcr`

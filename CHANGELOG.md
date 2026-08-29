@@ -9,25 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- SMART and UDAP discovery now accept valid raw JSON-object response bodies even
+- SMART and UDAP discovery now accept usable raw JSON-object response bodies
   when incorrect or missing response content types leave them undecoded by the
-  HTTP adapter. Malformed and non-object JSON continue to raise protocol-specific
-  `DiscoveryError` failures.
-- Shared discovery, registration, and OAuth error parsing now rejects ambiguous
-  symbol/string key collisions, recursive structures, and non-JSON-compatible
-  adapter-provided Hash values instead of risking silent normalization or
-  unexpected type errors. Valid response behavior is unchanged.
-- UDAP Dynamic Client Registration now validates and snapshots caller metadata
+  HTTP adapter. Shared discovery, registration, and OAuth error handling treats
+  malformed or non-object JSON plus ambiguous, recursive, or non-JSON-compatible
+  adapter-provided Hashes as unusable instead of risking silent normalization
+  or unexpected type errors.
+- SMART metadata diagnostics now validate array-valued field shapes. Capability
+  and signing-algorithm helpers treat malformed list advertisements as
+  unsupported instead of applying scalar substring semantics or raising an
+  unexpected type error. Authorization and token operations now also apply the
+  configured HTTPS/localhost policy to endpoints obtained through SMART
+  discovery before using them.
+- UDAP Dynamic Client Registration now validates and snapshots caller input
   before discovery, then gates only on trusted DCR profile, endpoint, algorithm,
-  and certification-requirement values. Unrelated discovery conformance defects
-  remain available through `UdapMetadata#valid?` without blocking an otherwise
-  usable registration request.
-- UDAP registration warns when a server omits the STU2 `RS256` baseline and can
-  negotiate another advertised, supported, key-compatible algorithm. In the
-  v0.4.1 compatibility phase, missing or insufficient `scopes_supported`
-  metadata produces aggregated warnings while registration, modification, and
-  lifecycle-safe cancellation continue; exact wildcard advertisement becomes a
-  registration requirement in v0.5.0.
+  certification, and scope values needed by the request. Missing RS256
+  advertisement and unconfirmed scope support produce value-free warnings when
+  an otherwise usable request can proceed; unrelated metadata conformance
+  defects remain available through `UdapMetadata#valid?`. In v0.4.1,
+  unadvertised wildcards still proceed after warning; registration and
+  modification require exact advertisement in v0.5.0, while wildcard scope
+  compatibility remains warning-only during cancellation.
 - UDAP authorization-code registration now rejects only locally provable
   `logo_uri` defects. Usable HTTPS URLs whose PNG, JPG/JPEG, or GIF format
   cannot be inferred from the path are accepted with a value-free warning;

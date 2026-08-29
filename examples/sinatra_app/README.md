@@ -282,11 +282,16 @@ If a SMART server advertises `client_credentials` grant support, the "Backend Se
 
 1. Navigate to a server detail page
 2. Click "Request Backend Token"
-3. Optionally enter custom scopes (defaults to `system/*.rs`)
+3. Review or edit the configured `system/` scopes prefilled from the server configuration
 4. Click "Request Token"
 5. View the access token, expiry, granted scopes, and SMART compliance check result
 
 Requires `ASYMMETRIC_PRIVATE_KEY_PEM` and `ASYMMETRIC_KID` to be configured (same key pair used for confidential asymmetric App Launch).
+The demo rejects an empty scope submission and preserves the requested scopes
+when requesting another token, so it never relies on Safire's deprecated
+implicit Backend Services fallback. It also rejects non-system scopes because
+the demo does not establish the out-of-band user or patient context that SMART
+permits advanced Backend Services integrations to coordinate.
 
 ### UDAP Discovery
 

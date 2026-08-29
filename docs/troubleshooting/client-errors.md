@@ -267,6 +267,29 @@ Verify the public key registered with the server matches the private key you are
 
 ## Backend Services Errors
 
+### Deprecated implicit scope fallback
+
+SMART requires the Backend Services token request to carry the scopes selected
+by the client. Configure them on `ClientConfig` or pass them per request:
+
+```ruby
+client.request_backend_token(scopes: ['system/Patient.rs'])
+```
+
+Safire v0.4.x temporarily falls back to `system/*.rs` and logs a deprecation
+warning when both sources are absent. This compatibility behavior is removed in
+v0.6.0, when the call will raise `ConfigurationError` instead.
+
+Safire does not treat discovery `scopes_supported` as an exhaustive allow-list.
+The server may support scopes it does not advertise, so explicit client scope
+requests are submitted for server-side authorization.
+
+The usual Backend Services request contains `system/` scopes. If explicit
+non-system scopes are submitted, Safire proceeds without warning because SMART
+permits `user/` and `patient/` scopes when context is coordinated out of band.
+Confirm that coordination and the server's registration policy when diagnosing
+an authorization-server rejection.
+
 ### `ConfigurationError`: Missing `private_key` or `kid`
 
 ```

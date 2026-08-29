@@ -30,6 +30,24 @@ token_data = client.request_backend_token
 #    }
 ```
 
+The example uses the scopes configured on the client. You can instead pass
+them explicitly:
+
+```ruby
+token_data = client.request_backend_token(scopes: ['system/Patient.rs'])
+```
+
+{: .warning }
+> The v0.4.x compatibility fallback to `system/*.rs` is deprecated. Always
+> configure scopes or pass `scopes:`; requests without either will raise
+> `ConfigurationError` in v0.6.0.
+
+Use `system/` scopes for the standard Backend Services flow. The
+[SMART STU2.2 scope requirements](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#scopes)
+do not prohibit coordinated `user/` or `patient/` scopes, so Safire does not
+block or warn on them. It preserves explicit non-system scopes; the
+authorization server remains responsible for accepting the request.
+
 Safire posts to the token endpoint:
 
 ```http
@@ -117,7 +135,7 @@ end
 begin
   token_data = client.request_backend_token
 rescue Safire::Errors::ConfigurationError => e
-  # client_id, private_key, or kid missing — only private_key and kid can be overridden at call time
+  # client_id, private_key, or kid missing. In v0.6.0 this also covers missing scopes.
   Rails.logger.error("Backend services misconfigured: #{e.message}")
   raise
 rescue Safire::Errors::TokenError => e
@@ -193,7 +211,7 @@ Safire includes a live integration spec that exercises the full Backend Services
 | `SAFIRE_LIVE_BACKEND_CLIENT_ID` | Registered backend client ID |
 | `SAFIRE_LIVE_BACKEND_KID` | Key ID matching the registered JWKS |
 | `SAFIRE_LIVE_BACKEND_PRIVATE_KEY_PEM` | PEM-encoded private key |
-| `SAFIRE_LIVE_BACKEND_SCOPES` | Space-separated scopes (optional; default: `system/*.rs`) |
+| `SAFIRE_LIVE_BACKEND_SCOPES` | Space-separated scopes registered for the client |
 | `SAFIRE_LIVE_BACKEND_ALGORITHM` | JWT algorithm (optional; default: `RS384`) |
 
 ```bash

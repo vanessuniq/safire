@@ -88,6 +88,22 @@ may collectively cover a requested permission set. STU2 does not guarantee that
 the server accepts the combined token, so this permissive inference must not be
 reused as a hard-failure decision without a separate normative rule.
 
+SMART Backend Services scope intent remains client-owned. In v0.4.x, Safire
+preserves the historical `system/*.rs` fallback only for compatibility and
+logs a deprecation warning whenever it is used. Callers should configure or
+pass scopes explicitly; absent scopes become a runtime `ConfigurationError` in
+v0.6.0. SMART discovery `scopes_supported` is non-exhaustive and is not used as
+an exact allow-list for token requests.
+
+`system/` scopes are the normal Backend Services context. The
+[SMART STU2.2 Backend Services scope requirements](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#scopes)
+also state that `user/` and `patient/` scopes are not prohibited when context
+is established through out-of-band coordination. Safire therefore preserves
+and submits explicit non-system scopes without warning or rejection. The
+library cannot determine whether the caller completed that external
+coordination, and must not make a permitted healthy path noisy based on missing
+local evidence.
+
 Scope diagnostics log only the requested scope category and count, never the
 raw token values. SMART v2 scopes may carry FHIR search constraints, and opaque
 custom scopes may encode equally sensitive application context in forms Safire
@@ -106,7 +122,7 @@ This matrix covers the public protocol operations currently implemented by the
 | SMART `authorization_url` | Invalid method; missing client ID, scopes, redirect URI, or usable authorization endpoint | Metadata diagnostics remain explicit | User authorization, launch context, and granted scopes |
 | SMART `request_access_token` | Missing client credentials; unusable token endpoint; OAuth error; malformed token response or missing access token | `token_response_valid?` is caller-invoked | Code acceptance and issued token contents |
 | SMART `refresh_token` | Missing client credentials; unusable token endpoint; OAuth error; malformed token response or missing access token | `token_response_valid?` is caller-invoked | Refresh-token acceptance and issued scope |
-| SMART `request_backend_token` | Missing client ID or signing credentials; unusable token endpoint; OAuth error; malformed token response or missing access token | `token_response_valid?(flow: :backend_services)` is caller-invoked | Client authentication, requested scope, and token issuance |
+| SMART `request_backend_token` | Missing client ID or signing credentials; unusable token endpoint; OAuth error; malformed token response or missing access token | The v0.4.x missing-scope fallback warns; `token_response_valid?(flow: :backend_services)` is caller-invoked | Out-of-band context, client authentication, requested scope, and token issuance |
 | SMART `register_client` | Missing or unsafe registration endpoint; OAuth error; malformed response or missing/invalid client ID | SMART metadata diagnostics remain explicit | Registration policy and issued credentials |
 | SMART `token_response_valid?` | None; this is not an operational gate | Warns and returns `false` for response conformance defects | Caller decides whether a failed diagnostic is acceptable |
 | UDAP `server_metadata` | Transport/HTTP/204 failure; non-object JSON; failed signed-metadata signature, chain, revocation, issuer, time, or endpoint validation | `UdapMetadata#valid?` is caller-invoked | Supported communities, profiles, and capabilities |

@@ -1,6 +1,6 @@
 # Safire Roadmap
 
-## Latest Published Release — v0.4.0
+## Latest Published Release — v0.4.1
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
 

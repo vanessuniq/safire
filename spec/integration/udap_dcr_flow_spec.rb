@@ -177,18 +177,41 @@ RSpec.describe 'UDAP Dynamic Client Registration Flow', type: :integration do
     end
   end
 
-  it 'warns and sends an unadvertised wildcard during the v0.4.1 compatibility phase' do
+  it 'rejects an unadvertised wildcard registration before signing or POSTing' do
     stub_udap_discovery(body: udap_metadata.merge('scopes_supported' => ['system/Patient.rs']))
+    stub_registration_response
+    allow(Safire.logger).to receive(:warn)
+
+    expect { client.register_client(registration_metadata.merge(scope: 'system/*.rs'), client_uri:) }
+      .to raise_error(Safire::Errors::ValidationError, /wildcard scope count=1.*not advertised exactly/i)
+    expect(registration_requests).to be_empty
+  end
+
+  it 'registers an exactly advertised wildcard without warning' do
+    stub_udap_discovery
     stub_registration_response
     allow(Safire.logger).to receive(:warn)
 
     client.register_client(registration_metadata.merge(scope: 'system/*.rs'), client_uri:)
 
     expect(decoded_software_statement['scope']).to eq('system/*.rs')
+    expect(Safire.logger).not_to have_received(:warn)
+  end
+
+  it 'warns but still cancels when the registered wildcard is no longer advertised' do
+    stub_udap_discovery(body: udap_metadata.merge('scopes_supported' => ['system/Patient.rs']))
+    stub_registration_response(
+      status: 200,
+      body: { 'client_id' => 'udap-client-123', 'grant_types' => [] }
+    )
+    allow(Safire.logger).to receive(:warn)
+
+    result = client.cancel_registration(cancellation_metadata.merge(scope: 'system/*.rs'), client_uri:)
+
+    expect(result['grant_types']).to eq([])
     expect(Safire.logger).to have_received(:warn)
-      .with(/wildcard scope count=1.*no exact advertisement.*v0\.5\.0/i).once
-    expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
-    expect(WebMock).to have_requested(:post, registration_endpoint)
+      .with(/wildcard scope count=1.*cancellation.*remains warning-only/i).once
+    expect(registration_requests.length).to eq(1)
   end
 
   it 'cancels registration with a signed empty grant_types claim' do

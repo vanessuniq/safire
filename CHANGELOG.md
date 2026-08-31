@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** UDAP Dynamic Client Registration and modification now enforce
+  the UDAP Security STU2 rule that a wildcard scope may be requested only when
+  it is advertised. A requested scope token containing a literal `*` raises
+  `ValidationError` unless it appears exactly in `scopes_supported`, and raises
+  `DiscoveryError` when `scopes_supported` provides no usable scope strings
+  while a wildcard must be evaluated. Usable advertised entries are still
+  honored when a malformed sibling entry is present. This replaces the v0.4.1
+  deprecation warning. The scope check stays warning-only during cancellation,
+  so scope-advertisement drift alone cannot block credential cleanup, and
+  non-wildcard scopes remain subject to server-side negotiation with at most a
+  value-free warning.
+
 ## [0.4.1] - 2026-08-29
 
 ### Changed

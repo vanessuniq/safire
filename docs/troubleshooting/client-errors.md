@@ -52,12 +52,21 @@ registration = udap_client.register_client(
 
 A missing `RS256` advertisement produces a warning because STU2 requires that
 server baseline, but Safire can proceed with another advertised, supported,
-key-compatible algorithm. Missing, malformed, or insufficient
-`scopes_supported` also warns in v0.4.1 instead of blocking DCR. Requested
-wildcards are checked by exact membership; narrower non-wildcard SMART FHIR
-scopes may be covered by broader advertised scopes. Registration and
-modification will reject unadvertised wildcard requests in v0.5.0, while
-cancellation remains warning-only.
+key-compatible algorithm.
+
+Scope handling depends on what the request needs from `scopes_supported`.
+Registration and modification reject an unadvertised requested wildcard with
+`ValidationError`, because STU2 permits requesting a wildcard only when it is
+advertised. When a wildcard is requested but `scopes_supported` provides no
+usable scope strings, Safire raises `DiscoveryError`: it is obligated to
+evaluate the wildcard and the server's advertisement makes that impossible. A
+malformed entry beside usable ones does not trigger this; Safire decides
+against the usable entries and leaves the defect to `UdapMetadata#valid?`. The
+same unusable metadata only warns when every requested scope is non-wildcard,
+because no client-side rule depends on the advertisement there and the
+authorization server remains free to grant or reject the request. Cancellation
+warns and proceeds in every scope case, so scope-advertisement drift alone
+never blocks cleanup.
 
 ### `ValidationError`: UDAP registration metadata or certifications are invalid
 

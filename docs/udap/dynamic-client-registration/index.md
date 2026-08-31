@@ -105,15 +105,22 @@ same `client_uri` and trust community requests modification. The authorization
 server may preserve the existing `client_id` or issue a replacement; use the
 identifier returned by the latest accepted response.
 
-In v0.4.1, Safire warns but still submits when a requested wildcard scope is not
-advertised exactly in `scopes_supported`. Non-wildcard SMART FHIR scopes are
-quiet when a broader advertised scope covers them; any remaining unconfirmed
-tokens produce one warning. Scope warnings report only the scope category and
-count because constrained SMART scopes and opaque custom scopes may contain
-sensitive values that do not belong in application logs. Missing or malformed
-scope metadata also warns rather than blocks. Registration and modification
-will require exact wildcard advertisement in v0.5.0, while the authorization
-server remains responsible for the scopes it grants.
+A requested scope token containing a literal `*` is a wildcard and must appear
+exactly in `scopes_supported`: UDAP Security STU2 permits requesting a wildcard
+scope only when it is advertised. Registration and modification raise
+`ValidationError` for an unadvertised wildcard, and `DiscoveryError` when
+`scopes_supported` provides no usable scope strings while a wildcard must be
+evaluated. Usable advertised entries are honored even when a malformed sibling
+entry is present; the sibling remains a `UdapMetadata#valid?` diagnostic.
+Cancellation warns and proceeds in both situations, so scope-advertisement
+drift alone cannot strand an existing registration.
+
+Non-wildcard SMART FHIR scopes are quiet when a broader advertised scope covers
+them; any remaining unconfirmed tokens produce one warning and are submitted,
+leaving the final scope decision to the authorization server. Scope warnings
+report only the scope category and count because constrained SMART scopes and
+opaque custom scopes may contain sensitive values that do not belong in
+application logs.
 
 ## Communities and Certifications
 
@@ -166,7 +173,8 @@ Safire performs the following sequence for every registration lifecycle call:
 1. Validates and snapshots caller metadata and certification input.
 2. Discovers and cryptographically validates community-scoped UDAP metadata.
 3. Checks the focused DCR profile, endpoint, algorithm, and certification fields.
-4. Reports scope-advertisement uncertainty according to the release policy above.
+4. Enforces exact wildcard advertisement for registration and modification,
+   and warns about remaining scope uncertainty as described above.
 5. Signs a fresh five-minute software statement with a fresh `jti`.
 6. POSTs the fixed UDAP request envelope to the authoritative signed endpoint.
 7. Parses the RFC 7591-shaped response into a string-keyed `Hash`.
@@ -190,8 +198,8 @@ the software statement.
 
 | Error | When raised |
 |-------|-------------|
-| `Safire::Errors::DiscoveryError` | Discovery or `signed_metadata` validation fails, or a DCR profile, endpoint, algorithm, or certification-requirement value cannot be used safely |
-| `Safire::Errors::ValidationError` | Caller metadata or certification input is invalid before signing |
+| `Safire::Errors::DiscoveryError` | Discovery or `signed_metadata` validation fails; a DCR profile, endpoint, algorithm, or certification-requirement value cannot be used safely; or `scopes_supported` provides no usable scope strings while a requested wildcard must be evaluated |
+| `Safire::Errors::ValidationError` | Caller metadata or certification input is invalid before signing, or a requested wildcard scope is not advertised exactly in `scopes_supported` |
 | `Safire::Errors::ConfigurationError` | Signing configuration or algorithm selection is missing or incompatible |
 | `Safire::Errors::CertificateError` | The client key, certificate chain, validity period, ordering, or URI SAN cannot support signing |
 | `Safire::Errors::RegistrationError` | The server rejects the request or does not return a usable response that confirms the lifecycle outcome |

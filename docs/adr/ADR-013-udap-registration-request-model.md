@@ -46,6 +46,13 @@ or other network activity. Scope diagnostics and software-statement signing
 consume the same immutable instance; Safire does not independently normalize
 the caller's raw Hash at multiple stages.
 
+The value object validates the `scope` string's local shape only.
+Discovery-bound scope policy lives in `Protocols::Udap`: registration and
+modification reject a requested wildcard that is not advertised exactly in the
+server's `scopes_supported` metadata, while that check stays warning-only for
+cancellation so scope-advertisement drift alone cannot block cleanup (see
+ADR-015).
+
 Top-level string and symbol keys are normalized to strings. Supplying both forms
 of one key is rejected rather than allowing insertion order to decide which
 value is signed. The value object and its canonical internal hash are frozen,

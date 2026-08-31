@@ -87,14 +87,26 @@ profile, a usable authoritative registration endpoint, usable registration
 algorithm metadata, and type-safe certification requirements. Other structural
 conformance checks remain available through the explicit `valid?` diagnostic.
 
-In v0.4.1, requested UDAP registration scopes are diagnostic only. Requested
-tokens containing a literal `*` are classified first and compared by exact
-membership in `scopes_supported`; narrower recognized SMART FHIR scopes may be
-covered by broader advertised scopes. Unrecognized syntax uses exact membership.
-Missing, malformed, or insufficient advertisements produce separate aggregated
-warnings while the server remains authoritative for negotiation. Registration
-and modification move to exact wildcard enforcement in v0.5.0; cancellation
-remains warning-only so an existing registration can still be removed.
+UDAP registration scope handling classifies requested tokens containing a
+literal `*` first and compares them by exact membership in `scopes_supported`;
+narrower recognized SMART FHIR scopes may be covered by broader advertised
+scopes, and unrecognized syntax uses exact membership. Registration and
+modification enforce the STU2 rule that a wildcard scope may be requested only
+when it is advertised: an unadvertised requested wildcard raises
+`ValidationError`, and `scopes_supported` that provides no usable non-blank
+scope strings raises `DiscoveryError` when a wildcard must be evaluated.
+Malformed sibling entries do not discard usable advertisements; callers can
+invoke `UdapMetadata#valid?` to diagnose the structural defect. Cancellation
+keeps both conditions warning-only. That is Safire's lifecycle-safety policy,
+not a stated STU2 exception: STU2 applies its scope-negotiation rules to
+registration requests generally and cancellation is expressed as one, but an
+empty `grant_types` request removes access rather than seeking it, and failing
+it over advertisement drift could strand an orphaned registration. Only
+scope-advertisement drift receives this treatment; trust, capability, signing,
+transport, and confirmation failures still stop cancellation. Non-wildcard
+scopes are never rejected locally: unlisted or unconfirmed tokens produce one
+aggregated value-free warning while the server remains authoritative for
+negotiation.
 
 For warning suppression only, compatible advertised FHIR permission fragments
 may collectively cover a requested permission set. STU2 does not guarantee that
@@ -147,8 +159,8 @@ This matrix covers the public protocol operations currently implemented by the
 | SMART `register_client` | Supply RFC 7591 client metadata and any required initial access token | Explicit or discovered HTTPS registration endpoint | Missing or unsafe endpoint; transport or OAuth failure; unusable response or missing/invalid client ID | None | Discovery capability helpers and `SmartMetadata#valid?` remain caller-invoked | Registration policy, accepted metadata, and issued credentials |
 | SMART `token_response_valid?` | Choose whether to require the optional conformance diagnostic | Token-response Hash and selected flow | None; this method is not an operational gate | Logs each diagnosed response defect and returns `false` | This method is the explicit diagnostic | Caller decides how to handle a failed diagnostic |
 | UDAP `server_metadata` | Supply the intended community and production trust/revocation policy; validate signed metadata before any later workflow | UDAP well-known endpoint and a trusted signed-metadata chain | Transport, HTTP, or 204 outcome; unusable JSON object; failed signature, chain, revocation, issuer, time, or endpoint validation | None | Caller may invoke `UdapMetadata#valid?` or explicitly re-run `signed_metadata_valid?` | Community-specific profiles and capabilities |
-| UDAP `register_client` | Supply conformant metadata, client URI, certifications when required, and a matching private key/certificate chain | Trusted discovery; `udap_dcr`; authoritative registration endpoint; usable algorithm and certification-requirement metadata | Unsafe or unusable readiness data; invalid caller metadata or signing identity; transport or server rejection; pending or malformed completion response | Missing RS256 advertisement and unconfirmed scope support warn in v0.4.1 | Caller may invoke `UdapMetadata#valid?`; it is not a blanket gate | Registration policy, scope and certification acceptance, effective metadata, and issued client ID |
-| UDAP `cancel_registration` | Supply the same stable client URI and trust-community identity; preserve local state until cancellation is confirmed | Registration readiness above and an existing registration to remove | Registration hard failures above; any response that does not provide final 2xx body confirmation with the client ID and empty grants | Scope compatibility and malformed scope advertisements remain warning-only so cleanup can proceed | Caller may invoke `UdapMetadata#valid?`; it is not a blanket gate | Cancellation policy and the confirmation response |
+| UDAP `register_client` | Supply conformant metadata, client URI, certifications when required, a matching private key/certificate chain, and only advertised wildcard scopes | Trusted discovery; `udap_dcr`; authoritative registration endpoint; usable algorithm and certification-requirement metadata; usable `scopes_supported` when a wildcard is requested | Unsafe or unusable readiness data; unadvertised requested wildcard scope; invalid caller metadata or signing identity; transport or server rejection; pending or malformed completion response | Missing RS256 advertisement and unconfirmed non-wildcard scope coverage warn | Caller may invoke `UdapMetadata#valid?`; it is not a blanket gate | Registration policy, scope and certification acceptance, effective metadata, and issued client ID |
+| UDAP `cancel_registration` | Supply the same stable client URI and trust-community identity; preserve local state until cancellation is confirmed | Registration readiness above and an existing registration to remove | Registration hard failures above except scope-advertisement enforcement; any response that does not provide final 2xx body confirmation with the client ID and empty grants | Scope compatibility and malformed scope advertisements remain warning-only so cleanup can proceed | Caller may invoke `UdapMetadata#valid?`; it is not a blanket gate | Cancellation policy and the confirmation response |
 
 SMART cancellation and UDAP authorization, token, refresh, backend-token, and
 token-response operations are not implemented. They raise

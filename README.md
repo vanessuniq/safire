@@ -79,10 +79,10 @@ cancellation = udap_client.cancel_registration(
 
 UDAP registration uses the trusted fields needed for that workflow rather than
 turning the full `UdapMetadata#valid?` conformance diagnostic into an automatic
-gate. In v0.4.1, an unadvertised requested wildcard produces a warning and is
-still submitted; v0.5.0 will require exact wildcard advertisement for
-registration and modification while keeping wildcard scope drift warning-only
-during cancellation.
+gate. Registration and modification require a requested wildcard scope to be
+advertised exactly in `scopes_supported`, as UDAP Security STU2 requires;
+during cancellation that check stays warning-only, so scope-advertisement
+drift alone never blocks cleanup.
 
 UDAP JWT client authentication and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
 

@@ -534,12 +534,12 @@ RSpec.describe Safire::Protocols::Udap do
     end
     let(:software_statement) { instance_double(Safire::Protocols::UdapSoftwareStatement, to_jwt: 'header.payload.sig') }
 
-    def stub_registration_discovery_for_community(community)
+    def stub_registration_discovery_for_community(community, body: registration_discovery_body)
       stub_request(:get, well_known_url)
         .with(query: { 'community' => community })
         .to_return(
           status: 200,
-          body: registration_discovery_body.to_json,
+          body: body.to_json,
           headers: { 'Content-Type' => 'application/json' }
         )
     end
@@ -823,31 +823,35 @@ RSpec.describe Safire::Protocols::Udap do
         expect(Safire.logger).not_to have_received(:warn)
       end
 
-      it 'warns distinctly and proceeds for an unadvertised requested wildcard in v0.4.1' do
+      it 'rejects an unadvertised requested wildcard before signing or POSTing' do
         stub_udap(
           body: registration_discovery_body.merge('scopes_supported' => ['system/Patient.rs'])
         )
         client_metadata[:scope] = 'system/*.rs'
         allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
 
-        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
-        expect(Safire.logger).to have_received(:warn)
-          .with(/wildcard scope count=1.*no exact advertisement.*v0\.5\.0/i).once
-        expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
-        expect(WebMock).to have_requested(:post, registration_endpoint)
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::ValidationError) { |error|
+            expect(error.message).to match(/scope.*wildcard scope count=1.*not advertised exactly/i)
+            expect(error.message).not_to include('system/*.rs')
+          }
+        expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+        expect(WebMock).not_to have_requested(:post, registration_endpoint)
       end
 
-      it 'requires exact advertisement for a requested v1 permission wildcard' do
+      it 'rejects a requested v1 permission wildcard that coverage could otherwise normalize' do
         stub_udap(
           body: registration_discovery_body.merge('scopes_supported' => ['system/*.cruds'])
         )
         client_metadata[:scope] = 'system/Patient.*'
         allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/Patient.*')
 
-        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
-        expect(Safire.logger).to have_received(:warn)
-          .with(/wildcard scope count=1.*no exact advertisement/i).once
-        expect(Safire.logger).not_to have_received(:warn).with(%r{system/Patient\.\*})
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::ValidationError) { |error|
+            expect(error.message).to match(/wildcard scope count=1.*not advertised exactly/i)
+            expect(error.message).not_to include('system/Patient.*')
+          }
+        expect(WebMock).not_to have_requested(:post, registration_endpoint)
       end
 
       it 'does not warn when advertised FHIR scope coverage proves a non-wildcard request' do
@@ -871,7 +875,7 @@ RSpec.describe Safire::Protocols::Udap do
         expect(Safire.logger).not_to have_received(:warn).with(/mrn-123|tenant-a|study-c/)
       end
 
-      [nil, [], 'system/*.rs', ['system/*.rs', nil]].each do |advertised_scopes|
+      [nil, [], 'system/*.rs', [nil, '']].each do |advertised_scopes|
         it "warns and proceeds when scopes_supported is #{advertised_scopes.inspect}" do
           stub_udap(
             body: registration_discovery_body.merge('scopes_supported' => advertised_scopes)
@@ -879,22 +883,78 @@ RSpec.describe Safire::Protocols::Udap do
 
           expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
           expect(Safire.logger).to have_received(:warn)
-            .with(/non-wildcard scope count=1.*coverage cannot be confirmed.*missing, empty, or malformed/i).once
+            .with(/non-wildcard scope count=1.*coverage cannot be confirmed.*no usable scope strings/i).once
           expect(Safire.logger).not_to have_received(:warn).with(%r{system/Patient\.rs})
+        end
+
+        it "raises DiscoveryError for a requested wildcard when scopes_supported is #{advertised_scopes.inspect}" do
+          stub_udap(
+            body: registration_discovery_body.merge('scopes_supported' => advertised_scopes)
+          )
+          client_metadata[:scope] = 'system/*.rs'
+          allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+          expect { udap.register_client(client_metadata, client_uri:) }
+            .to raise_error(
+              Safire::Errors::DiscoveryError,
+              /scopes_supported must be an array containing at least one usable scope string/
+            )
+          expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+          expect(WebMock).not_to have_requested(:post, registration_endpoint)
         end
       end
 
-      it 'warns distinctly when a wildcard cannot be checked against malformed scope metadata' do
+      it 'preserves community context when wildcard evaluation has no usable advertised scopes' do
+        community = 'https://community.example.com/udap'
+        expected_endpoint = Addressable::URI.parse(well_known_url).tap do |uri|
+          uri.query_values = { 'community' => community }
+        end.to_s
+        stub_registration_discovery_for_community(
+          community,
+          body: registration_discovery_body.merge('scopes_supported' => [nil, ''])
+        )
+        client_metadata[:scope] = 'system/*.rs'
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+        expect { udap.register_client(client_metadata, client_uri:, community:) }
+          .to raise_error(Safire::Errors::DiscoveryError) { |error|
+            expect(error.endpoint).to eq(expected_endpoint)
+            expect(error.error_description).to match(/at least one usable scope string/)
+          }
+        expect(Safire::Protocols::UdapSoftwareStatement).not_to have_received(:new)
+        expect(WebMock).not_to have_requested(:post, registration_endpoint)
+      end
+
+      it 'proves a requested wildcard against usable entries despite a malformed sibling' do
         stub_udap(
-          body: registration_discovery_body.merge('scopes_supported' => nil)
+          body: registration_discovery_body.merge('scopes_supported' => ['system/*.rs', nil])
         )
         client_metadata[:scope] = 'system/*.rs'
         allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
 
         expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
-        expect(Safire.logger).to have_received(:warn)
-          .with(/wildcard scope count=1.*cannot be confirmed.*missing, empty, or malformed.*v0\.5\.0/i).once
-        expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
+        expect(Safire.logger).not_to have_received(:warn)
+      end
+
+      it 'rejects an unadvertised wildcard when usable entries exist alongside a malformed sibling' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => ['system/Patient.rs', nil])
+        )
+        client_metadata[:scope] = 'system/*.rs'
+        allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+        expect { udap.register_client(client_metadata, client_uri:) }
+          .to raise_error(Safire::Errors::ValidationError, /wildcard scope count=1.*not advertised exactly/i)
+        expect(WebMock).not_to have_requested(:post, registration_endpoint)
+      end
+
+      it 'covers a non-wildcard request through usable entries despite a malformed sibling' do
+        stub_udap(
+          body: registration_discovery_body.merge('scopes_supported' => ['system/*.rs', nil])
+        )
+
+        expect(udap.register_client(client_metadata, client_uri:)).to eq(registration_response)
+        expect(Safire.logger).not_to have_received(:warn)
       end
 
       it 'does not treat wildcard lookalike text as a requested wildcard' do
@@ -1245,6 +1305,20 @@ RSpec.describe Safire::Protocols::Udap do
       expect(udap.cancel_registration(client_metadata, client_uri:)).to eq(cancellation_response)
       expect(Safire.logger).to have_received(:warn)
         .with(/wildcard scope count=1.*cancellation.*remains warning-only/i).once
+      expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
+      expect(WebMock).to have_requested(:post, registration_endpoint)
+    end
+
+    it 'warns and still cancels when a cancellation wildcard cannot be checked against unusable scope metadata' do
+      stub_udap(
+        body: registration_discovery_body.merge('scopes_supported' => nil)
+      )
+      client_metadata[:scope] = 'system/*.rs'
+      allow(registration_metadata).to receive(:to_h).and_return('scope' => 'system/*.rs')
+
+      expect(udap.cancel_registration(client_metadata, client_uri:)).to eq(cancellation_response)
+      expect(Safire.logger).to have_received(:warn)
+        .with(/wildcard scope count=1.*cannot be confirmed.*no usable scope strings.*cancellation/i).once
       expect(Safire.logger).not_to have_received(:warn).with(%r{system/\*\.rs})
       expect(WebMock).to have_requested(:post, registration_endpoint)
     end

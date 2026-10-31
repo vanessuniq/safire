@@ -85,7 +85,11 @@ VERSION = 'X.Y.Z'.freeze
 
 Wait for approval, then edit the file and run `bundle install` to regenerate `Gemfile.lock`.
 
-Update the `Latest Published Release` in the Roadmap.md file
+Update `ROADMAP.md` for the release, then show the user the exact ROADMAP diff and wait for approval:
+
+1. Update the `Latest Published Release` heading to `vX.Y.Z`.
+2. Remove every "(on `main`, unreleased…)" marker from features that this release ships, meaning features listed in the CHANGELOG section being released. Find them with `grep -n ', unreleased' ROADMAP.md`. A marker can wrap onto the next line (for example `(on `main`, unreleased; see` followed by `[CHANGELOG.md](CHANGELOG.md#unreleased))`). Remove the whole parenthetical, including the wrapped link, and re-flow the bullet text. Keep the general note near the top that links to the CHANGELOG `[Unreleased]` section. Afterwards, `grep -n 'CHANGELOG.md#unreleased' ROADMAP.md` should match only that general note.
+3. Check that no **Planned Features** entry describes something this release ships. Move any such entry to **Implemented Features**.
 
 Ask the user to approve this commit:
 ```

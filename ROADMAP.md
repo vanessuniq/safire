@@ -41,6 +41,13 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   discovery, certification envelope handling, RFC 7591-shaped registration
   response parsing, and cancellation confirmation through an empty
   `grant_types` response
+- **UDAP Registration Wildcard Enforcement** (on `main`, unreleased; see
+  [CHANGELOG.md](CHANGELOG.md#unreleased)) — new registration and modification
+  reject a requested wildcard scope not advertised exactly in
+  `scopes_supported` (`ValidationError`), and reject unusable
+  `scopes_supported` when a wildcard must be evaluated (`DiscoveryError`),
+  replacing the v0.4.1 deprecation warning; cancellation remains warning-only
+  so scope-advertisement drift cannot block credential cleanup
 
 ### Demo Application
 
@@ -55,10 +62,6 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 
 ### v0.5.0 — UDAP JWT Client Authentication and B2B Authorization
 
-- **UDAP Registration Wildcard Enforcement** — require exact
-  `scopes_supported` advertisement for requested wildcard scopes during new
-  registration and modification after the v0.4.1 warning period; cancellation
-  remains warning-only so metadata drift cannot strand an existing registration
 - **UDAP Authentication Tokens** — certificate-backed JWT client authentication
   for token endpoint requests, using authoritative signed discovery metadata
 - **B2B Client Credentials** — headless system-to-system authorization with the

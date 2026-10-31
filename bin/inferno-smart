@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Runs the Phase 1 Inferno SMART App Launch STU2.2 Backend Services harness.
+# See compliance/inferno/README.md. Requires Docker with the compose plugin.
+#
+# Environment (all optional):
+#   INFERNO_KIT_TAG     test kit tag to clone            (default v1.0.3)
+#   INFERNO_KIT_REF     commit the tag must resolve to   (default 980e54e…)
+#   INFERNO_KIT_DIR     where the kit is cloned          (default tmp/smart-app-launch-test-kit)
+#   INFERNO_REPORT_DIR  where results.json/report.html go (default tmp/inferno)
+#   INFERNO_KEEP=1      leave the Inferno container running afterwards
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export INFERNO_KIT_TAG="${INFERNO_KIT_TAG:-v1.0.3}"
+export INFERNO_KIT_REF="${INFERNO_KIT_REF:-980e54e4ed632b28267d797013399a8588772174}"
+export INFERNO_KIT_DIR="${INFERNO_KIT_DIR:-$ROOT/tmp/smart-app-launch-test-kit}"
+export INFERNO_REPORT_DIR="${INFERNO_REPORT_DIR:-$ROOT/tmp/inferno}"
+export INFERNO_URL="http://localhost:4567"
+COMPOSE=(docker compose -f "$ROOT/compliance/inferno/docker-compose.yml")
+
+if docker image inspect "safire-inferno-smart:$INFERNO_KIT_REF" >/dev/null 2>&1; then
+  echo "Using existing image safire-inferno-smart:$INFERNO_KIT_REF"
+else
+  if [ ! -d "$INFERNO_KIT_DIR" ]; then
+    git clone --quiet --depth 1 --branch "$INFERNO_KIT_TAG" \
+      https://github.com/inferno-framework/smart-app-launch-test-kit.git "$INFERNO_KIT_DIR"
+  fi
+  actual="$(git -C "$INFERNO_KIT_DIR" rev-parse HEAD)"
+  if [ "$actual" != "$INFERNO_KIT_REF" ]; then
+    echo "Test kit checkout is at $actual, expected $INFERNO_KIT_REF" >&2
+    exit 1
+  fi
+  "${COMPOSE[@]}" build
+fi
+
+cleanup() {
+  status=$?
+  if [ "$status" -ne 0 ]; then "${COMPOSE[@]}" logs --tail 100 inferno || true; fi
+  if [ "${INFERNO_KEEP:-0}" != "1" ]; then "${COMPOSE[@]}" down --volumes || true; fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+"${COMPOSE[@]}" up --detach --wait
+cd "$ROOT"
+bundle exec ruby compliance/inferno/backend_services_run.rb
+echo "Report: $INFERNO_REPORT_DIR/report.html"

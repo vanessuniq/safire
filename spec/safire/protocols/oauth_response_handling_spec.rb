@@ -14,6 +14,75 @@ RSpec.describe Safire::Protocols::OAuthResponseHandling do
       def build_oauth_error(faraday_error, error_class)
         oauth_error_from(faraday_error, error_class)
       end
+
+      def parse_token(body)
+        parse_token_response(body)
+      end
+
+      def build_token_error(faraday_error)
+        token_error_from(faraday_error)
+      end
+    end
+  end
+
+  describe '#parse_token_response' do
+    it 'returns a Hash response with an access_token unchanged' do
+      body = { 'access_token' => 'token-abc', 'token_type' => 'Bearer', 'expires_in' => 3600 }
+
+      expect(handler.parse_token(body)).to equal(body)
+    end
+
+    it 'raises TokenError with field names only when access_token is missing' do
+      expect { handler.parse_token('token_type' => 'Bearer', 'scope' => 'patient/*.rs') }
+        .to raise_error(Safire::Errors::TokenError) { |error|
+          expect(error.received_fields).to contain_exactly('token_type', 'scope')
+          expect(error.message).to include('Missing access token', 'token_type', 'scope')
+          expect(error.message).not_to include('Bearer', 'patient/*.rs')
+        }
+    end
+
+    it 'raises TokenError when access_token is blank' do
+      expect { handler.parse_token('access_token' => '  ', 'token_type' => 'Bearer') }
+        .to raise_error(Safire::Errors::TokenError) { |error|
+          expect(error.received_fields).to contain_exactly('access_token', 'token_type')
+        }
+    end
+
+    it 'raises TokenError when access_token is nil' do
+      expect { handler.parse_token('access_token' => nil) }
+        .to raise_error(Safire::Errors::TokenError) { |error|
+          expect(error.received_fields).to eq(['access_token'])
+        }
+    end
+
+    [
+      ['an Array', %w[access_token]],
+      ['nil', nil],
+      ['a raw JSON-object String', '{"access_token":"token-abc"}']
+    ].each do |label, body|
+      it "raises TokenError for #{label} body" do
+        expect { handler.parse_token(body) }
+          .to raise_error(Safire::Errors::TokenError) { |error|
+            expect(error.error_description).to eq('response is not a JSON object')
+            expect(error.received_fields).to be_nil
+          }
+      end
+    end
+  end
+
+  describe '#token_error_from' do
+    it 'builds a TokenError from the OAuth error response' do
+      faraday_error = instance_double(
+        Faraday::Error,
+        response: { status: 400, body: { 'error' => 'invalid_grant', 'error_description' => 'Code expired' } }
+      )
+
+      error = handler.build_token_error(faraday_error)
+
+      expect(error).to be_a(Safire::Errors::TokenError)
+      expect(error.status).to eq(400)
+      expect(error.error_code).to eq('invalid_grant')
+      expect(error.error_description).to eq('Code expired')
     end
   end
 

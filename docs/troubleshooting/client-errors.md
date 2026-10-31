@@ -277,18 +277,25 @@ Verify the public key registered with the server matches the private key you are
 
 ## Backend Services Errors
 
-### Deprecated implicit scope fallback
+### Missing Backend Services scopes
 
-SMART requires the Backend Services token request to carry the scopes selected
-by the client. Configure them on `ClientConfig` or pass them per request:
+**Symptom:** `request_backend_token` raises
+`Safire::Errors::ConfigurationError` with `missing_attributes == [:scopes]`
+and the message `Configuration missing: scopes; SMART Backend Services requires
+an explicit scope. Configure scopes: on the client or pass scopes: to
+request_backend_token.` No HTTP request (including discovery) is sent.
+
+SMART lists `scope` as a required Backend Services token request parameter.
+Configure scopes on `ClientConfig` or pass them per request:
 
 ```ruby
 client.request_backend_token(scopes: ['system/Patient.rs'])
 ```
 
-Safire v0.4.x temporarily falls back to `system/*.rs` and logs a deprecation
-warning when both sources are absent. This compatibility behavior is removed in
-v0.6.0, when the call will raise `ConfigurationError` instead.
+Blank values (`nil`, `[]`, `['']`, `['  ']`, `''`) count as absent. Before
+v0.6.0, Safire fell back to `system/*.rs` with a deprecation warning; that
+fallback is removed. Callers that relied on it should pass
+`scopes: ['system/*.rs']` explicitly.
 
 Safire does not treat discovery `scopes_supported` as an exhaustive allow-list.
 The server may support scopes it does not advertise, so explicit client scope

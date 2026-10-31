@@ -37,10 +37,15 @@ them explicitly:
 token_data = client.request_backend_token(scopes: ['system/Patient.rs'])
 ```
 
-{: .warning }
-> The v0.4.x compatibility fallback to `system/*.rs` is deprecated. Always
-> configure scopes or pass `scopes:`; requests without either will raise
-> `ConfigurationError` in v0.6.0.
+{: .important }
+> The [SMART STU2.2 token request](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#request)
+> lists `scope` as **required**. Since v0.6.0, Safire never supplies a default
+> scope: per-call `scopes:` are used when they contain a non-blank entry,
+> otherwise the configured `scopes`, otherwise `request_backend_token` raises
+> `Safire::Errors::ConfigurationError` (`missing_attributes == [:scopes]`)
+> before any HTTP request. A blank per-call value (`nil`, `[]`, `['']`, `''`)
+> falls back to the configured scopes. The v0.4.x/v0.5.x `system/*.rs`
+> fallback and its deprecation warning have been removed.
 
 Use `system/` scopes for the standard Backend Services flow. The
 [SMART STU2.2 scope requirements](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#scopes)
@@ -135,7 +140,7 @@ end
 begin
   token_data = client.request_backend_token
 rescue Safire::Errors::ConfigurationError => e
-  # client_id, private_key, or kid missing. In v0.6.0 this also covers missing scopes.
+  # client_id, scopes, private_key, or kid missing (e.missing_attributes names which)
   Rails.logger.error("Backend services misconfigured: #{e.message}")
   raise
 rescue Safire::Errors::TokenError => e

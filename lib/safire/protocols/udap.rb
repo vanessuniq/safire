@@ -28,11 +28,8 @@ module Safire
       MANDATORY_REGISTRATION_ALGORITHM = 'RS256'.freeze
       REGISTER_ACTION = 'Registering client via UDAP Dynamic Client Registration...'.freeze
       CANCEL_ACTION = 'Cancelling client registration via UDAP Dynamic Client Registration...'.freeze
-      CANCELLATION_SCOPE_LIFECYCLE =
-        'cancellation proceeds and remains warning-only so existing access can be removed'.freeze
       private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :SUCCESSFUL_CANCELLATION_STATUSES,
-                       :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION,
-                       :CANCELLATION_SCOPE_LIFECYCLE
+                       :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION
 
       def initialize(config)
         @base_url = config.base_url
@@ -326,111 +323,11 @@ module Safire
       end
 
       def validate_registration_scopes!(registration_metadata, discovered, operation:, community:)
-        wildcards, non_wildcards = registration_scope_groups(registration_metadata)
-        advertised = usable_advertised_scopes(discovered.scopes_supported)
-
-        if advertised.blank?
-          return handle_unusable_scope_advertisement(wildcards, non_wildcards, operation:, community:)
-        end
-
-        coverage = UdapScopeCoverage.new(advertised)
-        unadvertised_wildcards = wildcards.reject { |scope| coverage.advertised_exactly?(scope) }
-        handle_unadvertised_wildcards(unadvertised_wildcards, operation:)
-        uncovered = coverage.uncovered_non_wildcards_for_warning(non_wildcards)
-        warn_uncovered_non_wildcards(uncovered)
-      end
-
-      def registration_scope_groups(registration_metadata)
-        requested = registration_metadata.to_h.fetch('scope').split.uniq
-        requested.partition { |scope| UdapScopeCoverage.requested_wildcard?(scope) }
-      end
-
-      # A malformed sibling entry is a server-conformance defect for
-      # `UdapMetadata#valid?` to diagnose; it does not prevent Safire from
-      # deciding against the usable entries.
-      def usable_advertised_scopes(scopes)
-        return unless scopes.is_a?(Array)
-
-        scopes.select { |scope| scope.is_a?(String) && scope.present? }
-      end
-
-      # STU2 Scope negotiation: a client MAY request a wildcard scope only if
-      # wildcards are listed in +scopes_supported+. When that list is unusable,
-      # registration and modification cannot show a requested wildcard is
-      # advertised, so Safire raises. Cancellation removes access, so
-      # scope-advertisement drift stays warning-only there (see ADR-015).
-      def handle_unusable_scope_advertisement(wildcards, non_wildcards, operation:, community:)
-        if wildcards.any? && operation == :register
-          registration_discovery_error!(
-            'scopes_supported must be an array containing at least one usable scope string ' \
-            'to evaluate requested wildcard scopes',
-            community
-          )
-        end
-
-        warn_cancellation_unconfirmed_wildcards(wildcards)
-        warn_unconfirmed_non_wildcards(non_wildcards)
-      end
-
-      def handle_unadvertised_wildcards(scopes, operation:)
-        return if scopes.empty?
-        return warn_cancellation_unadvertised_wildcards(scopes) if operation == :cancel
-
-        raise Errors::ValidationError.new(
-          attribute: :scope,
-          reason: "#{scope_summary(scopes, 'wildcard')} not advertised exactly in scopes_supported " \
-                  '(UDAP Security STU2 permits requesting a wildcard scope only when it is advertised)'
-        )
-      end
-
-      def warn_cancellation_unadvertised_wildcards(scopes)
-        emit_scope_diagnostic(
-          scopes,
-          category: 'wildcard',
-          detail: 'no exact advertisement in scopes_supported',
-          lifecycle: CANCELLATION_SCOPE_LIFECYCLE
-        )
-      end
-
-      def warn_cancellation_unconfirmed_wildcards(scopes)
-        emit_scope_diagnostic(
-          scopes,
-          category: 'wildcard',
-          detail: 'exact advertisement cannot be confirmed because scopes_supported provides no usable scope strings',
-          lifecycle: CANCELLATION_SCOPE_LIFECYCLE
-        )
-      end
-
-      def warn_uncovered_non_wildcards(scopes)
-        emit_scope_diagnostic(
-          scopes,
-          category: 'non-wildcard',
-          detail: 'coverage is not listed or locally proven by scopes_supported; ' \
-                  'proceeding with server-side scope negotiation'
-        )
-      end
-
-      def warn_unconfirmed_non_wildcards(scopes)
-        emit_scope_diagnostic(
-          scopes,
-          category: 'non-wildcard',
-          detail: 'coverage cannot be confirmed because scopes_supported provides no usable scope strings; ' \
-                  'proceeding with server-side scope negotiation'
-        )
-      end
-
-      # Value-free by design: reports category and deduplicated count, never raw
-      # requested scope values, which can carry sensitive search constraints.
-      def emit_scope_diagnostic(scopes, category:, detail:, lifecycle: nil)
-        return if scopes.empty?
-
-        message = "[UDAP] #{scope_summary(scopes, category)}; #{detail}"
-        message = "#{message}; #{lifecycle}" if lifecycle
-        Safire.logger.warn(message)
-      end
-
-      def scope_summary(scopes, category)
-        "requested #{category} scope count=#{scopes.length}"
+        UdapScopeNegotiation.new(
+          scopes_supported: discovered.scopes_supported,
+          operation:,
+          discovery_endpoint: well_known_endpoint(community:)
+        ).evaluate!(registration_metadata.to_h.fetch('scope').split)
       end
 
       def normalize_certifications!(certifications)

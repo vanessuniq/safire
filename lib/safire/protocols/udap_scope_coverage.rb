@@ -4,9 +4,9 @@ module Safire
     # against exhaustive UDAP +scopes_supported+ metadata.
     #
     # This collaborator deliberately does not authorize requests or decide hard
-    # failures. Exact wildcard-advertisement policy remains with {Udap}; this
-    # class only identifies non-wildcard scopes that cannot be locally proven to
-    # be covered for diagnostic purposes.
+    # failures. Exact wildcard-advertisement policy belongs to
+    # {UdapScopeNegotiation}; this class only identifies non-wildcard scopes
+    # that cannot be locally proven to be covered for diagnostic purposes.
     #
     # @api private
     class UdapScopeCoverage

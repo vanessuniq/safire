@@ -1,7 +1,7 @@
 #!/bin/sh
-# Generate the YARD API docs into docs/api and apply the navigation fix below.
-# Exits nonzero if YARD fails or the navigation fix cannot be confirmed, so CI
-# never builds the Jekyll site from stale or unpatched API docs.
+# Generate the YARD API docs into docs/api and confirm the navigation fix below.
+# Exits nonzero if YARD fails or the navigation fix is missing, so CI never
+# builds the Jekyll site from stale or broken API docs.
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -12,34 +12,22 @@ rm -rf docs/api
 
 bundle exec yard doc --no-private --output-dir docs/api -m markdown
 
-# Fix YARD navigation bug: nav iframe links are relative to the iframe base URL,
-# but app.js resolves them against the parent window URL (which changes on navigation).
-# Convert them to absolute URLs in the iframe before posting the navigate message.
-# Newer YARD templates already do this (see the upstream check below); the
-# patch is then not needed. Any other template shape is an error, so a YARD
-# template change cannot silently drop the fix.
+# YARD navigation: nav iframe links are relative to the iframe base URL, but
+# app.js resolves them against the parent window URL (which changes on
+# navigation). YARD's own template now converts them to absolute URLs inside
+# the iframe before posting the navigate message, so Safire no longer patches
+# the file. Check that the fix is still there, so a YARD template change
+# cannot silently bring back broken navigation.
 ruby - docs/api/js/full_list.js <<'RUBY'
 file = ARGV.fetch(0)
-target = "url: $clicked.find('.object_link a').attr('href'),"
-patched = "url: new URL($clicked.find('.object_link a').attr('href'), window.location.href).href,"
 upstream = 'url = new URL(url, window.location.href).href;'
 
-abort "bin/docs: #{file} not found; cannot apply YARD navigation fix" unless File.file?(file)
+abort "bin/docs: #{file} not found; cannot confirm YARD navigation fix" unless File.file?(file)
 
-content = File.read(file)
-count = content.scan(target).size
-
-if count == 1
-  File.write(file, content.sub(target, patched))
-  puts "bin/docs: patched YARD navigation links in #{file}"
-elsif count > 1
-  abort "bin/docs: expected 1 occurrence of navigation snippet in #{file}, found #{count}: #{target}"
-elsif content.include?(patched)
-  puts "bin/docs: #{file} already patched; nothing to do"
-elsif content.include?(upstream)
-  puts "bin/docs: #{file} already resolves navigation links (YARD upstream fix); nothing to do"
-else
-  abort "bin/docs: navigation snippet not found in #{file}; YARD template may have changed. " \
-        "Expected: #{target}"
+unless File.read(file).include?(upstream)
+  abort "bin/docs: YARD navigation fix not found in #{file}; YARD template may have changed. " \
+        "Expected: #{upstream}"
 end
+
+puts "bin/docs: #{file} resolves navigation links to absolute URLs"
 RUBY

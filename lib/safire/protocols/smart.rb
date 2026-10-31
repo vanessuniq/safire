@@ -30,12 +30,13 @@ module Safire
       ].freeze
 
       WELL_KNOWN_PATH = '/.well-known/smart-configuration'.freeze
-      LEGACY_BACKEND_SCOPES = ['system/*.rs'].freeze
-      BACKEND_SCOPE_DEPRECATION_WARNING =
-        '[Safire] SMART Backend Services default scope is deprecated; pass scopes: or configure scopes explicitly. ' \
-        'Requests without scopes will raise ConfigurationError in v0.6.0.'.freeze
+      # Value-free message for a Backend Services token request without usable scopes. SMART App Launch 2.2.0
+      # backend-services.md lists +scope+ as a required token request parameter.
+      MISSING_BACKEND_SCOPES_MESSAGE =
+        'Configuration missing: scopes; SMART Backend Services requires an explicit scope. ' \
+        'Configure scopes: on the client or pass scopes: to request_backend_token.'.freeze
 
-      private_constant :LEGACY_BACKEND_SCOPES, :BACKEND_SCOPE_DEPRECATION_WARNING
+      private_constant :MISSING_BACKEND_SCOPES_MESSAGE
 
       attr_reader(*ATTRIBUTES)
       attr_accessor :client_type
@@ -191,11 +192,16 @@ module Safire
       # No user interaction, redirect, or PKCE is involved. The client authenticates
       # exclusively via a signed JWT assertion (RS384 or ES384).
       #
-      # @param scopes [Array<String>, nil] scope override; blank overrides fall back to configured scopes. For
-      #   v0.4.x compatibility, a request without usable per-call or configured scopes emits a deprecation warning
-      #   and falls back to +["system/*.rs"]+. This fallback will be removed in v0.6.0, when missing scopes will
-      #   raise {Safire::Errors::ConfigurationError}. Explicit non-+system/+ scopes are submitted unchanged because
-      #   SMART permits them when the caller establishes the required context out of band.
+      # SMART App Launch 2.2.0 lists +scope+ as a required token request parameter, so Safire never invents a
+      # default: the request uses usable per-call scopes, otherwise usable configured scopes, otherwise raises
+      # {Safire::Errors::ConfigurationError} before any HTTP request. (v0.4.x and v0.5.x instead fell back to
+      # +["system/*.rs"]+ with a deprecation warning; that fallback was removed in v0.6.0.)
+      #
+      # @param scopes [Array<String>, String, nil] scope override. Blank entries are dropped and surrounding
+      #   whitespace is trimmed; an override with no usable entry (+nil+, +[]+, +['']+, +['  ']+, +''+) falls back
+      #   to the configured +scopes+. Explicit +system/+, +user/+, and +patient/+ scopes are submitted unchanged
+      #   and without a warning: SMART says +user/+ and +patient/+ scopes are "not prohibited" for Backend Services
+      #   but require out-of-band coordination to establish context.
       # @param private_key [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String] private key or PEM string for the JWT
       #   assertion; uses the configured key if not provided. Required — must be present either in configuration
       #   or passed here.
@@ -206,15 +212,17 @@ module Safire
       #   * "token_type"  [String] token type, value +"Bearer"+ (required)
       #   * "expires_in"  [Integer] lifetime of the access token in seconds (required per Backend Services spec)
       #   * "scope"       [String] authorized scopes (required)
-      # @raise [Safire::Errors::ConfigurationError] if +client_id+, +private_key+, or +kid+ are missing
+      # @raise [Safire::Errors::ConfigurationError] if +client_id+, +private_key+, or +kid+ are missing, or if
+      #   neither the per-call +scopes:+ nor the configured +scopes+ contain a usable scope
+      #   (+missing_attributes+ is +[:scopes]+; the message names no scope values)
       # @raise [ArgumentError] if the signing key or JWT assertion configuration is invalid
       # @raise [Safire::Errors::TokenError] if the server returns an error or invalid response
       # @raise [Safire::Errors::DiscoveryError] if a discovered +token_endpoint+ is missing or unusable
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, or SSL error
       def request_backend_token(scopes: nil, private_key: self.private_key, kid: self.kid)
         validate_client_id!
-        assertion_params = jwt_assertion_params(private_key:, kid:)
         scopes = resolve_backend_scopes(scopes)
+        assertion_params = jwt_assertion_params(private_key:, kid:)
 
         Safire.logger.info('Requesting backend services access token (client_credentials grant)...')
 
@@ -441,8 +449,7 @@ module Safire
         configured = normalize_backend_scopes(scopes)
         return configured if configured.present?
 
-        Safire.logger.warn(BACKEND_SCOPE_DEPRECATION_WARNING)
-        LEGACY_BACKEND_SCOPES
+        raise Errors::ConfigurationError.new(missing_attributes: [:scopes]), MISSING_BACKEND_SCOPES_MESSAGE
       end
 
       def normalize_backend_scopes(scopes)

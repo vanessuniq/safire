@@ -29,24 +29,28 @@ Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
 | # | Task | Branch | Base | Issue | PR | Status |
 |---|---|---|---|---|---|---|
 | 5.1 | Shared UDAP signing credentials | `refactor/udap-signing-credentials` | `main` | #338 | #351 | draft PR |
-| 5.2 | Authentication Token builder | `feature/udap-authentication-token` | #351 | #338 | — | in progress |
+| 5.2 | Authentication Token builder | `feature/udap-authentication-token` | #351 | #338 | #354 | draft PR |
 | 5.3 | `hl7-b2b` extension model | `feature/udap-b2b-authorization-extension` | `main` | #339 | #352 | draft PR |
 | 5.4 | Shared token response parsing | `refactor/shared-token-response-parsing` | `main` | #339 | #350 | draft PR |
 | — | Wildcard wording (#332) | `docs/udap-wildcard-spec-wording` | `main` | #332 | #335 | draft PR (other session) |
 | 5.6 | Scope negotiation collaborator | `refactor/udap-scope-negotiation` | #335 | #339 | #353 | draft PR |
 | — | rack security bump (D-18) | `fix/bump-rack-advisories` | `main` | — | #349 | draft PR (other session); merged into integration |
 | — | Release skill markers (#333) | `docs/release-skill-roadmap-markers` | `main` | #333 | #336 | draft PR (other session) |
-| 5.9 | Integration (merge-only) | `integration/v0.5.0` | 5.6 | #340 | — | planned |
-| 5.7 | Token-request discovery readiness | `feature/udap-token-readiness` | 5.9 | #339 | — | planned |
-| 5.10 | B2B client_credentials request + facade | `feature/udap-b2b-client-credentials` | 5.7 | #339 | — | planned |
+| 5.9 | Integration (merge-only): #352, #350, #336, #349, #354 | `integration/v0.5.0` | #353 | #340 | #355 | draft PR; green at `ca42bd8` (1395 ex.) |
+| 5.7 | Token-request discovery readiness | `feature/udap-token-readiness` | #355 | #339 | — | in progress |
+| 5.10 | B2B client_credentials request + facade | `feature/udap-b2b-client-credentials` | 5.7 | #339 | — | in progress |
 | 5.11 | Demo B2B token workflow | `feature/demo-udap-b2b-token` | 5.10 | #339 | — | planned |
 | 5.12 | Release notes consolidation | `docs/v0.5.0-release-notes` | 5.11 | #340 | — | planned |
 | 5.A | Pre-release alignment audit | — | 5.12 | #340 | — | planned |
 | 5.R | Release preparation | `release-0.5.0` | last fix | #340 | — | planned |
 
-### v0.6.0 / v0.7.0
+### v0.6.0
 
-Planned; see [v0.6.0.md](v0.6.0.md) and [v0.7.0.md](v0.7.0.md).
+| # | Task | Branch | Base | Issue | PR | Status |
+|---|---|---|---|---|---|---|
+| 6.1 | Explicit SMART backend scopes (breaking) | `feature/smart-backend-explicit-scopes` | v0.5.0 tip (currently `integration/v0.5.0`) | #341 | — | in progress |
+
+Remaining v0.6.0 tasks: see [v0.6.0.md](v0.6.0.md). v0.7.0: see [v0.7.0.md](v0.7.0.md).
 
 ### Quality and Compliance
 

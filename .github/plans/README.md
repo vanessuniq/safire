@@ -28,12 +28,13 @@ Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
 
 | # | Task | Branch | Base | Issue | PR | Status |
 |---|---|---|---|---|---|---|
-| 5.1 | Shared UDAP signing credentials | `refactor/udap-signing-credentials` | `main` | #338 | — | in progress |
-| 5.2 | Authentication Token builder | `feature/udap-authentication-token` | 5.1 | #338 | — | planned |
-| 5.3 | `hl7-b2b` extension model | `feature/udap-b2b-authorization-extension` | `main` | #339 | — | in progress |
-| 5.4 | Shared token response parsing | `refactor/shared-token-response-parsing` | `main` | #339 | — | in progress |
+| 5.1 | Shared UDAP signing credentials | `refactor/udap-signing-credentials` | `main` | #338 | #351 | draft PR |
+| 5.2 | Authentication Token builder | `feature/udap-authentication-token` | #351 | #338 | — | in progress |
+| 5.3 | `hl7-b2b` extension model | `feature/udap-b2b-authorization-extension` | `main` | #339 | #352 | draft PR |
+| 5.4 | Shared token response parsing | `refactor/shared-token-response-parsing` | `main` | #339 | #350 | draft PR |
 | — | Wildcard wording (#332) | `docs/udap-wildcard-spec-wording` | `main` | #332 | #335 | draft PR (other session) |
-| 5.6 | Scope negotiation collaborator | `refactor/udap-scope-negotiation` | #335 | #339 | — | in progress |
+| 5.6 | Scope negotiation collaborator | `refactor/udap-scope-negotiation` | #335 | #339 | #353 | draft PR |
+| — | rack security bump (D-18) | `fix/bump-rack-advisories` | `main` | — | #349 | draft PR (other session); merged into integration |
 | — | Release skill markers (#333) | `docs/release-skill-roadmap-markers` | `main` | #333 | #336 | draft PR (other session) |
 | 5.9 | Integration (merge-only) | `integration/v0.5.0` | 5.6 | #340 | — | planned |
 | 5.7 | Token-request discovery readiness | `feature/udap-token-readiness` | 5.9 | #339 | — | planned |
@@ -56,6 +57,10 @@ Planned; see [v0.6.0.md](v0.6.0.md) and [v0.7.0.md](v0.7.0.md).
 | Q3 | Inferno Phase 2 | — | Q2 | #347 | — | planned |
 
 ## Blockers and unverified claims
+
+- `main` fails `bundler-audit` (rack advisories). Every PR based on `main`
+  shows a red "Security audit" CI step not caused by its diff until #349
+  merges; the v0.5.0 integration branch includes #349 (D-18).
 
 - `hl7.org`, `build.fhir.org`, `rfc-editor.org`, `udap.org` are blocked by the
   sandbox network policy. Spec text comes from the IG sources at their release

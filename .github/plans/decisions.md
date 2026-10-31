@@ -136,7 +136,7 @@ headings):
 
 ## D-10 Scope negotiation applies to token requests
 
-- **Basis [N]:** general.md §7.4: constraints "apply for both registration
+- **Basis [N]:** general.md §7.3: constraints "apply for both registration
   requests and access token requests"; "A client application **MAY** request a
   wildcard scope only if wildcards are specified in the server's
   `scopes_supported` metadata list." b2b.md §5.2.2 client credentials: `scope`
@@ -167,7 +167,7 @@ headings):
 
 ## D-13 v0.6.0: authorization request scope rule
 
-- **Context:** §7.4 names registration and token requests; authorization
+- **Context:** §7.3 names registration and token requests; authorization
   requests are not named, but the scope requested there is the scope granted
   for the subsequent token.
 - **Decision [I]:** apply the wildcard rule to `authorization_url` as well,
@@ -202,3 +202,33 @@ headings):
   token request `scope` **required** [N].
 - **Decision:** `request_backend_token` without usable configured or per-call
   scopes raises `ConfigurationError` (breaking; v0.6.0 only).
+
+## D-17 Section numbers in UDAP STU2 citations
+
+- **Context:** the IG source has no explicit numbers on `general.md` headings.
+  Cross-references in the IG ("Section 7.1.4" = JWT Claims, "Section 7.2.1" =
+  state, "Section 7.4.1" = Certification template) fix the order: §7.1 JWT
+  requirements, §7.2 Authorization code flow, **§7.3 Scope negotiation**, §7.4
+  Certifications, §7.5 SMART App Launch.
+- **Decision:** cite Scope negotiation as §7.3 plus its anchor
+  (`general.html#scope-negotiation`). An earlier draft of this plan and issue
+  #339 said §7.4; both were corrected.
+
+## D-18 Fold #349 (rack advisories) into the v0.5.0 integration set
+
+- **Context:** `bundle exec bundler-audit check --update` fails on `main`
+  (rack 3.2.6: GHSA-p8x9-v4hv-2w4g, GHSA-wvg4-6p58-3gh3), so the CI "Security
+  audit" step is red for every PR based on `main`. Draft PR #349 (other
+  session) bumps rack to 3.2.8 in both lockfiles. rack is a development/test
+  dependency (via sinatra), not a runtime dependency of the gem.
+- **Decision:** merge `fix/bump-rack-advisories` into `integration/v0.5.0` so
+  combined-stack checks include the audit. Root PRs based on `main` will show
+  a red audit step that is not caused by their diff.
+
+## D-19 Token success responses stay Hash-only
+
+- **Context (from 5.4):** discovery and registration accept a raw JSON-object
+  String body (v0.4.1); token responses require an already-parsed Hash.
+- **Decision [I]:** keep Hash-only in v0.5.0 (no behavior change in the
+  refactor); UDAP token responses use the same parser. Recorded as a candidate
+  consistency enhancement for the audit, not a defect.

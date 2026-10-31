@@ -27,3 +27,4 @@ Architecture Decision Records (ADRs) document significant design decisions made 
 | [ADR-013]({% link adr/ADR-013-udap-registration-request-model.md %}) | UDAP registration metadata as an immutable value object | Accepted |
 | [ADR-014]({% link adr/ADR-014-udap-software-statement-signing.md %}) | UDAP software-statement signing | Accepted |
 | [ADR-015]({% link adr/ADR-015-client-role-and-runtime-readiness.md %}) | Client role and runtime readiness | Accepted |
+| [ADR-016]({% link adr/ADR-016-udap-authentication-token.md %}) | UDAP Authentication Token construction | Accepted |

@@ -98,6 +98,11 @@ key matches the leaf certificate, and checks that the client URI appears in the
 leaf certificate URI SAN. Certificate validity dates are checked when the
 builder is constructed and rechecked each time a software statement is emitted.
 
+Key parsing, algorithm selection, chain order, key-to-leaf, and validity-date
+checks, plus `alg`/`x5c` header generation and signing, live in the private
+`UdapSigningCredentials` class so UDAP Authentication Tokens can share them;
+the leaf URI SAN check remains specific to software statements.
+
 Safire does not decide whether the authorization server will trust the client
 certificate chain. Chain-building to trust anchors, revocation policy, and
 community trust for the client certificate remain authorization-server

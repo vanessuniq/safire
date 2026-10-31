@@ -105,11 +105,14 @@ module Safire
       # and update-style 200 responses as long as the response is a JSON object with
       # a non-blank string +client_id+.
       #
-      # A requested scope token containing a literal +*+ is treated as a wildcard
-      # and must appear exactly in the server's +scopes_supported+ metadata; UDAP
-      # Security STU2 permits requesting a wildcard scope only when it is
-      # advertised. Non-wildcard scopes remain subject to server-side negotiation
-      # and produce at most a value-free warning.
+      # UDAP Security STU2 lets a client request a wildcard scope only if wildcards
+      # are listed in the server's +scopes_supported+ metadata (see
+      # {https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation
+      # STU2 General Guidance: Scope negotiation}). Safire applies this stricter
+      # local check: a requested scope token containing a literal +*+ is treated
+      # as a wildcard and must appear exactly in +scopes_supported+. Non-wildcard
+      # scopes remain subject to server-side negotiation and produce at most a
+      # value-free warning.
       #
       # @param metadata [Hash] caller-controlled UDAP registration metadata
       # @param client_uri [String] exact URI used as +iss+ and +sub+ and required
@@ -351,8 +354,10 @@ module Safire
         scopes.select { |scope| scope.is_a?(String) && scope.present? }
       end
 
-      # Registration and modification SHALL NOT request a wildcard scope the
-      # server cannot be shown to advertise; cancellation removes access, so
+      # STU2 Scope negotiation: a client MAY request a wildcard scope only if
+      # wildcards are listed in +scopes_supported+. When that list is unusable,
+      # registration and modification cannot show a requested wildcard is
+      # advertised, so Safire raises. Cancellation removes access, so
       # scope-advertisement drift stays warning-only there (see ADR-015).
       def handle_unusable_scope_advertisement(wildcards, non_wildcards, operation:, community:)
         if wildcards.any? && operation == :register

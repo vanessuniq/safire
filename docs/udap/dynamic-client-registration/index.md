@@ -105,9 +105,12 @@ same `client_uri` and trust community requests modification. The authorization
 server may preserve the existing `client_id` or issue a replacement; use the
 identifier returned by the latest accepted response.
 
-A requested scope token containing a literal `*` is a wildcard and must appear
-exactly in `scopes_supported`: UDAP Security STU2 permits requesting a wildcard
-scope only when it is advertised. Registration and modification raise
+UDAP Security STU2 lets a client request a wildcard scope only if wildcards
+are listed in the server's `scopes_supported`
+([Scope negotiation](https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation)).
+Safire applies a stricter local check: a requested scope token containing a
+literal `*` is a wildcard and must appear exactly in `scopes_supported`.
+Registration and modification raise
 `ValidationError` for an unadvertised wildcard, and `DiscoveryError` when
 `scopes_supported` provides no usable scope strings while a wildcard must be
 evaluated. Usable advertised entries are honored even when a malformed sibling

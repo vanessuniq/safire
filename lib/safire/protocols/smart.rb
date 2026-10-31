@@ -370,16 +370,6 @@ module Safire
         )
       end
 
-      def parse_token_response(token_response)
-        unless token_response.is_a?(Hash)
-          raise Errors::TokenError.new(error_description: 'response is not a JSON object')
-        end
-
-        return token_response if token_response['access_token'].present?
-
-        raise Errors::TokenError.new(received_fields: token_response.keys)
-      end
-
       def token_type_valid?(response, flow: :app_launch)
         if response['token_type'].blank?
           Safire.logger.warn(
@@ -515,10 +505,6 @@ module Safire
         return if missing.empty?
 
         raise Errors::ConfigurationError.new(missing_attributes: missing)
-      end
-
-      def token_error_from(faraday_error)
-        oauth_error_from(faraday_error, Errors::TokenError)
       end
 
       def registration_error_from(faraday_error)

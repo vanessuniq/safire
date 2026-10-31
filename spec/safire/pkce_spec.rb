@@ -75,8 +75,8 @@ RSpec.describe Safire::PKCE do
       expect(challenge.length).to eq(43)
     end
 
-    it 'uses SHA256 hashing' do
-      # Known test vector
+    it 'matches the RFC 7636 Appendix B S256 test vector' do
+      # RFC 7636 Appendix B known test vector
       verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
       expected_challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
 
@@ -89,6 +89,104 @@ RSpec.describe Safire::PKCE do
         expect { described_class.generate_code_challenge('') }.to raise_error(
           ArgumentError, /Code verifier must be between 43 and 128 characters/
         )
+      end
+    end
+
+    context 'with a non-String verifier' do
+      {
+        'nil' => nil,
+        'an Integer' => 1_234_567,
+        'a Symbol of valid length' => ('a' * 43).to_sym,
+        'an Array' => ['a'] * 43
+      }.each do |description, verifier|
+        it "raises ArgumentError naming the class for #{description}" do
+          expect { described_class.generate_code_challenge(verifier) }.to raise_error(
+            ArgumentError, "Code verifier must be a String, got #{verifier.class}"
+          )
+        end
+      end
+
+      it 'does not echo the verifier value in the error message' do
+        verifier = ('s3cr3t' * 8).to_sym
+
+        expect { described_class.generate_code_challenge(verifier) }.to raise_error(ArgumentError) { |error|
+          expect(error.message).not_to include(verifier.to_s)
+        }
+      end
+    end
+
+    context 'with length boundaries' do
+      it 'rejects a 42-character verifier' do
+        expect { described_class.generate_code_challenge('a' * 42) }.to raise_error(
+          ArgumentError, 'Code verifier must be between 43 and 128 characters long, got 42'
+        )
+      end
+
+      it 'accepts a 43-character verifier' do
+        expect(described_class.generate_code_challenge('a' * 43)).to match(/\A[A-Za-z0-9_-]{43}\z/)
+      end
+
+      it 'accepts a 128-character verifier' do
+        expect(described_class.generate_code_challenge('a' * 128)).to match(/\A[A-Za-z0-9_-]{43}\z/)
+      end
+
+      it 'rejects a 129-character verifier' do
+        expect { described_class.generate_code_challenge('a' * 129) }.to raise_error(
+          ArgumentError, 'Code verifier must be between 43 and 128 characters long, got 129'
+        )
+      end
+    end
+
+    context 'with allowed characters' do
+      it 'accepts a verifier containing every unreserved character' do
+        verifier = [*'A'..'Z', *'a'..'z', *'0'..'9', '-', '.', '_', '~'].join
+
+        expect(described_class.generate_code_challenge(verifier)).to match(/\A[A-Za-z0-9_-]{43}\z/)
+      end
+
+      it 'accepts a String subclass' do
+        verifier = Class.new(String).new('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk')
+
+        expect(described_class.generate_code_challenge(verifier)).to eq('E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM')
+      end
+
+      it 'accepts a frozen verifier' do
+        expect(described_class.generate_code_challenge(('a' * 43).freeze)).to be_a(String)
+      end
+    end
+
+    context 'with disallowed characters' do
+      {
+        'a space' => ' ',
+        'a plus sign' => '+',
+        'a slash' => '/',
+        'an equals sign' => '=',
+        'a percent sign' => '%',
+        'a trailing newline' => "\n",
+        'a non-ASCII character' => 'é'
+      }.each do |description, char|
+        it "rejects a verifier containing #{description}" do
+          verifier = ('a' * 42) + char
+
+          expect { described_class.generate_code_challenge(verifier) }.to raise_error(
+            ArgumentError, /Code verifier contains invalid characters/
+          )
+        end
+      end
+    end
+
+    context 'with non-ASCII or invalid encodings' do
+      {
+        'multibyte UTF-8 characters' => 'é' * 43,
+        'invalid UTF-8 bytes' => ("\xFF" * 43).dup.force_encoding(Encoding::UTF_8),
+        'high binary bytes' => ("\xFF" * 43).b,
+        'an ASCII-incompatible encoding' => ('a' * 43).encode(Encoding::UTF_16LE)
+      }.each do |description, verifier|
+        it "rejects #{description} with the invalid characters error" do
+          expect { described_class.generate_code_challenge(verifier) }.to raise_error(
+            ArgumentError, /Code verifier contains invalid characters/
+          )
+        end
       end
     end
 

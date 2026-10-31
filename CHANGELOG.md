@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-wildcard scopes remain subject to server-side negotiation with at most a
   value-free warning.
 
+### Fixed
+
+- `Safire::PKCE.generate_code_challenge` now raises `ArgumentError` for a
+  non-String code verifier (for example `nil`, an Integer, or a Symbol) instead
+  of leaking `NoMethodError` or `TypeError`. The message names only the received
+  class, never the verifier value. Verifiers with non-ASCII, invalid-byte, or
+  ASCII-incompatible encodings now raise the existing invalid-characters
+  `ArgumentError` instead of an encoding error.
+
 ## [0.4.1] - 2026-08-29
 
 ### Changed

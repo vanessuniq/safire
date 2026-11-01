@@ -14,7 +14,7 @@ description: "Run the UDAP Security STU2 authorization code flow for consumer-fa
 Safire implements the UDAP Security STU2
 [authorization code flow](https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow)
 on a `protocol: :udap` client through the same facade methods as SMART:
-`Safire::Client#authorization_url`.
+`Safire::Client#authorization_url` and `#request_access_token`.
 
 ## Table of contents
 {: .no_toc .text-delta }
@@ -164,6 +164,72 @@ Use each `state` once and keep it bound to the user's session. If the response
 has an `error` parameter (RFC 6749 §4.1.2.1), handle it without exchanging a
 code.
 
+## Step 3: exchange the code
+
+```ruby
+token_data = client.request_access_token(
+  code:            params[:code],
+  code_verifier:   session.delete(:udap_code_verifier),
+  trusted_anchors: [udap_ca],
+  crls:            [udap_crl]
+)
+
+token_data['access_token']
+token_data['refresh_token'] # present only if the server issued one
+```
+
+Keyword arguments:
+
+| Keyword | Purpose |
+|---------|---------|
+| `code:` | **Required.** Authorization code from the callback (non-blank String) |
+| `code_verifier:` | **Required.** The `:code_verifier` from step 1 (RFC 7636: 43–128 unreserved characters) |
+| `extensions:` | Optional Hash of Authorization Extension Objects. Must not contain `hl7-b2b`. Omitted by default |
+| `community:`, `trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:` | Discovery and server trust policy; use the same values as step 1 |
+| `private_key:`, `certificate_chain:`, `jwt_algorithm:` | Per-call overrides of the configured signing identity |
+
+What Safire sends
+([consumer §4.2.2](https://hl7.org/fhir/us/udap-security/STU2/consumer.html#submitting-a-token-request),
+[b2b §5.2.2.1](https://hl7.org/fhir/us/udap-security/STU2/b2b.html#authorization-code-grant)):
+a form-encoded POST to the authoritative signed `token_endpoint` with exactly
+`grant_type=authorization_code`, `code`, `redirect_uri`, `code_verifier`,
+`client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`,
+`client_assertion`, and `udap=1`.
+
+- `redirect_uri` is the configured value. STU2: it "**SHALL** be present only
+  if the `redirect_uri` parameter was included in the authorization request
+  ... and their values **SHALL** be identical". Step 1 always sends it, so
+  step 3 always sends the same value. Do not change the configured
+  `redirect_uri` between the two steps.
+- `code_verifier`: clients "**SHALL** include a `code_verifier` parameter and
+  value in the token request as per Section 4.5 of RFC 7636".
+- No `Authorization` header, `client_id`, or `client_secret`. Clients
+  "**SHALL NOT** include an HTTP Authorization header or client secret".
+
+The `client_assertion` is an Authentication Token with `alg` and `x5c`
+headers and claims `iss` and `sub` (the `client_id`), `aud` (the signed token
+endpoint, unchanged), `iat`, `exp` (300 seconds later), and a fresh `jti`. It
+has no `extensions` claim unless you pass `extensions:`. STU2 b2b §5.2.1 says
+the B2B Authorization Extension Object is "required for B2B client apps using
+the `client_credentials` flow; omit for client apps using the
+`authorization_code` flow". Safire therefore rejects `hl7-b2b` here with
+`ValidationError`.
+
+Token readiness for this grant matches
+[B2B Client Credentials]({% link udap/b2b-client-credentials.md %}#discovery-readiness)
+(`udap_authn`, `authorization_code` in `grant_types_supported`, usable signed
+`token_endpoint`, `private_key_jwt`, signing algorithms), with one difference.
+If `udap_authorization_extensions_required` lists extensions that the request
+does not send, Safire logs a warning with a count and proceeds. Discovery §2.2
+calls them "required ... in every token request", but b2b §5.2.1 says to omit
+`hl7-b2b` for this flow. Safire does not fail on this conflict. The server
+decides.
+
+The response is returned as sent once it is a JSON object with a non-blank
+`access_token`. It may include `refresh_token`, `id_token`, `scope`, and SMART
+context such as `patient`. The server "**MAY** grant all scopes requested ...
+or a subset thereof" (§7.3), so read `scope`.
+
 ## Discovery readiness
 
 Before it builds the URL, Safire validates `signed_metadata` and then checks:
@@ -177,6 +243,31 @@ Before it builds the URL, Safire validates `signed_metadata` and then checks:
 
 Token-endpoint readiness (`udap_authn`, `private_key_jwt`, signing algorithms)
 is checked when the code is exchanged, not here.
+
+## Error handling
+
+```ruby
+begin
+  token_data = client.request_access_token(code:, code_verifier:, trusted_anchors: [udap_ca], crls: [udap_crl])
+rescue Safire::Errors::ConfigurationError => e
+  # missing client_id, redirect_uri, private_key, certificate_chain; incompatible algorithm
+rescue Safire::Errors::ValidationError => e
+  # blank code, invalid code_verifier, invalid or hl7-b2b extensions
+rescue Safire::Errors::DiscoveryError => e
+  # untrusted or unusable discovery metadata
+rescue Safire::Errors::CertificateError => e
+  # client certificate chain cannot support signing
+rescue Safire::Errors::TokenError => e
+  # server rejection (e.error_code such as 'invalid_grant', 'invalid_client')
+  # or a success body without a non-blank access_token
+rescue Safire::Errors::NetworkError => e
+  # connection, TLS, timeout, or blocked redirect
+end
+```
+
+Error messages name the attribute, never the code, verifier, or token value.
+Safire never retries a token request. An authorization code is single-use, so
+start a new authorization request after a failed exchange.
 
 ## Limitations
 

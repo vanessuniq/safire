@@ -11,8 +11,8 @@ module Safire
     # and signing algorithms a caller should use, or raises.
     #
     # The +grant_type+ parameter lets one readiness policy serve
-    # +client_credentials+ (implemented) and +authorization_code+ /
-    # +refresh_token+ (planned) token requests.
+    # +client_credentials+ and +authorization_code+ token requests, and
+    # +refresh_token+ requests (planned).
     #
     # Runtime hard failures ({Errors::DiscoveryError}) — Safire cannot send a
     # conformant token request:
@@ -39,11 +39,12 @@ module Safire
     #
     # Runtime hard failures ({Errors::ValidationError}) — the caller's request
     # cannot satisfy the server:
-    # - An extension key listed in +udap_authorization_extensions_required+
-    #   ("required by the Authorization Server in every token request", §2.2)
-    #   is absent from the request's extension keys (attribute +:extensions+;
-    #   the message names the missing key names, which are protocol
-    #   identifiers rather than request values).
+    # - For +client_credentials+, an extension key listed in
+    #   +udap_authorization_extensions_required+ ("required by the
+    #   Authorization Server in every token request", §2.2) is absent from the
+    #   request's extension keys (attribute +:extensions+; the message names
+    #   the missing key names, which are protocol identifiers rather than
+    #   request values).
     # - Scope negotiation failures from {UdapScopeNegotiation} with operation
     #   +:token+ (unadvertised wildcard scopes;
     #   {https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation
@@ -61,6 +62,16 @@ module Safire
     #   ({https://hl7.org/fhir/us/udap-security/STU2/b2b.html#constructing-authentication-token
     #   STU2 §5.2.1}): "The Authorization Server MAY ignore any unrecognized
     #   claims in the Authentication Token."
+    # - For +authorization_code+ (and +refresh_token+), keys listed in
+    #   +udap_authorization_extensions_required+ are missing from the request.
+    #   STU2 conflicts here: §2.2 lists extensions "required ... in every
+    #   token request", while
+    #   {https://hl7.org/fhir/us/udap-security/STU2/b2b.html#constructing-authentication-token
+    #   b2b §5.2.1} says the +hl7-b2b+ object is "required for B2B client apps
+    #   using the +client_credentials+ flow; omit for client apps using the
+    #   +authorization_code+ flow". Safire proceeds (implementation choice) so
+    #   the authorization code flow stays usable; the server decides. The
+    #   warning reports a count, not key names.
     #
     # Broader conformance (for example the exact fixed-value arrays) remains
     # the explicit {UdapMetadata#valid?} diagnostic.
@@ -88,12 +99,13 @@ module Safire
 
       include URIValidation
 
-      GRANT_TYPES = %w[client_credentials authorization_code refresh_token].freeze
+      CLIENT_CREDENTIALS = 'client_credentials'.freeze
+      GRANT_TYPES = [CLIENT_CREDENTIALS, 'authorization_code', 'refresh_token'].freeze
       AUTHENTICATION_METHOD = 'private_key_jwt'.freeze
       MANDATORY_ALGORITHM = 'RS256'.freeze
       DISCOVERY_LABEL = 'UDAP metadata'.freeze
 
-      private_constant :GRANT_TYPES, :AUTHENTICATION_METHOD, :MANDATORY_ALGORITHM, :DISCOVERY_LABEL
+      private_constant :CLIENT_CREDENTIALS, :GRANT_TYPES, :AUTHENTICATION_METHOD, :MANDATORY_ALGORITHM, :DISCOVERY_LABEL
 
       # @param metadata [UdapMetadata] trusted discovery metadata with signed
       #   endpoint claims already applied
@@ -126,8 +138,9 @@ module Safire
       # @return [Result] token endpoint and signing algorithms to use
       # @raise [Errors::DiscoveryError] when trusted metadata cannot support
       #   the token request
-      # @raise [Errors::ValidationError] when a required extension is missing or
-      #   a requested wildcard scope is not advertised
+      # @raise [Errors::ValidationError] when a required extension is missing
+      #   (+client_credentials+ only) or a requested wildcard scope is not
+      #   advertised
       # @raise [ArgumentError] when +scopes+ or +extension_keys+ are malformed
       def evaluate!(scopes: nil, extension_keys: [])
         validate_arguments!(scopes, extension_keys)
@@ -136,9 +149,9 @@ module Safire
         token_endpoint = validate_token_endpoint!
         validate_authentication_method!
         algorithms = validate_signing_algorithms!
-        validate_required_extensions!(extension_keys)
+        unsent_required = validate_required_extensions!(extension_keys)
         negotiate_scopes!(scopes)
-        emit_warnings(algorithms, extension_keys)
+        emit_warnings(algorithms, extension_keys, unsent_required)
         Result.new(token_endpoint:, signing_algorithms: algorithms)
       end
 
@@ -148,7 +161,7 @@ module Safire
         unless extension_keys.is_a?(Array) && extension_keys.all?(String)
           raise ArgumentError, 'extension_keys must be an array of strings'
         end
-        return unless @grant_type == 'client_credentials' && (!scopes.is_a?(Array) || scopes.empty?)
+        return unless @grant_type == CLIENT_CREDENTIALS && (!scopes.is_a?(Array) || scopes.empty?)
 
         raise ArgumentError, 'client_credentials token requests require a non-empty scopes array'
       end
@@ -206,7 +219,7 @@ module Safire
         end
 
         missing = Array(required).uniq - extension_keys
-        return if missing.empty?
+        return missing if missing.empty? || @grant_type != CLIENT_CREDENTIALS
 
         raise Errors::ValidationError.new(
           attribute: :extensions,
@@ -225,10 +238,21 @@ module Safire
         ).evaluate!(scopes)
       end
 
-      def emit_warnings(algorithms, extension_keys)
+      def emit_warnings(algorithms, extension_keys, unsent_required)
         warn_missing_mandatory_algorithm(algorithms)
         warn_missing_authorization_profile
         warn_unlisted_extensions(extension_keys)
+        warn_unsent_required_extensions(unsent_required)
+      end
+
+      def warn_unsent_required_extensions(unsent_required)
+        return if unsent_required.empty?
+
+        Safire.logger.warn(
+          "[UDAP] udap_authorization_extensions_required lists extension count=#{unsent_required.length} " \
+          "not sent with the #{@grant_type} token request; UDAP Security STU2 says to omit the hl7-b2b " \
+          'extension for authorization_code clients, so the request proceeds and the authorization server decides'
+        )
       end
 
       def warn_missing_mandatory_algorithm(algorithms)
@@ -241,7 +265,7 @@ module Safire
       end
 
       def warn_missing_authorization_profile
-        return unless @grant_type == 'client_credentials'
+        return unless @grant_type == CLIENT_CREDENTIALS
         return if @metadata.client_authorization_profile?
 
         Safire.logger.warn(

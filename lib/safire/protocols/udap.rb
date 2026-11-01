@@ -12,12 +12,12 @@ module Safire
     # It builds authorization code requests for consumer-facing and
     # interactive B2B apps (per
     # {https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow
-    # STU2 §7.2}).
+    # STU2 §7.2}) and exchanges the resulting codes for access tokens with
+    # UDAP JWT-based client authentication.
     # Discovery results are cached per community within each instance.
     #
-    # Other UDAP flows (authorization code exchange, refresh token, and
-    # Tiered OAuth) raise +NotImplementedError+ and remain planned for future
-    # releases.
+    # Other UDAP flows (refresh token and Tiered OAuth) raise
+    # +NotImplementedError+ and remain planned for future releases.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
     # instantiate it directly — use {Safire::Client} instead.
@@ -43,10 +43,13 @@ module Safire
       AUTHORIZATION_ACTION = 'Generating UDAP authorization URL (authorization_code grant)...'.freeze
       STATE_BYTES = 32
       PKCE_METHOD = 'S256'.freeze
+      AUTHORIZATION_CODE_GRANT = 'authorization_code'.freeze
+      AUTHORIZATION_CODE_ACTION = 'Requesting UDAP access token (authorization_code grant)...'.freeze
       private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :SUCCESSFUL_CANCELLATION_STATUSES,
                        :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION, :TOKEN_HEADERS,
                        :CLIENT_ASSERTION_TYPE, :CLIENT_CREDENTIALS_GRANT, :CLIENT_CREDENTIALS_ACTION,
-                       :SCOPE_TOKEN_PATTERN, :AUTHORIZATION_ACTION, :STATE_BYTES, :PKCE_METHOD
+                       :SCOPE_TOKEN_PATTERN, :AUTHORIZATION_ACTION, :STATE_BYTES, :PKCE_METHOD,
+                       :AUTHORIZATION_CODE_GRANT, :AUTHORIZATION_CODE_ACTION
 
       def initialize(config)
         @base_url = config.base_url
@@ -436,6 +439,94 @@ module Safire
         build_udap_authorization_response(endpoint, scopes)
       end
 
+      # Exchanges an authorization code for an access token with UDAP
+      # JWT-based client authentication.
+      #
+      # Serves consumer-facing apps
+      # ({https://hl7.org/fhir/us/udap-security/STU2/consumer.html#obtaining-an-access-token
+      # STU2 §4.2}) and B2B apps using the authorization code grant
+      # ({https://hl7.org/fhir/us/udap-security/STU2/b2b.html#authorization-code-grant
+      # STU2 §5.2.2.1}). Call it only after the application has confirmed that
+      # the callback +state+ matches the value returned by {#authorization_url}
+      # (STU2 §7.2.1: the client "SHALL NOT proceed" otherwise).
+      #
+      # Order of operations: validate caller input (identity, +redirect_uri+,
+      # +code+, +code_verifier+, +extensions+) before any network activity;
+      # discover trusted UDAP metadata; check token-request readiness for the
+      # +authorization_code+ grant ({UdapTokenRequestReadiness}); sign an
+      # Authentication Token; then POST exactly once. Safire never retries.
+      #
+      # The form-encoded body contains exactly +grant_type=authorization_code+,
+      # +code+, +redirect_uri+ (the configured value, identical to the one
+      # {#authorization_url} sent: "their values SHALL be identical"),
+      # +code_verifier+ (RFC 7636 §4.5; STU2 "SHALL include a +code_verifier+"),
+      # +client_assertion_type+, +client_assertion+, and +udap=1+. No
+      # +Authorization+ header, +client_id+, or +client_secret+ is sent: clients
+      # "SHALL NOT include an HTTP Authorization header or client secret".
+      #
+      # The Authentication Token ({UdapAuthenticationToken}) uses the configured
+      # +client_id+ as +iss+ and +sub+, the authoritative signed
+      # +token_endpoint+ as +aud+ (and POST target), a 300-second lifetime, and
+      # a fresh +jti+. It has no +extensions+ claim unless +extensions:+ is
+      # given: STU2 b2b §5.2.1 says to omit the B2B Authorization Extension
+      # Object for the +authorization_code+ flow, so +hl7-b2b+ is rejected
+      # here. When the server lists +udap_authorization_extensions_required+
+      # that the request does not send, Safire logs a value-free warning and
+      # proceeds (STU2 §2.2 and b2b §5.2.1 conflict for this grant).
+      #
+      # @param code [String] authorization code from the callback
+      # @param code_verifier [String] PKCE code verifier returned by {#authorization_url}
+      # @param extensions [Hash{String, Symbol => Hash}, nil] optional Authorization Extension
+      #   Objects keyed by extension name; must not contain +hl7-b2b+. +nil+ or an empty Hash
+      #   omits the +extensions+ claim
+      # @param community [String, nil] optional UDAP community URI for discovery
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
+      #   for signed metadata validation
+      # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation
+      # @param revocation_checker [#call, nil] custom server certificate revocation policy
+      # @param verify_chain [Boolean] whether discovery signed_metadata chain validation is required
+      # @param private_key [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil]
+      #   client signing private key; defaults to configuration
+      # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>, nil]
+      #   leaf-first client signing certificate chain; defaults to configuration
+      # @param jwt_algorithm [String, nil] optional explicit Authentication Token signing algorithm
+      # @return [Hash] token response from the authorization server, including a non-blank
+      #   +"access_token"+; other members (+token_type+, +expires_in+, +scope+, +refresh_token+,
+      #   +id_token+, SMART context such as +patient+) are returned as sent
+      # @raise [Safire::Errors::ConfigurationError] when +client_id+, +redirect_uri+,
+      #   +private_key+, or +certificate_chain+ are missing, or signing configuration is invalid
+      # @raise [Safire::Errors::ValidationError] when +code+ is not a non-blank String,
+      #   +code_verifier+ is not an RFC 7636 verifier, or +extensions:+ is invalid
+      # @raise [Safire::Errors::DiscoveryError] when trusted UDAP discovery fails or the
+      #   metadata cannot support an authorization_code token request
+      # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
+      # @raise [Safire::Errors::TokenError] when the server rejects the request (OAuth +error+
+      #   codes such as +invalid_grant+ or +invalid_client+ are preserved) or returns a body
+      #   that is not a JSON object with a non-blank +access_token+
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
+      #   or a redirect to a non-HTTPS URL
+      # @see https://hl7.org/fhir/us/udap-security/STU2/consumer.html#submitting-a-token-request
+      def request_access_token(code:, code_verifier:, extensions: nil, community: nil, trusted_anchors: [],
+                               crls: [], revocation_checker: nil, verify_chain: true,
+                               private_key: @private_key, certificate_chain: @certificate_chain,
+                               jwt_algorithm: @jwt_algorithm)
+        validate_token_identity!(private_key, certificate_chain, redirect_uri: true)
+        request = {
+          grant_type: AUTHORIZATION_CODE_GRANT,
+          action: AUTHORIZATION_CODE_ACTION,
+          form: authorization_code_form(code, code_verifier),
+          extensions: user_grant_extensions(extensions, AUTHORIZATION_CODE_GRANT),
+          community: normalize_community(community)
+        }
+        submit_user_grant_token_request(
+          request,
+          trust: { trusted_anchors:, crls:, revocation_checker:, verify_chain: },
+          signing: { private_key:, certificate_chain:, jwt_algorithm: }
+        )
+      rescue Faraday::Error => e
+        raise token_error_from(e)
+      end
+
       private
 
       # -- authorization code request ----------------------------------------
@@ -670,9 +761,10 @@ module Safire
 
       # -- client_credentials token request ----------------------------------
 
-      def validate_token_identity!(private_key, certificate_chain)
+      def validate_token_identity!(private_key, certificate_chain, redirect_uri: false)
         missing = []
         missing << :client_id if @client_id.blank?
+        missing << :redirect_uri if redirect_uri && @redirect_uri.blank?
         missing << :private_key if private_key.blank?
         missing << :certificate_chain if certificate_chain.blank?
         raise Errors::ConfigurationError.new(missing_attributes: missing) if missing.any?
@@ -723,12 +815,14 @@ module Safire
         { UdapB2bAuthorizationExtension::EXTENSION_KEY => hl7_b2b }.merge(additional_token_extensions(extensions))
       end
 
-      def additional_token_extensions(extensions)
+      def additional_token_extensions(
+        extensions, hl7_b2b_reason: 'must not include hl7-b2b; pass the B2B Authorization Extension Object with b2b:'
+      )
         return {} if extensions.nil?
 
         extensions_error!('must be a Hash or nil') unless extensions.is_a?(Hash)
         extensions.each_with_object({}) do |(key, value), normalized|
-          name = token_extension_name(key)
+          name = token_extension_name(key, hl7_b2b_reason)
           extensions_error!('must not specify an extension more than once') if normalized.key?(name)
           extensions_error!('each extension must be a non-empty Hash') unless value.is_a?(Hash) && value.any?
 
@@ -736,7 +830,7 @@ module Safire
         end
       end
 
-      def token_extension_name(key)
+      def token_extension_name(key, hl7_b2b_reason)
         unless (key.is_a?(String) || key.is_a?(Symbol)) && key.to_s.present?
           extensions_error!('keys must be non-blank Strings or Symbols')
         end
@@ -744,7 +838,61 @@ module Safire
         name = key.to_s
         return name unless name == UdapB2bAuthorizationExtension::EXTENSION_KEY
 
-        extensions_error!('must not include hl7-b2b; pass the B2B Authorization Extension Object with b2b:')
+        extensions_error!(hl7_b2b_reason)
+      end
+
+      # -- authorization_code and refresh_token requests ---------------------
+
+      # STU2 b2b §5.2.1: the hl7-b2b object is for client_credentials; "omit
+      # for client apps using the authorization_code flow". Safire sends no
+      # extensions claim unless the caller passes other extensions.
+      def user_grant_extensions(extensions, grant_type)
+        normalized = additional_token_extensions(
+          extensions,
+          hl7_b2b_reason: "must not include hl7-b2b for the #{grant_type} grant; UDAP Security STU2 " \
+                          'reserves it for client_credentials'
+        )
+        normalized.presence
+      end
+
+      def authorization_code_form(code, code_verifier)
+        {
+          grant_type: AUTHORIZATION_CODE_GRANT,
+          code: required_token_string!(code, :code),
+          redirect_uri: @redirect_uri,
+          code_verifier: validate_code_verifier!(code_verifier)
+        }
+      end
+
+      # Reports only the attribute, never the value: codes and refresh tokens
+      # are credentials.
+      def required_token_string!(value, attribute)
+        return value if value.is_a?(String) && value.present?
+
+        raise Errors::ValidationError.new(attribute:, reason: 'must be a non-blank String')
+      end
+
+      def validate_code_verifier!(code_verifier)
+        PKCE.generate_code_challenge(code_verifier)
+        code_verifier
+      rescue ArgumentError => e
+        raise Errors::ValidationError.new(attribute: :code_verifier, reason: e.message)
+      end
+
+      def submit_user_grant_token_request(request, trust:, signing:)
+        readiness = user_grant_readiness(request, trust)
+        assertion = build_authentication_token(readiness, request[:extensions], **signing)
+        post_token_form(readiness.token_endpoint, request[:form], assertion.to_jwt, action: request[:action])
+      end
+
+      def user_grant_readiness(request, trust)
+        community = request[:community]
+        UdapTokenRequestReadiness.new(
+          metadata: server_metadata(community:, **trust),
+          grant_type: request[:grant_type],
+          discovery_endpoint: well_known_endpoint(community:),
+          allow_insecure_localhost: @allow_insecure_localhost
+        ).evaluate!(scopes: request[:scopes], extension_keys: request[:extensions].to_h.keys)
       end
 
       def extensions_error!(reason)
@@ -778,17 +926,18 @@ module Safire
       # STU2 b2b §5.2.2: exactly these parameters; no Authorization header,
       # client_id, or client_secret.
       def post_client_credentials_request(endpoint, scopes, client_assertion)
-        Safire.logger.info(CLIENT_CREDENTIALS_ACTION)
+        form = { grant_type: CLIENT_CREDENTIALS_GRANT, scope: scopes.join(' ') }
+        post_token_form(endpoint, form, client_assertion, action: CLIENT_CREDENTIALS_ACTION)
+      end
+
+      # Appends the UDAP JWT client authentication parameters (STU2 consumer
+      # §4.2.2, b2b §5.2.2) to a grant-specific form and POSTs it once.
+      def post_token_form(endpoint, form, client_assertion, action:)
+        Safire.logger.info(action)
 
         response = @http_client.post(
           endpoint,
-          body: {
-            grant_type: CLIENT_CREDENTIALS_GRANT,
-            scope: scopes.join(' '),
-            client_assertion_type: CLIENT_ASSERTION_TYPE,
-            client_assertion:,
-            udap: '1'
-          },
+          body: form.merge(client_assertion_type: CLIENT_ASSERTION_TYPE, client_assertion:, udap: '1'),
           headers: TOKEN_HEADERS
         )
         parse_token_response(response.body)

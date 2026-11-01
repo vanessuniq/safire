@@ -62,8 +62,12 @@ module Safire
   #   signed +authorization_endpoint+ found by trusted discovery (same +community:+ and trust
   #   keywords as {#register_client}). The return shape matches SMART:
   #   +{ auth_url:, state:, code_verifier: }+. The application must compare the callback +state+.
-  # * UDAP authorization code exchange, refresh token, and Tiered OAuth are not implemented yet
-  #   and raise +NotImplementedError+.
+  # * {#request_access_token} — authorization code exchange. For +protocol: :udap+ (see
+  #   {Safire::Protocols::Udap#request_access_token}) Safire POSTs +code+, the configured
+  #   +redirect_uri+ (identical to the authorization request), +code_verifier+, and a signed
+  #   Authentication Token (+client_assertion+, no +extensions+ by default) with +udap=1+; no
+  #   +Authorization+ header or client secret. Pass the same +community:+ and trust keywords.
+  # * UDAP refresh token and Tiered OAuth are not implemented yet and raise +NotImplementedError+.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration

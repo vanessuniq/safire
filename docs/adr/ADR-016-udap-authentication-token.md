@@ -142,5 +142,6 @@ certificate raises `CertificateError`.
   build a new assertion for every token request rather than caching one.
 - Invalid client IDs, endpoints, or extension objects fail before any JWT is
   produced, and error messages do not contain key material or claim values.
-- `Udap#request_backend_token` builds a fresh Authentication Token for each
-  client_credentials token request.
+- `Udap#request_backend_token`, `#request_access_token`, and `#refresh_token`
+  build a fresh Authentication Token for each token request (with `hl7-b2b`
+  only for client_credentials).

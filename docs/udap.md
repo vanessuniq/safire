@@ -3,7 +3,7 @@ layout: default
 title: UDAP
 nav_order: 5
 permalink: /udap/
-description: "UDAP Security STU2 discovery and Dynamic Client Registration in Safire."
+description: "UDAP Security STU2 discovery, Dynamic Client Registration, and B2B client credentials in Safire."
 has_children: true
 ---
 
@@ -13,9 +13,10 @@ has_children: true
 
 <div class="code-example" markdown="1">
 Safire implements UDAP Security STU2 discovery, signed metadata validation,
-community scoping, and certificate-backed Dynamic Client Registration for new
-registration, modification, and cancellation. JWT client authentication and
-Tiered OAuth remain planned.
+community scoping, certificate-backed Dynamic Client Registration for new
+registration, modification, and cancellation, and B2B access tokens with the
+client credentials grant and JWT client authentication. The authorization code
+and refresh token grants and Tiered OAuth remain planned.
 </div>
 
 ## Overview
@@ -188,19 +189,27 @@ for input rules, [Software Statements]({% link udap/dynamic-client-registration/
 for signing behavior, and [Registration Lifecycle]({% link udap/dynamic-client-registration/lifecycle.md %})
 for modification and cancellation semantics.
 
+## B2B Client Credentials
+
+After registration, `request_backend_token` obtains a B2B access token with the
+`client_credentials` grant. Safire signs an Authentication Token with the
+registered `client_id`, includes the required `hl7-b2b` Authorization Extension
+Object built from `b2b:`, and POSTs it to the authoritative signed
+`token_endpoint`. See
+[B2B Client Credentials]({% link udap/b2b-client-credentials.md %}).
+
 ## Scope and Protocol Choice
 
-Safire does not yet implement UDAP JWT client authentication, token acquisition,
-authorization-code handling, or Tiered OAuth. Those methods continue to raise
-`NotImplementedError` on a UDAP client. Dynamic registration obtains a
-`client_id`, but the later UDAP authentication and authorization flows remain
-separate roadmap work.
+Safire does not yet implement the UDAP authorization code grant, refresh tokens,
+or Tiered OAuth. `authorization_url`, `request_access_token`, `refresh_token`,
+and `token_response_valid?` continue to raise `NotImplementedError` on a UDAP
+client.
 
 | Feature | SMART App Launch in Safire | UDAP Security in Safire |
 |---------|----------------------------|--------------------------|
 | Discovery | SMART configuration JSON | Signed UDAP metadata with X.509 trust validation |
 | Dynamic registration | RFC 7591 metadata request | STU2 X.509-backed software statement |
-| Implemented client flows | App Launch and Backend Services | Registration lifecycle only |
+| Implemented client flows | App Launch and Backend Services | Registration lifecycle and B2B client credentials |
 | Client selection | `client_type:` | `protocol: :udap`; no `client_type:` |
 | Trust model | Per-server client registration and registered keys/secrets | Certificate trust communities and signed metadata |
 

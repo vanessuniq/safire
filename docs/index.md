@@ -45,7 +45,10 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 - B2B `client_credentials` access tokens with UDAP JWT client authentication
   (Authentication Tokens) and the `hl7-b2b` Authorization Extension Object
 
-The UDAP authorization code and refresh grants and Tiered OAuth remain planned. See
+- Authorization code flow with state, S256 PKCE, code exchange, and refresh,
+  authenticated with UDAP Authentication Tokens
+
+UDAP Tiered OAuth remains planned. See
 [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
 details.
 

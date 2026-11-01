@@ -15,6 +15,7 @@ require_relative 'models/udap_client_credentials'
 require_relative 'models/udap_discovery_presenter'
 require_relative 'models/udap_registration_presenter'
 require_relative 'models/udap_b2b_token_presenter'
+require_relative 'models/udap_authorization_code_presenter'
 
 # Sinatra demo application for Safire gem
 class SafireDemo < Sinatra::Base
@@ -283,6 +284,14 @@ class SafireDemo < Sinatra::Base
     require_udap_protocol!
   end
 
+  before '/demo/:server_id/udap-authorization' do
+    require_udap_protocol!
+  end
+
+  before '/demo/:server_id/udap-authorization/refresh' do
+    require_udap_protocol!
+  end
+
   # SMART Discovery
   get '/demo/:server_id/discovery' do
     erb :'demo/discovery'
@@ -366,6 +375,34 @@ class SafireDemo < Sinatra::Base
   rescue Safire::Errors::Error => e
     @udap_token_presenter = build_udap_token_presenter(error: e)
     erb :'demo/udap_token'
+  end
+
+  # UDAP authorization code flow - start form (STU2 general §7.2)
+  get '/demo/:server_id/udap-authorization' do
+    @udap_authorization_presenter = build_udap_authorization_presenter(form_params: {})
+    erb :'demo/udap_authorization'
+  end
+
+  # UDAP authorization code flow - build the authorization request and redirect
+  post '/demo/:server_id/udap-authorization' do
+    @udap_authorization_presenter = build_udap_authorization_presenter
+    auth_data = start_udap_authorization
+    store_udap_pending_authorization(auth_data)
+    redirect auth_data[:auth_url]
+  rescue Safire::Errors::Error => e
+    @udap_authorization_presenter = build_udap_authorization_presenter(error: e)
+    erb :'demo/udap_authorization'
+  end
+
+  # UDAP refresh token grant (STU2 consumer §4.3, b2b §5.3)
+  post '/demo/:server_id/udap-authorization/refresh' do
+    token_response = perform_udap_refresh
+    store_udap_token_session(token_response, udap_token_context)
+    @udap_authorization_presenter = build_udap_authorization_presenter(token_response:, result_kind: :refresh)
+    erb :'demo/udap_authorization'
+  rescue Safire::Errors::Error => e
+    @udap_authorization_presenter = build_udap_authorization_presenter(error: e)
+    erb :'demo/udap_authorization'
   end
 
   # Authorization flow - configuration form
@@ -491,13 +528,17 @@ class SafireDemo < Sinatra::Base
   post '/reset-session' do
     clear_oauth_session
     clear_token_session
+    clear_udap_session(UDAP_PENDING_SESSION_KEYS + UDAP_TOKEN_SESSION_KEYS)
     set_flash(:success, 'Session cleared successfully.')
     redirect '/'
   end
 
-  # OAuth callback
+  # OAuth callback shared by the SMART and UDAP authorization code flows.
+  # The returned state selects the pending flow; a missing or unmatched state is
+  # refused before any token request (UDAP STU2 general §7.2.1).
   get '/callback' do
-    return handle_invalid_state unless params[:state] == session[:oauth_state]
+    return handle_udap_callback if callback_state_matches?(session[:udap_oauth_state])
+    return handle_invalid_state unless callback_state_matches?(session[:oauth_state])
     return handle_oauth_error if params[:error]
 
     @server = FhirServer.find(session[:oauth_server_id])
@@ -514,10 +555,31 @@ class SafireDemo < Sinatra::Base
     token_server_id access_token refresh_token token_type expires_in scope patient encounter id_token
   ].freeze
 
+  UDAP_PENDING_SESSION_KEYS = %i[
+    udap_oauth_state udap_oauth_code_verifier udap_oauth_server_id udap_oauth_client_id udap_oauth_community
+  ].freeze
+
+  # Only the refresh token and its client context are kept; the access token is never stored.
+  UDAP_TOKEN_SESSION_KEYS = %i[
+    udap_refresh_token udap_token_server_id udap_token_client_id udap_token_community
+  ].freeze
+
   private
 
+  # Constant-time comparison of the returned state with a pending flow's state.
+  # Absent, blank, or non-String values never match.
+  def callback_state_matches?(expected)
+    returned = params[:state]
+    return false unless expected.is_a?(String) && expected.present?
+    return false unless returned.is_a?(String) && returned.present?
+
+    OpenSSL.secure_compare(returned, expected)
+  end
+
   def handle_invalid_state
-    set_flash(:error, 'Invalid state parameter - possible CSRF attack')
+    # A pending UDAP state is single-use: discard it so the flow must restart.
+    clear_udap_session(UDAP_PENDING_SESSION_KEYS)
+    set_flash(:error, 'Invalid or missing state parameter - authorization response refused; no token was requested')
     redirect '/'
   end
 
@@ -804,6 +866,148 @@ class SafireDemo < Sinatra::Base
       b2b: presenter.b2b,
       community: presenter.community.presence,
       **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  def build_udap_authorization_presenter(token_response: nil, error: nil, authorization_error: nil,
+                                         result_kind: nil, form_params: params)
+    UdapAuthorizationCodePresenter.new(
+      server: @server,
+      params: form_params,
+      credentials: udap_client_credentials,
+      trust_policy: udap_trust_policy,
+      redirect_uri:,
+      token_response:,
+      error:,
+      authorization_error:,
+      result_kind:,
+      refresh_available: udap_token_context.present?
+    )
+  end
+
+  # Authorization code clients use the demo callback, which the UDAP registration
+  # form registers by default, and the same signing identity as registration.
+  def build_udap_user_client(client_id)
+    Safire::Client.new(
+      {
+        base_url: @server.base_url,
+        client_id: client_id.presence,
+        redirect_uri:,
+        **udap_client_credentials.client_config_kwargs,
+        **localhost_policy_for(@server.base_url, redirect_uri)
+      }.compact,
+      protocol: :udap
+    )
+  end
+
+  def start_udap_authorization
+    presenter = @udap_authorization_presenter
+    build_udap_user_client(presenter.client_id).authorization_url(
+      scopes: presenter.scopes,
+      community: presenter.community.presence,
+      **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  def store_udap_pending_authorization(auth_data)
+    session[:udap_oauth_state] = auth_data[:state]
+    session[:udap_oauth_code_verifier] = auth_data[:code_verifier]
+    session[:udap_oauth_server_id] = @server.id
+    session[:udap_oauth_client_id] = @udap_authorization_presenter.client_id
+    session[:udap_oauth_community] = @udap_authorization_presenter.community.presence
+  end
+
+  # Removes the pending authorization so its state and verifier are used once.
+  def take_udap_pending_authorization
+    pending = UDAP_PENDING_SESSION_KEYS.to_h { |key| [key, session[key]] }
+    clear_udap_session(UDAP_PENDING_SESSION_KEYS)
+    pending
+  end
+
+  def handle_udap_callback
+    pending = take_udap_pending_authorization
+    @server = FhirServer.find(pending[:udap_oauth_server_id])
+    halt 404, 'Server not found' unless @server
+    return render_udap_authorization_error if params.key?(:error)
+
+    token_response = exchange_udap_code(pending)
+    context = { client_id: pending[:udap_oauth_client_id], community: pending[:udap_oauth_community] }
+    store_udap_token_session(token_response, context)
+    render_udap_callback_result(token_response:, result_kind: :exchange)
+  rescue Safire::Errors::Error => e
+    render_udap_callback_result(error: e)
+  end
+
+  def exchange_udap_code(pending)
+    build_udap_user_client(pending[:udap_oauth_client_id]).request_access_token(
+      code: params[:code],
+      code_verifier: pending[:udap_oauth_code_verifier],
+      community: pending[:udap_oauth_community],
+      **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  # Authorization response error (RFC 6749 §4.1.2.1): report it and request no token.
+  def render_udap_authorization_error
+    authorization_error = {
+      error: params[:error].to_s,
+      error_description: params[:error_description].is_a?(String) ? params[:error_description] : nil
+    }
+    render_udap_callback_result(authorization_error:)
+  end
+
+  def render_udap_callback_result(**)
+    @udap_authorization_presenter = build_udap_authorization_presenter(form_params: {}, **)
+    erb :'demo/udap_authorization'
+  end
+
+  def perform_udap_refresh
+    context = udap_token_context
+    raise missing_udap_refresh_token_error unless context
+
+    build_udap_user_client(context[:client_id]).refresh_token(
+      refresh_token: context[:refresh_token],
+      scopes: parse_scopes(params[:refresh_scope]),
+      community: context[:community],
+      **udap_trust_policy.server_metadata_kwargs
+    )
+  end
+
+  def udap_token_context
+    return unless session[:udap_token_server_id] == @server.id && session[:udap_refresh_token].present?
+
+    {
+      refresh_token: session[:udap_refresh_token],
+      client_id: session[:udap_token_client_id],
+      community: session[:udap_token_community]
+    }
+  end
+
+  # Keeps a rotated refresh token, or the previous one when none is returned.
+  def store_udap_token_session(token_response, context)
+    refresh_token = issued_refresh_token(token_response) || context[:refresh_token]
+    clear_udap_session(UDAP_TOKEN_SESSION_KEYS)
+    return if refresh_token.blank?
+
+    session[:udap_refresh_token] = refresh_token
+    session[:udap_token_server_id] = @server.id
+    session[:udap_token_client_id] = context[:client_id]
+    session[:udap_token_community] = context[:community]
+  end
+
+  def issued_refresh_token(token_response)
+    value = token_response['refresh_token']
+    value if value.is_a?(String) && value.present?
+  end
+
+  def clear_udap_session(keys)
+    keys.each { |key| session.delete(key) }
+  end
+
+  def missing_udap_refresh_token_error
+    Safire::Errors::ValidationError.new(
+      attribute: :refresh_token,
+      reason: 'is not available for this server in the current session; complete the authorization code flow first'
     )
   end
 

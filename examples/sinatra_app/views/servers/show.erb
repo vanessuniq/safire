@@ -162,6 +162,16 @@
               Request B2B Token
             </a>
           </article>
+
+          <article class="action-card">
+            <span class="action-kicker">Authorization Code</span>
+            <h3>User Authorization</h3>
+            <p>Run the <code>authorization_code</code> flow with PKCE and refresh the resulting token.</p>
+            <a href="/demo/<%= @server.id %>/udap-authorization"
+               class="btn <%= @server.udap_client_id.present? ? 'btn-primary' : 'btn-secondary' %>">
+              Start Authorization Code
+            </a>
+          </article>
         </div>
       </section>
     <% end %>

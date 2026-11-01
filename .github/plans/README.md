@@ -42,13 +42,13 @@ Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
 | 5.9 | Integration (merge-only): #352, #350, #336, #349, #354 | `integration/v0.5.0` | #353 | #340 | #355 | draft PR; green at `ca42bd8` (1395 ex.) |
 | 5.7 | Token-request discovery readiness | `feature/udap-token-readiness` | #355 | #339 | #357 | draft PR |
 | 5.10 | B2B client_credentials request + facade | `feature/udap-b2b-client-credentials` | #357 | #339 | #358 | draft PR; combined suite green at `51d6210` (1521 ex.) |
-| 5.A1 | Audit fixes B-01, B-13 | `docs/fix-unrunnable-doc-examples` | #358 | #360 #372 | — | in progress |
-| 5.A2 | Audit fixes B-02, B-03, B-04, B-09 | `docs/fix-smart-error-and-claim-docs` | 5.A1 | #361–#363 #368 | — | in progress |
-| 5.A3 | Audit fixes B-05, B-08 (docs) | `docs/fix-docs-links-and-config-refs` | 5.A2 | #364 #367 | — | in progress |
-| 5.11 | Demo B2B token workflow | `feature/demo-udap-b2b-token` | #358 | #339 | — | in progress |
-| 5.A4 | Audit fix B-11 (lockfiles) | `fix/refresh-demo-and-ci-lockfiles` | 5.11 | #370 | — | in progress |
-| 5.12 | Release notes + audit fixes B-06, B-07, B-08 (README), B-10; merges 5.A3 and 5.A4 tips | `docs/v0.5.0-release-notes` | 5.A3 | #340 #365–#367 #369 | — | planned |
-| 5.A | Pre-release alignment audit ([audit-v0.5.0.md](audit-v0.5.0.md)) | — | — | #340 | — | baseline done (13 blockers filed); feature audit pending |
+| 5.A1 | Audit fixes B-01, B-13 | `docs/fix-unrunnable-doc-examples` | #358 | #360 #372 | #374 | draft PR |
+| 5.A2 | Audit fixes B-02, B-03, B-04, B-09 | `docs/fix-smart-error-and-claim-docs` | #374 | #361–#363 #368 | #375 | draft PR |
+| 5.A3 | Audit fixes B-05, B-08 (docs) | `docs/fix-docs-links-and-config-refs` | #375 | #364 #367 | #376 | draft PR |
+| 5.11 | Demo B2B token workflow (parallel branch) | `feature/demo-udap-b2b-token` | #358 | #339 | #377 | draft PR |
+| 5.A4 | Audit fix B-11 (lockfiles; AS 7.1 exception D-21) | `fix/refresh-demo-and-ci-lockfiles` | #377 | #370 | #378 | draft PR |
+| 5.12 | Release notes + audit fixes B-06, B-07, B-08 (README), B-10; joins #376 and #378 by merge | `docs/v0.5.0-release-notes` | #376 | #340 #365–#367 #369 | #379 | draft PR; 1544 ex. green at `b19a92f` |
+| 5.A | Pre-release alignment audit ([audit-v0.5.0.md](audit-v0.5.0.md)) | — | — | #340 | — | baseline done; fixes in stack; feature audit + verification running on `b19a92f` |
 | 5.R | Release preparation | `release-0.5.0` | last fix | #340 | — | planned |
 
 ### v0.6.0
@@ -78,8 +78,8 @@ Remaining v0.6.0 tasks: see [v0.6.0.md](v0.6.0.md). v0.7.0: see [v0.7.0.md](v0.7
   tags (see [decisions.md](decisions.md)); RFC/udap.org text is cited, not
   quoted.
 - No reachable production UDAP authorization server. UDAP behavior is verified
-  with WebMock-based tests; an Inferno UDAP client-suite run (STU1-targeted kit)
-  is in progress as labeled external evidence.
+  with WebMock-based tests plus a labeled external Inferno UDAP client-suite run
+  (STU1-targeted kit; see [inferno-udap-v0.5.0.md](inferno-udap-v0.5.0.md)).
 - Stacked PRs (base other than `main`) do not trigger the Ruby CI workflow;
   combined stacks are validated locally and via manual workflow runs where
   noted.

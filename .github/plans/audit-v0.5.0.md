@@ -32,19 +32,19 @@ below has a validated fix in the v0.5.0 stack ancestry.
 
 | ID | Issue | Summary | Fix (PR / owner) | Status |
 |---|---|---|---|---|
-| B-01 | #360 | `docs/advanced.md` examples call missing APIs / wrong signatures | `docs/fix-unrunnable-doc-examples` | fix in progress |
-| B-02 | #361 | Asymmetric token-exchange page documents wrong error class | `docs/fix-smart-error-and-claim-docs` | fix in progress |
-| B-03 | #362 | Docs claim SMART assertion sends `iat` | `docs/fix-smart-error-and-claim-docs` | fix in progress |
-| B-04 | #363 | Discovery/DCR docs route transport failures to `DiscoveryError` | `docs/fix-smart-error-and-claim-docs` | fix in progress |
-| B-05 | #364 | Broken docs-site links | `docs/fix-docs-links-and-config-refs` | fix in progress |
-| B-06 | #365 | Exact-match wildcard rule attributed to STU2 (README, CHANGELOG, client-errors.md) | 5.12 release notes (coordinator) | planned |
-| B-07 | #366 | README claims CONTRIBUTION.md covers sign-off | 5.12 release notes (coordinator) | planned |
-| B-08 | #367 | README/security.md point to undocumented `user_agent`/SSL settings | docs part: `docs/fix-docs-links-and-config-refs`; README part: 5.12 | fix in progress |
-| B-09 | #368 | Public-client testing steps fail under HTTPS policy | `docs/fix-smart-error-and-claim-docs` | fix in progress |
-| B-10 | #369 | ROADMAP attributes RS256/ES256 to public clients | 5.12 release notes (coordinator) | planned |
-| B-11 | #370 | Demo and AS 7.1 lockfiles stale with advisories | `fix/refresh-demo-and-ci-lockfiles` | fix in progress |
+| B-01 | #360 | `docs/advanced.md` examples call missing APIs / wrong signatures | #374 | fix in stack, to verify |
+| B-02 | #361 | Asymmetric token-exchange page documents wrong error class | #375 | fix in stack, to verify |
+| B-03 | #362 | Docs claim SMART assertion sends `iat` | #375 | fix in stack, to verify |
+| B-04 | #363 | Discovery/DCR docs route transport failures to `DiscoveryError` | #375 | fix in stack, to verify |
+| B-05 | #364 | Broken docs-site links | #376 | fix in stack, to verify |
+| B-06 | #365 | Exact-match wildcard rule attributed to STU2 (README, CHANGELOG, client-errors.md) | #379 | fix in stack, to verify |
+| B-07 | #366 | README claims CONTRIBUTION.md covers sign-off | #379 | fix in stack, to verify |
+| B-08 | #367 | README/security.md point to undocumented `user_agent`/SSL settings | docs: #376; README: #379 | fix in stack, to verify |
+| B-09 | #368 | Public-client testing steps fail under HTTPS policy | #375 | fix in stack, to verify |
+| B-10 | #369 | ROADMAP attributes RS256/ES256 to public clients | #379 | fix in stack, to verify |
+| B-11 | #370 | Demo and AS 7.1 lockfiles stale with advisories | #378 (AS 7.1 exception, D-21) | fix in stack, to verify |
 | B-12 | #371 | `Safire::Client` YARD: untraceable "§8.1 unregistered client" claim; stale `flow:` note | #358 (5.10) removed both — verify in feature audit | fix in stack, to verify |
-| B-13 | #372 | `security.md` rotation example unreachable; `.include?` on optional field | `docs/fix-unrunnable-doc-examples` | fix in progress |
+| B-13 | #372 | `security.md` rotation example unreachable; `.include?` on optional field | #374 | fix in stack, to verify |
 
 Optional enhancements E-01–E-14 are recorded in the baseline report and are
 **not** release blockers; they were not filed as issues to keep the audit from

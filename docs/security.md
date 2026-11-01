@@ -234,21 +234,25 @@ session.delete(:code_verifier)
 
 ### Symmetric Secret Rotation
 
-Support two secrets during rotation to allow a zero-downtime rollover:
+Support two secrets during rotation to allow a zero-downtime rollover. Building a client sends no request, so the fallback must wrap the token request itself — that is where the server rejects an outdated secret:
 
 ```ruby
 module SmartSecretRotation
-  def build_smart_client
-    create_client(primary_secret)
+  # client: a Safire::Client with client_type: :confidential_symmetric
+  def refresh_with_secret_fallback(client, refresh_token)
+    client.refresh_token(refresh_token:, client_secret: primary_secret)
   rescue Safire::Errors::TokenError => e
-    raise unless e.error_code == 'invalid_client'
-    create_client(secondary_secret) # Fall back during rotation
+    raise unless e.error_code == 'invalid_client' && secondary_secret
+
+    client.refresh_token(refresh_token:, client_secret: secondary_secret) # Fall back during rotation
   end
 
   def primary_secret   = ENV['SMART_CLIENT_SECRET']
   def secondary_secret = ENV['SMART_CLIENT_SECRET_PREVIOUS']
 end
 ```
+
+`request_access_token` accepts the same `client_secret:` override. Avoid retrying an authorization code exchange with a second secret unless you know your server rejects client authentication before it consumes the code; codes are single-use, so the retry may fail with `invalid_grant`.
 
 ### Asymmetric Key Rotation
 
@@ -292,4 +296,4 @@ client.refresh_token(
 
 ---
 
-*See also: [Configuration Guide]({{ site.baseurl }}/configuration/) for `ssl_options` and `log_http` settings that affect security behaviour.*
+*See also: [Configuration Guide]({{ site.baseurl }}/configuration/) and [Logging]({% link configuration/logging.md %}) for the `log_http` setting and what HTTP logging filters.*

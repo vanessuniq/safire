@@ -192,7 +192,8 @@ module Safire
       # exclusively via a signed JWT assertion (RS384 or ES384).
       #
       # @param scopes [Array<String>, nil] scope override; blank overrides fall back to configured scopes. For
-      #   v0.4.x compatibility, a request without usable per-call or configured scopes emits a deprecation warning
+      #   compatibility (v0.4.1 through v0.5.x), a request without usable per-call or configured scopes emits a
+      #   deprecation warning
       #   and falls back to +["system/*.rs"]+. This fallback will be removed in v0.6.0, when missing scopes will
       #   raise {Safire::Errors::ConfigurationError}. Explicit non-+system/+ scopes are submitted unchanged because
       #   SMART permits them when the caller establishes the required context out of band.

@@ -14,6 +14,7 @@ require_relative 'models/udap_trust_policy'
 require_relative 'models/udap_client_credentials'
 require_relative 'models/udap_discovery_presenter'
 require_relative 'models/udap_registration_presenter'
+require_relative 'models/udap_b2b_token_presenter'
 
 # Sinatra demo application for Safire gem
 class SafireDemo < Sinatra::Base
@@ -278,6 +279,10 @@ class SafireDemo < Sinatra::Base
     require_udap_protocol!
   end
 
+  before '/demo/:server_id/udap-token' do
+    require_udap_protocol!
+  end
+
   # SMART Discovery
   get '/demo/:server_id/discovery' do
     erb :'demo/discovery'
@@ -344,6 +349,23 @@ class SafireDemo < Sinatra::Base
       form_params: cancellation_form_params(stored_udap_registration_context || {})
     )
     erb :'demo/udap_registration'
+  end
+
+  # UDAP B2B client_credentials token request form
+  get '/demo/:server_id/udap-token' do
+    @udap_token_presenter = build_udap_token_presenter(form_params: {})
+    erb :'demo/udap_token'
+  end
+
+  # UDAP B2B client_credentials token request (STU2 b2b §5.2)
+  post '/demo/:server_id/udap-token' do
+    @udap_token_presenter = build_udap_token_presenter
+    token_response = perform_udap_token_request
+    @udap_token_presenter = build_udap_token_presenter(token_response:)
+    erb :'demo/udap_token'
+  rescue Safire::Errors::Error => e
+    @udap_token_presenter = build_udap_token_presenter(error: e)
+    erb :'demo/udap_token'
   end
 
   # Authorization flow - configuration form
@@ -752,6 +774,36 @@ class SafireDemo < Sinatra::Base
       cancellation_response:,
       expected_client_id:,
       error:
+    )
+  end
+
+  def build_udap_token_presenter(token_response: nil, error: nil, form_params: params)
+    UdapB2bTokenPresenter.new(
+      server: @server,
+      params: form_params,
+      credentials: udap_client_credentials,
+      trust_policy: udap_trust_policy,
+      token_response:,
+      error:
+    )
+  end
+
+  def perform_udap_token_request
+    presenter = @udap_token_presenter
+    client = Safire::Client.new(
+      {
+        base_url: @server.base_url,
+        client_id: presenter.client_id.presence,
+        **udap_client_credentials.client_config_kwargs,
+        **localhost_policy_for(@server.base_url)
+      }.compact,
+      protocol: :udap
+    )
+    client.request_backend_token(
+      scopes: presenter.scopes,
+      b2b: presenter.b2b,
+      community: presenter.community.presence,
+      **udap_trust_policy.server_metadata_kwargs
     )
   end
 

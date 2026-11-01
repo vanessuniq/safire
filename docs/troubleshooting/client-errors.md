@@ -56,10 +56,13 @@ key-compatible algorithm.
 
 Scope handling depends on what the request needs from `scopes_supported`.
 Registration and modification reject an unadvertised requested wildcard with
-`ValidationError`, because STU2 permits requesting a wildcard only when it is
-advertised. When a wildcard is requested but `scopes_supported` provides no
-usable scope strings, Safire raises `DiscoveryError`: it is obligated to
-evaluate the wildcard and the server's advertisement makes that impossible. A
+`ValidationError`. UDAP Security STU2 lets a client request a wildcard scope
+only if wildcards are listed in `scopes_supported`
+([Scope negotiation](https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation),
+§7.3 item 3); requiring the requested wildcard to appear *exactly* is Safire's
+stricter local check. When a wildcard is requested but `scopes_supported`
+provides no usable scope strings, Safire raises `DiscoveryError`, because it
+cannot evaluate the wildcard against the server's advertisement. A
 malformed entry beside usable ones does not trigger this; Safire decides
 against the usable entries and leaves the defect to `UdapMetadata#valid?`. The
 same unusable metadata only warns when every requested scope is non-wildcard,
@@ -230,10 +233,12 @@ Verify the server supports Basic Auth before debugging credentials:
 
 ```ruby
 metadata = client.server_metadata
-unless metadata.token_endpoint_auth_methods_supported.include?('client_secret_basic')
-  raise 'Server does not support client_secret_basic'
+unless metadata.supports_symmetric_auth?
+  raise 'Server does not support confidential symmetric clients (client_secret_basic)'
 end
 ```
+
+`supports_symmetric_auth?` requires the `client-confidential-symmetric` capability. `token_endpoint_auth_methods_supported` is OPTIONAL in SMART discovery, so the helper treats an absent or empty list as allowing `client_secret_basic` and rejects only a non-empty list that omits it.
 
 Safire encodes credentials with `Base64.strict_encode64` — special characters in secrets are handled automatically.
 
@@ -266,12 +271,14 @@ Verify `private_key_jwt` is supported:
 
 ```ruby
 metadata = client.server_metadata
-unless metadata.token_endpoint_auth_methods_supported.include?('private_key_jwt')
-  raise 'Server does not support private_key_jwt'
+unless metadata.supports_asymmetric_auth?
+  raise 'Server does not support confidential asymmetric clients (private_key_jwt)'
 end
 ```
 
-Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets JWT `exp` to 5 minutes from `iat` — if your system clock is significantly skewed from the server, assertions will be rejected.
+`supports_asymmetric_auth?` requires the `client-confidential-asymmetric` capability, `private_key_jwt` in `token_endpoint_auth_methods_supported` (or that list absent or empty), and RS384 or ES384 in `token_endpoint_auth_signing_alg_values_supported` (or that list absent or empty).
+
+Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets the assertion's `exp` to 300 seconds (5 minutes) after the current local time and sends no `iat` claim (SMART requires `exp` to be no more than five minutes in the future) — if your system clock is significantly skewed from the server, assertions will be rejected.
 
 ---
 
@@ -286,7 +293,7 @@ by the client. Configure them on `ClientConfig` or pass them per request:
 client.request_backend_token(scopes: ['system/Patient.rs'])
 ```
 
-Safire v0.4.x temporarily falls back to `system/*.rs` and logs a deprecation
+Safire v0.4.1 through v0.5.x temporarily falls back to `system/*.rs` and logs a deprecation
 warning when both sources are absent. This compatibility behavior is removed in
 v0.6.0, when the call will raise `ConfigurationError` instead.
 

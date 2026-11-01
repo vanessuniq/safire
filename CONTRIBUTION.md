@@ -77,9 +77,12 @@ Create a descriptive branch name:
 Write clear, concise commit messages:
 
 - Use the imperative mood ("Add feature" not "Added feature")
-- Keep the subject line as the entire commit message (no body)
+- Keep the subject line as the entire message text (no body paragraphs)
 - Message should be 50 characters or less
 - Reference issues when applicable (`Fixes #123`)
+- Sign off every commit with `git commit -s`; the resulting
+  `Signed-off-by:` trailer (and any `Co-authored-by:` trailers) may follow the
+  subject line
 
 Example:
 ```

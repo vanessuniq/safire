@@ -1,6 +1,6 @@
 # Safire Roadmap
 
-## Latest Published Release — v0.4.1
+## Latest Published Release — v0.5.0
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
 
@@ -16,13 +16,13 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 ### SMART App Launch (v2.2.0)
 
 - **Discovery** — lazy fetch of `/.well-known/smart-configuration`; metadata cached per client instance
-- **Public Client** — PKCE-only authorization code flow (RS256/ES256)
+- **Public Client** — PKCE-only authorization code flow (no client authentication)
 - **Confidential Symmetric Client** — client secret + HTTP Basic Auth + PKCE
 - **Confidential Asymmetric Client** — `private_key_jwt` with RS384/ES384; JWKS URI support; auto-detected algorithm from key type
 - **POST-Based Authorization** — form-encoded authorization requests
 - **JWT Assertion Builder** — signed JWT assertions with configurable `kid` and expiry
 - **PKCE** — automatic code verifier and challenge generation
-- **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; client-selected scopes with a deprecated v0.4.x compatibility fallback
+- **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; client-selected scopes with a compatibility fallback deprecated since v0.4.1 (removed in v0.6.0)
 - **Dynamic Client Registration** — runtime client registration per [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591); endpoint discovered from SMART metadata or supplied explicitly; supports initial access token
 
 ### UDAP Security (STU2 / v2.0.0)
@@ -41,32 +41,30 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   discovery, certification envelope handling, RFC 7591-shaped registration
   response parsing, and cancellation confirmation through an empty
   `grant_types` response
-- **UDAP Registration Wildcard Enforcement** (on `main`, unreleased; see
-  [CHANGELOG.md](CHANGELOG.md#unreleased)) — new registration and modification
+- **UDAP Registration Wildcard Enforcement** — new registration and modification
   reject a requested wildcard scope not advertised exactly in
   `scopes_supported` (`ValidationError`), and reject unusable
   `scopes_supported` when a wildcard must be evaluated (`DiscoveryError`),
   replacing the v0.4.1 deprecation warning; cancellation remains warning-only
   so scope-advertisement drift cannot block credential cleanup
+- **UDAP Authentication Tokens** — certificate-backed JWT client
+  authentication for token endpoint requests, using authoritative signed
+  discovery metadata
+- **B2B Client Credentials** — headless system-to-system
+  authorization through `Client#request_backend_token` on `protocol: :udap`,
+  with the STU2 `hl7-b2b` authorization extension and discovery-constrained
+  scopes, signing algorithms, and extension support
 
 ### Demo Application
 
 - **Protocol-Aware Workflows** — Sinatra demo supports protocol-aware server
   setup, SMART discovery, registration, authorization, and token workflows,
-  plus UDAP signed metadata discovery and the registration/cancellation
-  lifecycle
+  plus UDAP signed metadata discovery, the registration/cancellation
+  lifecycle, and B2B client_credentials token requests
 
 ---
 
 ## Planned Features
-
-### v0.5.0 — UDAP JWT Client Authentication and B2B Authorization
-
-- **UDAP Authentication Tokens** — certificate-backed JWT client authentication
-  for token endpoint requests, using authoritative signed discovery metadata
-- **B2B Client Credentials** — headless system-to-system authorization with the
-  STU2 `hl7-b2b` authorization extension and discovery-constrained scopes,
-  signing algorithms, and extension support
 
 ### v0.6.0 — UDAP Authorization Code Flows
 
@@ -123,5 +121,5 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 | ActiveSupport | ≥ 7.1, < 9 |
 | Rails (optional) | ≥ 7.1 |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 2.0.0 (STU2 discovery and Dynamic Client Registration lifecycle implemented; JWT client authentication and authorization flows planned) |
+| UDAP Security | 2.0.0 (STU2 discovery, Dynamic Client Registration lifecycle, JWT client authentication, and B2B client credentials implemented; authorization code flows and Tiered OAuth planned) |
 | FHIR | R4, R4B |

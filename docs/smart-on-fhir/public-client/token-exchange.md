@@ -148,7 +148,9 @@ module SmartAuthentication
       base_url:     ENV['FHIR_BASE_URL'],
       client_id:    ENV['SMART_CLIENT_ID'],
       redirect_uri: callback_url,
-      scopes:       ['openid', 'profile', 'patient/*.read']
+      scopes:       ['openid', 'profile', 'patient/*.read'],
+      # Permits an http://localhost callback in development only; all other URIs must be HTTPS
+      allow_insecure_localhost: Rails.env.development?
     )
     Safire::Client.new(config, client_type: :public)
   end
@@ -193,7 +195,7 @@ rescue Safire::Errors::TokenError => e
 def initialize_client
   # ...
   @client.server_metadata # Trigger discovery eagerly if desired
-rescue Safire::Errors::DiscoveryError => e
+rescue Safire::Errors::DiscoveryError, Safire::Errors::NetworkError => e
   Rails.logger.error("SMART discovery failed: #{e.message}")
   render plain: 'FHIR server not available', status: :service_unavailable
 end
@@ -210,6 +212,8 @@ Set up against the [SMART Health IT reference server](https://launch.smarthealth
 FHIR_BASE_URL=https://launch.smarthealthit.org/v/r4/sim/eyJoIjoiMSJ9/fhir
 SMART_CLIENT_ID=your_test_client_id
 ```
+
+The local callback below uses plain HTTP. Safire rejects non-HTTPS URIs with `Safire::Errors::ConfigurationError` unless `allow_insecure_localhost: true` is set, which then permits HTTP only for `localhost` and `127.0.0.1`. The `build_smart_client` example above enables it only when `Rails.env.development?`. Alternatively, expose your local server through an HTTPS tunnel and register that URL instead.
 
 Steps:
 1. Register your client with redirect URI `http://localhost:3000/auth/callback`

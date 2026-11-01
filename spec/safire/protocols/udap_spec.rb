@@ -9,6 +9,8 @@ RSpec.describe Safire::Protocols::Udap do
     instance_double(
       Safire::ClientConfig,
       base_url:,
+      client_id: nil,
+      scopes: nil,
       allow_insecure_localhost:,
       private_key: configured_private_key,
       certificate_chain: configured_certificate_chain,
@@ -480,12 +482,6 @@ RSpec.describe Safire::Protocols::Udap do
   describe '#token_response_valid?' do
     it 'raises NotImplementedError' do
       expect { udap.token_response_valid?({}) }.to raise_error(NotImplementedError)
-    end
-  end
-
-  describe '#request_backend_token' do
-    it 'raises NotImplementedError' do
-      expect { udap.request_backend_token }.to raise_error(NotImplementedError)
     end
   end
 

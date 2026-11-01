@@ -29,7 +29,7 @@ flowchart TD
     A -->|"resolves config"| B
     A -->|"validates protocol + client_type"| C
     C -->|":smart (default)"| D
-    C -->|":udap"| G["Protocols::Udap\n— discovery implemented\n— DCR implemented\n— B2B client_credentials implemented\n— auth code flows planned"]
+    C -->|":udap"| G["Protocols::Udap\n— discovery implemented\n— DCR implemented\n— B2B client_credentials implemented\n— auth code + refresh implemented\n— Tiered OAuth planned"]
     D -->|"lazily fetches"| E
     E -->|"HTTP"| F
 ```

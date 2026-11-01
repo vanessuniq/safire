@@ -1,7 +1,8 @@
-name: Inferno SMART (Phase 1)
+name: Inferno SMART
 
-# Runs Safire as a SMART Backend Services client against Inferno's
-# SMART App Launch STU2.2 client test suite. See compliance/inferno/README.md.
+# Runs Safire as a SMART client against Inferno's SMART App Launch STU2.2
+# client test suite: Backend Services (Phase 1) and authorization code
+# standalone/EHR launch (Phase 2). See compliance/inferno/README.md.
 # Not run on pull requests: it builds the Inferno test kit image (several minutes).
 on:
   workflow_dispatch:
@@ -12,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  backend-services:
+  smart-client:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -31,8 +32,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: inferno-smart-backend-services
+          name: inferno-smart-client
           path: |
             tmp/inferno/results.json
             tmp/inferno/report.html
+            tmp/inferno/app-launch/results.json
+            tmp/inferno/app-launch/report.html
           if-no-files-found: warn

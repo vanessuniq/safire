@@ -4,9 +4,9 @@ require 'json'
 module SafireCompliance
   # Minimal client for the Inferno JSON API (inferno_core 1.x, +/api+ routes).
   #
-  # Only the endpoints the Phase 1 harness needs are wrapped: version lookup,
-  # test session creation, starting a suite run, polling the run, and
-  # retrieving session results.
+  # Only the endpoints the harness needs are wrapped: version lookup, test
+  # session creation, starting a suite run, polling the run, reading session
+  # data, and retrieving session results.
   class InfernoAPI
     class Error < StandardError; end
 
@@ -47,6 +47,11 @@ module SafireCompliance
     # @return [Array<Hash>] every result recorded in the session
     def results(session_id)
       get("/api/test_sessions/#{session_id}/results")
+    end
+
+    # @return [Array<Hash>] session data (+name+/+value+ pairs), e.g. outputs of a waiting test
+    def session_data(session_id)
+      get("/api/test_sessions/#{session_id}/session_data")
     end
 
     # Polls a run until its status is one of +statuses+.

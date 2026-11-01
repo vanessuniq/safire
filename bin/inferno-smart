@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Runs the Phase 1 Inferno SMART App Launch STU2.2 Backend Services harness.
+# Runs the Inferno SMART App Launch STU2.2 client harness: Phase 1 (Backend Services)
+# and Phase 2 (authorization code: standalone and EHR launch, plus negative controls).
 # See compliance/inferno/README.md. Requires Docker with the compose plugin.
 #
 # Environment (all optional):
 #   INFERNO_KIT_TAG     test kit tag to clone            (default v1.0.3)
 #   INFERNO_KIT_REF     commit the tag must resolve to   (default 980e54e…)
 #   INFERNO_KIT_DIR     where the kit is cloned          (default tmp/smart-app-launch-test-kit)
-#   INFERNO_REPORT_DIR  where results.json/report.html go (default tmp/inferno)
+#   INFERNO_REPORT_DIR  where results.json/report.html go (default tmp/inferno);
+#                       the Phase 2 report goes to $INFERNO_REPORT_DIR/app-launch
+#   INFERNO_SCENARIOS   comma-separated Phase 2 scenario ids to run (default: all)
 #   INFERNO_KEEP=1      leave the Inferno container running afterwards
 set -euo pipefail
 
@@ -43,5 +46,11 @@ trap cleanup EXIT
 
 "${COMPOSE[@]}" up --detach --wait
 cd "$ROOT"
-bundle exec ruby compliance/inferno/backend_services_run.rb
-echo "Report: $INFERNO_REPORT_DIR/report.html"
+export INFERNO_APP_LAUNCH_REPORT_DIR="$INFERNO_REPORT_DIR/app-launch"
+backend=0
+bundle exec ruby compliance/inferno/backend_services_run.rb || backend=$?
+echo "Phase 1 report: $INFERNO_REPORT_DIR/report.html (exit $backend)"
+app_launch=0
+bundle exec ruby compliance/inferno/app_launch_run.rb || app_launch=$?
+echo "Phase 2 report: $INFERNO_APP_LAUNCH_REPORT_DIR/report.html (exit $app_launch)"
+[ "$backend" -eq 0 ] && [ "$app_launch" -eq 0 ]

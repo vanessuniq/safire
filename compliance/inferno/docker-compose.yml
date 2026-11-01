@@ -1,5 +1,5 @@
 # Single-container Inferno running the SMART App Launch test kit, for the
-# Phase 1 (HTTP-only) Backend Services harness. See README.md.
+# client-suite harness (Backend Services and app launch drivers). See README.md.
 #
 # INFERNO_KIT_DIR must point at a checkout of
 # inferno-framework/smart-app-launch-test-kit at INFERNO_KIT_REF;
@@ -17,7 +17,7 @@ services:
       INFERNO_HOST: http://localhost:4567
       # Run jobs in-process so redis/sidekiq are not needed.
       ASYNC_JOBS: 'false'
-      # The client suite's Backend Services tests do not validate FHIR resources,
+      # The client suite's Backend Services and app launch tests do not validate FHIR resources,
       # so the HL7 validator service is not started.
       INITIALIZE_VALIDATOR_SESSIONS: 'false'
     command: sh -c "mkdir -p data && bundle exec inferno migrate && bundle exec puma"

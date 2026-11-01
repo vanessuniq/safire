@@ -42,8 +42,10 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 - Discovery (`/.well-known/udap`) with optional community scoping
 - Dynamic Client Registration metadata validation and normalization
 - X.509-backed software-statement signing for registration, modification, and cancellation
+- B2B `client_credentials` access tokens with UDAP JWT client authentication
+  (Authentication Tokens) and the `hl7-b2b` Authorization Extension Object
 
-JWT assertion authentication and Tiered OAuth remain planned. See
+The UDAP authorization code and refresh grants and Tiered OAuth remain planned. See
 [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
 details.
 

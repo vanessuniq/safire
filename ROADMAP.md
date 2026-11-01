@@ -16,7 +16,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 ### SMART App Launch (v2.2.0)
 
 - **Discovery** — lazy fetch of `/.well-known/smart-configuration`; metadata cached per client instance
-- **Public Client** — PKCE-only authorization code flow (RS256/ES256)
+- **Public Client** — PKCE-only authorization code flow (no client authentication)
 - **Confidential Symmetric Client** — client secret + HTTP Basic Auth + PKCE
 - **Confidential Asymmetric Client** — `private_key_jwt` with RS384/ES384; JWKS URI support; auto-detected algorithm from key type
 - **POST-Based Authorization** — form-encoded authorization requests
@@ -48,25 +48,26 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   `scopes_supported` when a wildcard must be evaluated (`DiscoveryError`),
   replacing the v0.4.1 deprecation warning; cancellation remains warning-only
   so scope-advertisement drift cannot block credential cleanup
+- **UDAP Authentication Tokens** (on `main`, unreleased; see
+  [CHANGELOG.md](CHANGELOG.md#unreleased)) — certificate-backed JWT client
+  authentication for token endpoint requests, using authoritative signed
+  discovery metadata
+- **B2B Client Credentials** (on `main`, unreleased; see
+  [CHANGELOG.md](CHANGELOG.md#unreleased)) — headless system-to-system
+  authorization through `Client#request_backend_token` on `protocol: :udap`,
+  with the STU2 `hl7-b2b` authorization extension and discovery-constrained
+  scopes, signing algorithms, and extension support
 
 ### Demo Application
 
 - **Protocol-Aware Workflows** — Sinatra demo supports protocol-aware server
   setup, SMART discovery, registration, authorization, and token workflows,
-  plus UDAP signed metadata discovery and the registration/cancellation
-  lifecycle
+  plus UDAP signed metadata discovery, the registration/cancellation
+  lifecycle, and (on `main`, unreleased) B2B client_credentials token requests
 
 ---
 
 ## Planned Features
-
-### v0.5.0 — UDAP JWT Client Authentication and B2B Authorization
-
-- **UDAP Authentication Tokens** — certificate-backed JWT client authentication
-  for token endpoint requests, using authoritative signed discovery metadata
-- **B2B Client Credentials** — headless system-to-system authorization with the
-  STU2 `hl7-b2b` authorization extension and discovery-constrained scopes,
-  signing algorithms, and extension support
 
 ### v0.6.0 — UDAP Authorization Code Flows
 
@@ -123,5 +124,5 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 | ActiveSupport | ≥ 7.1, < 9 |
 | Rails (optional) | ≥ 7.1 |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 2.0.0 (STU2 discovery and Dynamic Client Registration lifecycle implemented; JWT client authentication and authorization flows planned) |
+| UDAP Security | 2.0.0 (STU2 discovery, Dynamic Client Registration lifecycle, JWT client authentication, and B2B client credentials implemented; authorization code flows and Tiered OAuth planned) |
 | FHIR | R4, R4B |

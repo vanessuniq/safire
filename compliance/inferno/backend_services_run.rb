@@ -65,7 +65,7 @@ module SafireCompliance
     rescue *ORCHESTRATION_ERRORS => e
       # Still write a (failed) report so the workflow uploads something to diagnose.
       @orchestration_error = "#{e.class}: #{e.message}"
-      write_report(@session_id, [])
+      write_report(@session_id, partial_results)
     end
 
     private
@@ -143,7 +143,9 @@ module SafireCompliance
       @log.rewind
       passed = yield
       record_local(id, title, passed ? 'pass' : 'fail', @log.string)
-    rescue Safire::Errors::Error, ArgumentError => e
+    rescue StandardError => e
+      # Any failure is recorded as this check's result so later steps (including
+      # resuming Inferno's wait) still run and earlier local results are kept.
       record_local(id, title, 'error', "#{e.class}: #{e.message}")
     end
 
@@ -154,12 +156,25 @@ module SafireCompliance
     # The harness, not Safire, reads a resource with the issued token (Safire has no FHIR
     # client), then follows Inferno's continuation URL so the waiting test can complete.
     def resume_inferno_wait
-      http = Faraday.new
       if @token&.dig('access_token')
-        @fhir_read_status = http.get("#{fhir_base_url}/Patient/#{PATIENT_ID}", nil,
-                                     'Authorization' => "Bearer #{@token['access_token']}").status
+        @fhir_read_status = harness_http.get("#{fhir_base_url}/Patient/#{PATIENT_ID}", nil,
+                                             'Authorization' => "Bearer #{@token['access_token']}").status
       end
-      http.get("#{suite_base_url}/resume_pass", token: @client_id)
+      @resume_status = harness_http.get("#{suite_base_url}/resume_pass", token: @client_id).status
+    end
+
+    def harness_http
+      @harness_http ||= Faraday.new(request: { open_timeout: 10, timeout: 30 })
+    end
+
+    # Best effort: an Inferno session that already ran some tests still has
+    # useful results when a later orchestration step fails.
+    def partial_results
+      return [] unless @session_id
+
+      @api.results(@session_id)
+    rescue *ORCHESTRATION_ERRORS
+      []
     end
 
     def write_report(session_id, results)
@@ -175,7 +190,8 @@ module SafireCompliance
       missing = REQUIRED_RESULT_IDS - inferno.map { |r| r[:id] }
       { overall: overall_result(inferno, missing), metadata: metadata(session_id), inferno_results: inferno,
         missing_inferno_results: missing, local_checks: @local_checks,
-        harness: { fhir_read_status: @fhir_read_status, orchestration_error: @orchestration_error } }
+        harness: { fhir_read_status: @fhir_read_status, resume_status: @resume_status,
+                   orchestration_error: @orchestration_error } }
     end
 
     def overall_result(inferno, missing)
@@ -201,10 +217,10 @@ module SafireCompliance
     end
 
     def suite_version
-      response = Faraday.get("#{@inferno_url}/api/test_suites")
+      response = harness_http.get("#{@inferno_url}/api/test_suites")
       JSON.parse(response.body).find { |s| s['id'] == SUITE_ID }&.dig('version')
     rescue Faraday::Error, JSON::ParserError
-      nil
+      'unknown'
     end
   end
 end

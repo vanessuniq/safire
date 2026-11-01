@@ -11,7 +11,16 @@ RSpec.describe SafireCompliance::BackendServicesRun do
 
   before do
     allow(SafireCompliance::InfernoAPI).to receive(:new).and_return(api)
-    allow(Faraday).to receive(:get).and_raise(Faraday::ConnectionFailed, 'no suites endpoint in unit test')
+    allow(Faraday).to receive(:new).and_call_original
+    stub_request(:get, 'http://inferno.test/api/test_suites').to_raise(Faraday::ConnectionFailed)
+  end
+
+  around do |example|
+    # The run reconfigures Safire's global logger; restore it for other specs.
+    saved = Safire.instance_variable_get(:@configuration)
+    example.run
+  ensure
+    Safire.instance_variable_set(:@configuration, saved)
   end
 
   after { FileUtils.remove_entry(output_dir) }
@@ -60,6 +69,16 @@ RSpec.describe SafireCompliance::BackendServicesRun do
     expect(run.call).to eq(1)
     expect(report['harness']['orchestration_error']).to include('stuck')
     expect(File).to exist(File.join(output_dir, 'report.html'))
+  end
+
+  it 'keeps partial Inferno results when a later step fails' do
+    stub_orchestration([passing(described_class::SUITE_ID)])
+    allow(api).to receive(:wait_for_run).and_return({ 'status' => 'waiting' })
+                                        .and_raise(SafireCompliance::InfernoAPI::Error, 'stuck')
+
+    expect(run.call).to eq(1)
+    expect(report['inferno_results'].map { |r| r['id'] }).to eq([described_class::SUITE_ID])
+    expect(report['metadata']['test_kit_version']).to eq('unknown')
   end
 
   it 'writes a failed report when Inferno is unreachable' do

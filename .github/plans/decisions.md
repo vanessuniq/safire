@@ -63,7 +63,9 @@ headings):
 
 - **Decision:** v0.6.0 roots branch from the v0.5.0 release-prep branch tip
   (`release-0.5.0`), or from the last validated v0.5.0 PR if the release PR is
-  blocked; v0.7.0 likewise from v0.6.0. Each PR targets its immediate
+  blocked. Until `release-0.5.0` exists, a v0.6.0 root may start from the
+  current v0.5.0 tip (interim base, e.g. `integration/v0.5.0` for 6.1); the
+  coordinator later merges the newer v0.5.0 tip in and retargets the PR; v0.7.0 likewise from v0.6.0. Each PR targets its immediate
   predecessor so its diff is isolated. Merge order is documented in each release
   PR.
 
@@ -170,9 +172,12 @@ headings):
 - **Context:** §7.3 names registration and token requests; authorization
   requests are not named, but the scope requested there is the scope granted
   for the subsequent token.
-- **Decision [I]:** apply the wildcard rule to `authorization_url` as well,
-  labeled as an implementation choice (prevents a flow that would end in
-  `invalid_scope`). Alternative: warning-only. Revisit in review.
+- **Decision [I] (revised after #348 review):** §7.3 does not name
+  authorization requests, so hard-failing there would be stricter than the
+  text and could reject requests a server accepts. v0.6.0 uses **warning-only**
+  (value-free) for unadvertised wildcards in `authorization_url`; the token
+  request (code exchange/refresh carry no new scope, client_credentials does)
+  keeps the §7.3 hard rule. Alternative (hard fail) recorded for review.
 
 ## D-14 v0.6.0: `state` comparison remains the application's job
 

@@ -30,6 +30,15 @@ module SafireCompliance
     SCOPES = ['system/Patient.rs'].freeze
     PATIENT_ID = 'example'.freeze
     PASSING_RESULTS = %w[pass].freeze
+    # Inferno results that must be present (and pass) for the run to count as an
+    # Inferno-verified pass. An empty or partial results list therefore fails.
+    REQUIRED_RESULT_IDS = [
+      SUITE_ID,
+      "#{SUITE_ID}-smart_client_registration_bsca-smart_client_registration_bsca_verification",
+      "#{SUITE_ID}-smart_client_access-smart_client_token_request_bsca_verification",
+      "#{SUITE_ID}-smart_client_access-smart_client_token_use_verification"
+    ].freeze
+    ORCHESTRATION_ERRORS = [InfernoAPI::Error, Faraday::Error, JSON::ParserError, KeyError, TypeError].freeze
 
     # @param inferno_url [String] Inferno root URL (must match the host Inferno advertises)
     # @param output_dir [String] where +results.json+ and +report.html+ are written
@@ -51,18 +60,25 @@ module SafireCompliance
     # @return [Integer] exit status: 0 when every Inferno result and every local check passed
     def call
       configure_safire_logging
-      session = @api.create_session(SUITE_ID, [CLIENT_TYPE_OPTION])
-      run = @api.start_run(session['id'], SUITE_ID, inferno_inputs)
-      @api.wait_for_run(run['id'], %w[waiting done])
-
-      exercise_safire
-      resume_inferno_wait
-      @api.wait_for_run(run['id'], %w[done])
-
-      write_report(session['id'], @api.results(session['id']))
+      write_report(@session_id, orchestrate)
+    rescue *ORCHESTRATION_ERRORS => e
+      # Still write a (failed) report so the workflow uploads something to diagnose.
+      @orchestration_error = "#{e.class}: #{e.message}"
+      write_report(@session_id, [])
     end
 
     private
+
+    def orchestrate
+      @session_id = @api.create_session(SUITE_ID, [CLIENT_TYPE_OPTION]).fetch('id')
+      run = @api.start_run(@session_id, SUITE_ID, inferno_inputs)
+      @api.wait_for_run(run.fetch('id'), %w[waiting done])
+
+      exercise_safire
+      resume_inferno_wait
+      @api.wait_for_run(run.fetch('id'), %w[done])
+      @api.results(@session_id)
+    end
 
     def configure_safire_logging
       Safire.configure do |c|
@@ -154,10 +170,17 @@ module SafireCompliance
     end
 
     def build_report(session_id, results)
-      inferno = results.map { |r| summarize_result(r) }
-      overall = (inferno + @local_checks).all? { |r| PASSING_RESULTS.include?(r[:result]) } ? 'pass' : 'fail'
-      { overall:, metadata: metadata(session_id), inferno_results: inferno,
-        local_checks: @local_checks, harness: { fhir_read_status: @fhir_read_status } }
+      inferno = Array(results).map { |r| summarize_result(r) }
+      missing = REQUIRED_RESULT_IDS - inferno.map { |r| r[:id] }
+      { overall: overall_result(inferno, missing), metadata: metadata(session_id), inferno_results: inferno,
+        missing_inferno_results: missing, local_checks: @local_checks,
+        harness: { fhir_read_status: @fhir_read_status, orchestration_error: @orchestration_error } }
+    end
+
+    def overall_result(inferno, missing)
+      return 'fail' if @orchestration_error || missing.any?
+
+      (inferno + @local_checks).all? { |r| PASSING_RESULTS.include?(r[:result]) } ? 'pass' : 'fail'
     end
 
     # Input/output values (keys, tokens) are deliberately dropped; only names are kept.

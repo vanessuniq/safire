@@ -48,14 +48,19 @@ Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
 | 5.11 | Demo B2B token workflow (parallel branch) | `feature/demo-udap-b2b-token` | #358 | #339 | #377 | draft PR |
 | 5.A4 | Audit fix B-11 (lockfiles; AS 7.1 exception D-21) | `fix/refresh-demo-and-ci-lockfiles` | #377 | #370 | #378 | draft PR |
 | 5.12 | Release notes + audit fixes B-06, B-07, B-08 (README), B-10; joins #376 and #378 by merge | `docs/v0.5.0-release-notes` | #376 | #340 #365–#367 #369 | #379 | draft PR; 1544 ex. green at `b19a92f` |
-| 5.A | Pre-release alignment audit ([audit-v0.5.0.md](audit-v0.5.0.md)) | — | — | #340 | — | baseline done; fixes in stack; feature audit + verification running on `b19a92f` |
-| 5.R | Release preparation | `release-0.5.0` | last fix | #340 | — | planned |
+| 5.A | Pre-release alignment audit ([audit-v0.5.0.md](audit-v0.5.0.md)) | — | — | #340 | — | complete: 17 findings, all validated in stack |
+| 5.F1 | Feature-audit fixes F-01–F-03 | `docs/fix-v0.5.0-feature-audit` | #379 | #383–#385 | #386 | draft PR |
+| 5.F2 | Re-audit fix F-04 | `docs/fix-v0.5.0-fallback-wording` | #386 | #387 | #388 | draft PR |
+| 5.R | **Release preparation v0.5.0** | `release-0.5.0` | #388 | #340 | #389 | draft PR; CI green at `f5e0373` (run 41308808682) |
 
 ### v0.6.0
 
 | # | Task | Branch | Base | Issue | PR | Status |
 |---|---|---|---|---|---|---|
 | 6.1 | Explicit SMART backend scopes (breaking) | `feature/smart-backend-explicit-scopes` | interim `integration/v0.5.0` → `release-0.5.0` later (D-05) | #341 | #359 | draft PR |
+| 6.2 | UDAP authorization request | `feature/udap-authorization-url` | interim #358 → `release-0.5.0` later | #342 | #380 | draft PR |
+| 6.3 | UDAP authorization code token exchange | `feature/udap-authorization-code-token` | #380 | #342 | #381 | draft PR |
+| 6.4 | UDAP refresh token | `feature/udap-refresh-token` | #381 | #342 | #382 | draft PR |
 
 Remaining v0.6.0 tasks: see [v0.6.0.md](v0.6.0.md). v0.7.0: see [v0.7.0.md](v0.7.0.md).
 

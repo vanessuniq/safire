@@ -21,6 +21,11 @@ module Safire
     #   must be evaluated. Their messages do not name the operation.
     # - +:cancel+ (registration cancellation) reports both conditions as
     #   value-free warnings so existing access can be removed.
+    # - +:authorize+ (authorization code requests) also reports both
+    #   conditions as value-free warnings and proceeds. STU2 §7.3 names
+    #   registration and token requests, not authorization requests, so a
+    #   hard failure there would be stricter than the text; the authorization
+    #   server remains authoritative (implementation choice).
     #
     # Non-wildcard scopes are never rejected locally under any operation:
     # unlisted or unconfirmed tokens produce one aggregated value-free warning
@@ -36,10 +41,13 @@ module Safire
     #
     # @api private
     class UdapScopeNegotiation
-      OPERATIONS = %i[register cancel token].freeze
+      OPERATIONS = %i[register cancel token authorize].freeze
       DISCOVERY_LABEL = 'UDAP metadata'.freeze
-      CANCELLATION_LIFECYCLE =
-        'cancellation proceeds and remains warning-only so existing access can be removed'.freeze
+      WARNING_ONLY_LIFECYCLES = {
+        cancel: 'cancellation proceeds and remains warning-only so existing access can be removed',
+        authorize: 'the authorization request proceeds because UDAP Security STU2 scope negotiation ' \
+                   'names registration and token requests only; the authorization server decides'
+      }.freeze
       UNUSABLE_ADVERTISEMENT =
         'scopes_supported must be an array containing at least one usable scope string ' \
         'to evaluate requested wildcard scopes'.freeze
@@ -47,12 +55,12 @@ module Safire
         'not advertised exactly in scopes_supported ' \
         '(UDAP Security STU2 permits requesting a wildcard scope only when it is advertised)'.freeze
 
-      private_constant :OPERATIONS, :DISCOVERY_LABEL, :CANCELLATION_LIFECYCLE,
+      private_constant :OPERATIONS, :DISCOVERY_LABEL, :WARNING_ONLY_LIFECYCLES,
                        :UNUSABLE_ADVERTISEMENT, :UNADVERTISED_WILDCARD_RULE
 
       # @param scopes_supported [Object] the discovered +scopes_supported+ value,
       #   as published (may be +nil+, a non-array, or contain malformed entries)
-      # @param operation [Symbol] +:register+, +:cancel+, or +:token+
+      # @param operation [Symbol] +:register+, +:cancel+, +:token+, or +:authorize+
       # @param discovery_endpoint [String] the UDAP well-known URL (including any
       #   +community+ query) reported as {Errors::DiscoveryError#endpoint}
       # @raise [ArgumentError] when +operation+ is not supported
@@ -72,7 +80,7 @@ module Safire
       #   tokens, already split and normalized by the caller; duplicates are
       #   ignored
       # @return [void]
-      # @raise [Errors::ValidationError] (+:register+, +:token+) when a requested
+      # @raise [Errors::ValidationError] (+:register+, +:token+ only) when a requested
       #   wildcard is not advertised exactly
       # @raise [Errors::DiscoveryError] (+:register+, +:token+) when a wildcard
       #   is requested and +scopes_supported+ provides no usable scope strings
@@ -107,12 +115,13 @@ module Safire
       end
 
       def enforcing?
-        @operation != :cancel
+        !WARNING_ONLY_LIFECYCLES.key?(@operation)
       end
 
       # When +scopes_supported+ is unusable, a requested wildcard cannot be
       # shown to be advertised, so enforcing operations raise. Cancellation
-      # removes access, so scope-advertisement drift stays warning-only there
+      # removes access, and authorization requests are outside the text of
+      # STU2 §7.3, so scope-advertisement drift stays warning-only there
       # (see ADR-015).
       def handle_unusable_advertisement(wildcards, non_wildcards)
         if wildcards.any? && enforcing?
@@ -123,13 +132,13 @@ module Safire
           )
         end
 
-        warn_cancellation_unconfirmed_wildcards(wildcards)
+        warn_unconfirmed_wildcards(wildcards)
         warn_unconfirmed_non_wildcards(non_wildcards)
       end
 
       def handle_unadvertised_wildcards(scopes)
         return if scopes.empty?
-        return warn_cancellation_unadvertised_wildcards(scopes) unless enforcing?
+        return warn_unadvertised_wildcards(scopes) unless enforcing?
 
         raise Errors::ValidationError.new(
           attribute: :scope,
@@ -137,21 +146,21 @@ module Safire
         )
       end
 
-      def warn_cancellation_unadvertised_wildcards(scopes)
+      def warn_unadvertised_wildcards(scopes)
         emit_scope_diagnostic(
           scopes,
           category: 'wildcard',
           detail: 'no exact advertisement in scopes_supported',
-          lifecycle: CANCELLATION_LIFECYCLE
+          lifecycle: WARNING_ONLY_LIFECYCLES.fetch(@operation)
         )
       end
 
-      def warn_cancellation_unconfirmed_wildcards(scopes)
+      def warn_unconfirmed_wildcards(scopes)
         emit_scope_diagnostic(
           scopes,
           category: 'wildcard',
           detail: 'exact advertisement cannot be confirmed because scopes_supported provides no usable scope strings',
-          lifecycle: CANCELLATION_LIFECYCLE
+          lifecycle: WARNING_ONLY_LIFECYCLES[@operation]
         )
       end
 

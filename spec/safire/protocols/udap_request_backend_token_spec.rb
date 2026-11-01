@@ -20,6 +20,7 @@ RSpec.describe Safire::Protocols::Udap, '#request_backend_token' do
       Safire::ClientConfig,
       base_url:,
       client_id:,
+      redirect_uri: nil,
       scopes: configured_scopes,
       allow_insecure_localhost:,
       private_key:,

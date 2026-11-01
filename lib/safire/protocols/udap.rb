@@ -9,10 +9,15 @@ module Safire
     # It also requests B2B access tokens with the client credentials grant and
     # UDAP JWT-based client authentication (per
     # {https://hl7.org/fhir/us/udap-security/STU2/b2b.html STU2 §5}).
+    # It builds authorization code requests for consumer-facing and
+    # interactive B2B apps (per
+    # {https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow
+    # STU2 §7.2}).
     # Discovery results are cached per community within each instance.
     #
-    # Other UDAP flows (authorization code, refresh token, and Tiered OAuth)
-    # raise +NotImplementedError+ and remain planned for future releases.
+    # Other UDAP flows (authorization code exchange, refresh token, and
+    # Tiered OAuth) raise +NotImplementedError+ and remain planned for future
+    # releases.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
     # instantiate it directly — use {Safire::Client} instead.
@@ -35,14 +40,18 @@ module Safire
       CLIENT_CREDENTIALS_GRANT = 'client_credentials'.freeze
       CLIENT_CREDENTIALS_ACTION = 'Requesting UDAP B2B access token (client_credentials grant)...'.freeze
       SCOPE_TOKEN_PATTERN = /\A[\x21\x23-\x5B\x5D-\x7E]+\z/
+      AUTHORIZATION_ACTION = 'Generating UDAP authorization URL (authorization_code grant)...'.freeze
+      STATE_BYTES = 32
+      PKCE_METHOD = 'S256'.freeze
       private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :SUCCESSFUL_CANCELLATION_STATUSES,
                        :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION, :TOKEN_HEADERS,
                        :CLIENT_ASSERTION_TYPE, :CLIENT_CREDENTIALS_GRANT, :CLIENT_CREDENTIALS_ACTION,
-                       :SCOPE_TOKEN_PATTERN
+                       :SCOPE_TOKEN_PATTERN, :AUTHORIZATION_ACTION, :STATE_BYTES, :PKCE_METHOD
 
       def initialize(config)
         @base_url = config.base_url
         @client_id = config.client_id
+        @redirect_uri = config.redirect_uri
         @scopes = config.scopes
         @allow_insecure_localhost = config.allow_insecure_localhost
         @private_key = config.private_key
@@ -340,7 +349,127 @@ module Safire
         raise token_error_from(e)
       end
 
+      # Builds the authorization request for the UDAP authorization code flow.
+      #
+      # One implementation serves consumer-facing apps
+      # ({https://hl7.org/fhir/us/udap-security/STU2/consumer.html#obtaining-an-authorization-code
+      # STU2 §4.1}) and B2B apps registered for the +authorization_code+ grant
+      # ({https://hl7.org/fhir/us/udap-security/STU2/b2b.html#obtaining-an-authorization-code
+      # STU2 §5.1}); both defer to the shared constraints of
+      # {https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow
+      # STU2 §7.2}.
+      #
+      # Order of operations: validate caller input (+client_id+,
+      # +redirect_uri+, scopes) before any network activity; discover trusted
+      # UDAP metadata (signed metadata must validate,
+      # {https://hl7.org/fhir/us/udap-security/STU2/discovery.html#signed-metadata-elements
+      # STU2 §2.3}); check authorization readiness
+      # ({UdapAuthorizationRequestReadiness}); then build the URL. No request is
+      # sent to the authorization endpoint; the application redirects the user
+      # agent to +:auth_url+.
+      #
+      # The redirect URL targets the authoritative signed
+      # +authorization_endpoint+ (any query component it already carries is
+      # preserved) and adds exactly the STU2 §7.2 parameters: +response_type=code+,
+      # +client_id+, +redirect_uri+, +scope+, +state+, +code_challenge+, and
+      # +code_challenge_method=S256+. A configured +authorization_endpoint+ is
+      # not used for UDAP.
+      #
+      # - +redirect_uri+ is conditional in STU2 §7.2 (required when more than
+      #   one is registered). Safire always sends the configured value so the
+      #   code exchange can send the identical value (consumer §4.2 / b2b
+      #   §5.2.2: "their values SHALL be identical").
+      # - +state+ is generated per call (32 random bytes, URL-safe Base64).
+      #   STU2 §7.2.1: "The client application SHALL NOT proceed if the +state+
+      #   parameter is not included in the authorization response or its value
+      #   does not match". Safire does not see the callback; the application
+      #   must store +:state+ and compare it before exchanging the code.
+      # - PKCE uses S256 only (STU2 §7.2.2); store +:code_verifier+ for the
+      #   token request.
+      # - SMART-specific +aud+ and +launch+ parameters are not added: they are
+      #   not in the STU2 §7.2 table. Request SMART launch context through
+      #   scopes such as +launch/patient+ (STU2 §7.5.6).
+      # - Only GET redirect URLs are built; STU2 does not define POST-based
+      #   authorization requests.
+      #
+      # Scopes come from +scopes:+ when it yields at least one scope, otherwise
+      # from configured +scopes+ (Array of Strings or a space-delimited String;
+      # split on whitespace, blanks and duplicates removed). STU2 §7.2 marks
+      # +scope+ required, so Safire has no default. Requested wildcard scopes
+      # that are not advertised exactly in +scopes_supported+ produce a
+      # value-free warning and the request proceeds: STU2 §7.3 names
+      # registration and token requests, not authorization requests.
+      #
+      # @param scopes [Array<String>, String, nil] requested scopes; falls back to configured +scopes+
+      # @param community [String, nil] optional UDAP community URI for discovery
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
+      #   for signed metadata validation
+      # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation
+      # @param revocation_checker [#call, nil] custom server certificate revocation policy
+      # @param verify_chain [Boolean] whether discovery signed_metadata chain validation is required
+      # @return [Hash] containing:
+      #   * :auth_url [String] authorization URL to redirect the user agent to
+      #   * :state [String] generated +state+; store it and compare it with the callback's +state+
+      #   * :code_verifier [String] PKCE code verifier; store it for {#request_access_token}
+      # @raise [Safire::Errors::ConfigurationError] when +client_id+, +redirect_uri+, or scopes
+      #   are missing, or a scope source is not a String or Array
+      # @raise [Safire::Errors::ValidationError] when a scope contains characters outside the
+      #   RFC 6749 scope-token set
+      # @raise [Safire::Errors::DiscoveryError] when trusted UDAP discovery fails, the server does
+      #   not advertise the +authorization_code+ grant, or +authorization_endpoint+ is missing or unusable
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
+      #   or a redirect to a non-HTTPS URL during discovery
+      # @see https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow
+      def authorization_url(scopes: nil, community: nil, trusted_anchors: [], crls: [], revocation_checker: nil,
+                            verify_chain: true)
+        validate_authorization_identity!
+        scopes = resolve_token_scopes(scopes)
+        community = normalize_community(community)
+        discovered = server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
+        endpoint = UdapAuthorizationRequestReadiness.new(
+          metadata: discovered,
+          discovery_endpoint: well_known_endpoint(community:),
+          allow_insecure_localhost: @allow_insecure_localhost
+        ).evaluate!(scopes:)
+
+        Safire.logger.info(AUTHORIZATION_ACTION)
+        build_udap_authorization_response(endpoint, scopes)
+      end
+
       private
+
+      # -- authorization code request ----------------------------------------
+
+      def validate_authorization_identity!
+        missing = []
+        missing << :client_id if @client_id.blank?
+        missing << :redirect_uri if @redirect_uri.blank?
+        raise Errors::ConfigurationError.new(missing_attributes: missing) if missing.any?
+      end
+
+      def build_udap_authorization_response(endpoint, scopes)
+        code_verifier = PKCE.generate_code_verifier
+        state = SecureRandom.urlsafe_base64(STATE_BYTES)
+        params = {
+          response_type: 'code',
+          client_id: @client_id,
+          redirect_uri: @redirect_uri,
+          scope: scopes.join(' '),
+          state:,
+          code_challenge: PKCE.generate_code_challenge(code_verifier),
+          code_challenge_method: PKCE_METHOD
+        }
+        { auth_url: append_query(endpoint, params), state:, code_verifier: }
+      end
+
+      # Preserves any query component of the authoritative endpoint and
+      # appends the authorization parameters.
+      def append_query(endpoint, params)
+        encoded = Addressable::URI.new.tap { |uri| uri.query_values = params }.query
+        uri = Addressable::URI.parse(endpoint)
+        uri.query = [uri.query.presence, encoded].compact.join('&')
+        uri.to_s
+      end
 
       # Shared request preparation and POST for both :register and :cancel operations.
       def submit_registration_request(metadata, operation:, action:, **)

@@ -272,7 +272,7 @@ module Safire
       # +client_secret+ is sent: clients "SHALL NOT include an HTTP
       # Authorization header or client secret in its token endpoint request".
       #
-      # STU2 b2b §5.2.3: "A client application SHALL only use an access token in
+      # STU2 b2b §5.2.4: "A client application SHALL only use an access token in
       # a manner consistent with any assertions made when requesting that
       # token." Request a new token whenever the requestor, purpose of use, or
       # other +hl7-b2b+ context changes; Safire does not cache tokens.

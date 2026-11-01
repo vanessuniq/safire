@@ -47,7 +47,7 @@ flowchart TD
 | `client_type:` | Symbol | No | `nil` (→ `:public` for SMART) | SMART client type — `:public`, `:confidential_symmetric`, or `:confidential_asymmetric`; not applicable for `:udap` (any explicit value raises `ConfigurationError`) |
 | `client_secret` | String | No | — | Required for `:confidential_symmetric` |
 | `private_key` | OpenSSL::PKey / String | No | — | RSA/EC private key; used by SMART asymmetric clients and as the UDAP client signing key (software statements and Authentication Tokens) |
-| `certificate_chain` | Array of PEM strings / OpenSSL::X509::Certificate | No | — | Non-empty, leaf-first, issuer-ordered client certificate chain for UDAP software-statement signing |
+| `certificate_chain` | Array of PEM strings / OpenSSL::X509::Certificate | No | — | Non-empty, leaf-first, issuer-ordered client certificate chain for UDAP software-statement and Authentication Token signing |
 | `kid` | String | No | — | Key ID matching the public key registered with the server |
 | `jwt_algorithm` | String | No | auto | SMART: `RS384` or `ES384`; UDAP software statements and Authentication Tokens: `RS256`, `RS384`, `ES256`, or `ES384`, constrained by the key and the server's advertised algorithms |
 | `jwks_uri` | String | No | — | SMART-only URL to the client's public JWKS, included as `jku` in SMART JWT assertions |
@@ -56,7 +56,8 @@ flowchart TD
 | `token_endpoint` | String | No | — | Override the discovered token endpoint |
 
 `certificate_chain` and the UDAP algorithm values are used by
-`Safire::Client#register_client` when `protocol: :udap`.
+`Safire::Client#register_client`, `#cancel_registration`, and
+`#request_backend_token` when `protocol: :udap`.
 
 ## Global Configuration
 

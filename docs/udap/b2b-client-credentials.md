@@ -154,7 +154,7 @@ interpret its contents.
 
 ### One token per authorization context
 
-STU2 b2b §5.2.3: "A client application SHALL only use an access token in a
+STU2 b2b §5.2.4 (Client application use of access tokens): "A client application SHALL only use an access token in a
 manner consistent with any assertions made when requesting that token." When
 the requestor, purpose of use, consent, or other asserted context changes,
 request a new token with a new `b2b:` object. Safire does not cache tokens, and

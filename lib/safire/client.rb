@@ -14,9 +14,9 @@ module Safire
   #     required by all authorization flows and validated at call time
   # * :redirect_uri [String] redirect URI registered with the authorization server;
   #     required for app launch, not required for backend services
-  # * :scopes [Array<String>] default scopes. SMART Backend Services callers should
-  #     configure or pass scopes explicitly; the +["system/*.rs"]+ fallback (v0.4.1 through v0.5.x) is
-  #     deprecated and will be removed in v0.6.0
+  # * :scopes [Array<String>] default scopes. SMART Backend Services callers
+  #     must configure or pass scopes explicitly; since v0.6.0 missing scopes raise
+  #     +ConfigurationError+ (the v0.4.1–v0.5.x +["system/*.rs"]+ fallback was removed)
   # * :client_secret [String, optional] required for confidential_symmetric clients
   # * :private_key [OpenSSL::PKey, String, optional] private key for SMART asymmetric clients,
   #     backend services, and UDAP software-statement signing

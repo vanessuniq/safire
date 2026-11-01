@@ -1,6 +1,6 @@
 # Safire Demo Application
 
-A Sinatra-based web application that demonstrates the Safire gem for SMART authorization, UDAP discovery, UDAP Dynamic Client Registration, and UDAP B2B client credentials tokens.
+A Sinatra-based web application that demonstrates the Safire gem for SMART authorization, UDAP discovery, UDAP Dynamic Client Registration, UDAP B2B client credentials tokens, and the UDAP authorization code flow.
 
 ## Features
 
@@ -10,6 +10,7 @@ A Sinatra-based web application that demonstrates the Safire gem for SMART autho
 - **UDAP Discovery**: Fetch `/.well-known/udap`, validate `signed_metadata`, inspect STU2 fields, and run community-scoped discovery
 - **UDAP Dynamic Client Registration**: Register and cancel a certificate-backed UDAP client, store the returned UDAP client identifier separately from SMART credentials, and inspect filtered registration responses
 - **UDAP B2B Token Request**: Request a UDAP STU2 B2B `client_credentials` access token with an `hl7-b2b` authorization extension, using the stored UDAP client ID, and inspect a masked token response
+- **UDAP Authorization Code**: Run the UDAP STU2 `authorization_code` flow with PKCE through the demo callback, exchange the code with a signed Authentication Token, refresh the token, and inspect masked token responses
 - **Authorization Flows**: Test multiple launch types:
   - Provider Standalone Launch
   - Patient Standalone Launch
@@ -289,8 +290,8 @@ If a SMART server advertises `client_credentials` grant support, the "Backend Se
 
 Requires `ASYMMETRIC_PRIVATE_KEY_PEM` and `ASYMMETRIC_KID` to be configured (same key pair used for confidential asymmetric App Launch).
 The demo rejects an empty scope submission and preserves the requested scopes
-when requesting another token, so it never relies on Safire's deprecated
-implicit Backend Services fallback. It also rejects non-system scopes because
+when requesting another token, matching Safire, which raises `ConfigurationError` when
+no scopes are configured or passed. It also rejects non-system scopes because
 the demo does not establish the out-of-band user or patient context that SMART
 permits advanced Backend Services integrations to coordinate.
 
@@ -376,6 +377,54 @@ replaced with `[FILTERED]`. The demo does not store the token in the session.
 Configuration, validation, discovery, certificate, token (including the OAuth
 `error` code), and network errors are shown on the same page.
 
+### UDAP Authorization Code
+
+Navigate to a UDAP-enabled server detail page and open **Start Authorization
+Code** in the UDAP Security section. The page uses a `protocol: :udap`
+`Safire::Client` configured with the stored UDAP client ID, the demo callback
+as `redirect_uri`, and the same `UDAP_CLIENT_PRIVATE_KEY_PEM` /
+`UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` signing identity used for registration.
+Server trust uses the same `UdapTrustPolicy` as the other UDAP pages.
+
+Prerequisites:
+
+- a UDAP client registered with the `authorization_code` grant and the demo
+  callback (`http://localhost:4567/callback` when running locally) in its
+  `redirect_uris`. The UDAP registration form prefills this callback; it is
+  the same callback the SMART flows use
+- the server advertises `authorization_code` in `grant_types_supported` and
+  signs an `authorization_endpoint`
+
+The flow:
+
+1. **Start.** The form prefills the client ID, scopes, and community from the
+   stored registration. Submitting it calls `authorization_url`, stores the
+   returned `state` and `code_verifier` in the session, and redirects to the
+   signed `authorization_endpoint`
+2. **Callback.** `/callback` compares the returned `state` with the stored
+   value using a constant-time comparison. If `state` is missing or does not
+   match, the response is refused and no token is requested (UDAP STU2
+   General §7.2.1: the client "SHALL NOT proceed if the `state` parameter is
+   not included in the authorization response or its value does not match").
+   The pending `state` and `code_verifier` are removed on every callback, so
+   each `state` is used once. If the response carries `error`, the page shows
+   the escaped `error` and `error_description` and requests no token.
+   Otherwise the demo calls `request_access_token` with the code and stored
+   `code_verifier`
+3. **Refresh.** When a refresh token was issued, **Refresh Token** calls
+   `refresh_token` with it and an optional narrower scope (blank keeps the
+   original grant). A rotated refresh token replaces the stored one
+
+The result shows the token type, expiry, and granted scopes. The access token
+is masked (first and last four characters plus length), the refresh token is
+shown only as issued or not, and `id_token` and other non-allowlisted fields
+are replaced with `[FILTERED]`. The demo keeps only the refresh token and its
+client context in the session; it does not store the access token, and it does
+not log tokens. Configuration, validation, discovery, certificate, token
+(including the OAuth `error` code), and network errors are shown on the same
+page. **Reset Session** discards a pending authorization and the stored
+refresh token.
+
 ### Token Refresh
 
 After completing an authorization flow, if the server issued a refresh token:
@@ -406,10 +455,13 @@ examples/sinatra_app/
 │   └── servers.yml     # Server configurations (YAML storage)
 ├── models/
 │   ├── fhir_server.rb                # Server model with YAML persistence
+│   ├── udap_authorization_code_presenter.rb # UDAP authorization code presentation model
+│   ├── udap_b2b_token_presenter.rb   # UDAP B2B token presentation model
 │   ├── udap_client_credentials.rb    # UDAP demo client signing credential loader
 │   ├── udap_discovery_presenter.rb   # UDAP discovery presentation model
 │   ├── udap_pem_parsing.rb           # Shared UDAP demo PEM parsing helper
 │   ├── udap_registration_presenter.rb # UDAP registration presentation model
+│   ├── udap_token_display.rb         # Shared UDAP token masking and error labels
 │   └── udap_trust_policy.rb          # UDAP signed_metadata server trust policy
 ├── public/
 │   ├── css/
@@ -431,6 +483,8 @@ examples/sinatra_app/
         ├── refresh.erb
         ├── udap_discovery.erb
         ├── udap_registration.erb
+        ├── udap_token.erb
+        ├── udap_authorization.erb
         └── backend_token.erb
 ```
 
@@ -442,12 +496,17 @@ examples/sinatra_app/
 | `GET /register` | SMART Dynamic Client Registration form |
 | `POST /register` | Submits a SMART registration request and saves the new server entry |
 | `/launch` | EHR/Portal launch endpoint |
-| `/callback` | OAuth2 callback handler |
+| `/callback` | OAuth2 callback handler for the SMART and UDAP authorization code flows; refuses a missing or unmatched `state` |
 | `GET /demo/:id/discovery` | SMART discovery result page |
 | `GET /demo/:id/udap-discovery` | UDAP discovery result page |
 | `GET /demo/:id/udap-registration` | UDAP Dynamic Client Registration form and result page |
 | `POST /demo/:id/udap-registration` | Submits a UDAP Dynamic Client Registration request |
 | `POST /demo/:id/udap-registration/cancel` | Submits a UDAP registration cancellation request |
+| `GET /demo/:id/udap-token` | UDAP B2B token request form |
+| `POST /demo/:id/udap-token` | Submits a UDAP B2B `client_credentials` token request |
+| `GET /demo/:id/udap-authorization` | UDAP authorization code start form |
+| `POST /demo/:id/udap-authorization` | Builds the UDAP authorization request and redirects to the server |
+| `POST /demo/:id/udap-authorization/refresh` | Submits a UDAP refresh token request |
 | `GET /demo/:id/backend-token` | Backend Services token request form |
 | `POST /demo/:id/backend-token` | Submits the backend services token request |
 | `POST /reset-session` | Clears all OAuth and token session data |

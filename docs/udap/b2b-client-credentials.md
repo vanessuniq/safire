@@ -213,8 +213,10 @@ Safire returns `expires_in` and `token_type` as sent and does not enforce them.
 
 ## Limitations
 
-- Only the client credentials grant is implemented. The UDAP authorization
-  code and refresh token grants and Tiered OAuth raise `NotImplementedError`.
+- This page covers the client credentials grant. The authorization code and
+  refresh grants are documented in
+  [Authorization Code]({% link udap/authorization-code.md %}); Tiered OAuth is
+  not implemented.
 - Safire's behavior is covered by unit and mocked integration tests. It has
   not been conformance-tested against an external UDAP authorization server or
   a certification harness.

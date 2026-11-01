@@ -181,8 +181,10 @@ module Safire
         compatible = compatible_algorithms
         return select_explicit_algorithm(explicit_algorithm, compatible) unless explicit_algorithm.nil?
 
-        compatible.find { |candidate| @supported_algorithms.include?(candidate) } ||
-          configuration_error!(:supported_algorithms, @supported_algorithms, compatible)
+        selected = compatible.find { |candidate| @supported_algorithms.include?(candidate) }
+        return immutable_string(selected) if selected
+
+        configuration_error!(:supported_algorithms, @supported_algorithms, compatible)
       end
 
       def select_explicit_algorithm(algorithm, compatible)

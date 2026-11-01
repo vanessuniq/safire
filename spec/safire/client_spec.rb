@@ -197,7 +197,18 @@ RSpec.describe Safire::Client do
     end
 
     it 'raises NotImplementedError for unimplemented UDAP flows' do
-      expect { udap_client.refresh_token(refresh_token: 'refresh') }.to raise_error(NotImplementedError)
+      expect { udap_client.token_response_valid?({}) }.to raise_error(NotImplementedError)
+    end
+
+    it 'delegates refresh_token to Protocols::Udap' do
+      response = { 'access_token' => 'refreshed' }
+      protocol_client = instance_double(Safire::Protocols::Udap, refresh_token: response)
+      allow(Safire::Protocols::Udap).to receive(:new).and_return(protocol_client)
+
+      result = described_class.new(config, protocol: :udap).refresh_token(refresh_token: 'r', scopes: ['openid'])
+
+      expect(result).to eq(response)
+      expect(protocol_client).to have_received(:refresh_token).with(refresh_token: 'r', scopes: ['openid'])
     end
 
     it 'delegates request_access_token to Protocols::Udap' do

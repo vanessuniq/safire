@@ -462,12 +462,6 @@ RSpec.describe Safire::Protocols::Udap do
 
   # ---------- Unimplemented Behaviours ----------
 
-  describe '#refresh_token' do
-    it 'raises NotImplementedError' do
-      expect { udap.refresh_token }.to raise_error(NotImplementedError)
-    end
-  end
-
   describe '#token_response_valid?' do
     it 'raises NotImplementedError' do
       expect { udap.token_response_valid?({}) }.to raise_error(NotImplementedError)

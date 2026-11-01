@@ -11,8 +11,8 @@ module Safire
     # and signing algorithms a caller should use, or raises.
     #
     # The +grant_type+ parameter lets one readiness policy serve
-    # +client_credentials+ and +authorization_code+ token requests, and
-    # +refresh_token+ requests (planned).
+    # +client_credentials+, +authorization_code+, and +refresh_token+ token
+    # requests.
     #
     # Runtime hard failures ({Errors::DiscoveryError}) — Safire cannot send a
     # conformant token request:
@@ -23,7 +23,7 @@ module Safire
     # - The requested grant is not in +grant_types_supported+, including an
     #   empty or non-array value. Normative (§2.2): "clients SHALL interpret an
     #   empty array value to mean that the corresponding capability is NOT
-    #   supported by the server."
+    #   supported by the server." Exception: +refresh_token+ (see warnings).
     # - +token_endpoint+ is missing, not an absolute HTTPS URI with a host
     #   (HTTP loopback only when +allow_insecure_localhost+ is enabled), or has
     #   a fragment. Implementation choice mirroring SMART token-endpoint
@@ -72,6 +72,12 @@ module Safire
     #   +authorization_code+ flow". Safire proceeds (implementation choice) so
     #   the authorization code flow stays usable; the server decides. The
     #   warning reports a count, not key names.
+    # - For +refresh_token+, the grant is not in +grant_types_supported+.
+    #   A refresh request is only possible after the server issued a refresh
+    #   token, which is the more specific evidence of support; STU2 lets
+    #   servers issue refresh tokens (consumer §4.3, b2b §5.3) and §2.2 lists
+    #   +refresh_token+ only as an example grant. Implementation choice: the
+    #   request proceeds and the server decides.
     #
     # Broader conformance (for example the exact fixed-value arrays) remains
     # the explicit {UdapMetadata#valid?} diagnostic.
@@ -100,12 +106,14 @@ module Safire
       include URIValidation
 
       CLIENT_CREDENTIALS = 'client_credentials'.freeze
-      GRANT_TYPES = [CLIENT_CREDENTIALS, 'authorization_code', 'refresh_token'].freeze
+      REFRESH_TOKEN = 'refresh_token'.freeze
+      GRANT_TYPES = [CLIENT_CREDENTIALS, 'authorization_code', REFRESH_TOKEN].freeze
       AUTHENTICATION_METHOD = 'private_key_jwt'.freeze
       MANDATORY_ALGORITHM = 'RS256'.freeze
       DISCOVERY_LABEL = 'UDAP metadata'.freeze
 
-      private_constant :CLIENT_CREDENTIALS, :GRANT_TYPES, :AUTHENTICATION_METHOD, :MANDATORY_ALGORITHM, :DISCOVERY_LABEL
+      private_constant :CLIENT_CREDENTIALS, :REFRESH_TOKEN, :GRANT_TYPES, :AUTHENTICATION_METHOD,
+                       :MANDATORY_ALGORITHM, :DISCOVERY_LABEL
 
       # @param metadata [UdapMetadata] trusted discovery metadata with signed
       #   endpoint claims already applied
@@ -145,12 +153,13 @@ module Safire
       def evaluate!(scopes: nil, extension_keys: [])
         validate_arguments!(scopes, extension_keys)
         validate_authentication_profile!
-        validate_grant_type!
+        grant_advertised = validate_grant_type!
         token_endpoint = validate_token_endpoint!
         validate_authentication_method!
         algorithms = validate_signing_algorithms!
         unsent_required = validate_required_extensions!(extension_keys)
         negotiate_scopes!(scopes)
+        warn_unadvertised_refresh_grant unless grant_advertised
         emit_warnings(algorithms, extension_keys, unsent_required)
         Result.new(token_endpoint:, signing_algorithms: algorithms)
       end
@@ -174,7 +183,8 @@ module Safire
 
       def validate_grant_type!
         grants = @metadata.grant_types_supported
-        return if grants.is_a?(Array) && grants.include?(@grant_type)
+        return true if grants.is_a?(Array) && grants.include?(@grant_type)
+        return false if @grant_type == REFRESH_TOKEN
 
         discovery_error!("server does not advertise the #{@grant_type} grant in grant_types_supported")
       end
@@ -236,6 +246,13 @@ module Safire
           operation: :token,
           discovery_endpoint: @discovery_endpoint
         ).evaluate!(scopes)
+      end
+
+      def warn_unadvertised_refresh_grant
+        Safire.logger.warn(
+          '[UDAP] grant_types_supported does not advertise refresh_token; proceeding because the ' \
+          'authorization server issued the refresh token and decides whether to accept it'
+        )
       end
 
       def emit_warnings(algorithms, extension_keys, unsent_required)

@@ -15,8 +15,9 @@ has_children: true
 Safire implements UDAP Security STU2 discovery, signed metadata validation,
 community scoping, certificate-backed Dynamic Client Registration for new
 registration, modification, and cancellation, and B2B access tokens with the
-client credentials grant and JWT client authentication. The authorization code
-and refresh token grants and Tiered OAuth remain planned.
+client credentials grant and JWT client authentication, and the authorization
+code flow with refresh for consumer-facing and interactive B2B apps. Tiered
+OAuth remains planned.
 </div>
 
 ## Overview
@@ -200,10 +201,11 @@ Object built from `b2b:`, and POSTs it to the authoritative signed
 
 ## Scope and Protocol Choice
 
-Safire does not yet implement the UDAP authorization code grant, refresh tokens,
-or Tiered OAuth. `authorization_url`, `request_access_token`, `refresh_token`,
-and `token_response_valid?` continue to raise `NotImplementedError` on a UDAP
-client.
+UDAP clients support `authorization_url`, `request_access_token`, and
+`refresh_token` (see
+[Authorization Code]({% link udap/authorization-code.md %})). Tiered OAuth is
+not implemented, and `token_response_valid?` raises `NotImplementedError` on a
+UDAP client.
 
 | Feature | SMART App Launch in Safire | UDAP Security in Safire |
 |---------|----------------------------|--------------------------|

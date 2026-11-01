@@ -114,7 +114,14 @@ token = b2b_client.request_backend_token(
 )
 ```
 
-The UDAP authorization code and refresh grants and Tiered OAuth are planned.
+User-facing and interactive B2B apps use the UDAP authorization code flow:
+`authorization_url` (state and S256 PKCE generated for you), then
+`request_access_token(code:, code_verifier:)` and `refresh_token(refresh_token:)`,
+each authenticated with a UDAP Authentication Token. Your callback must compare
+the returned `state` before exchanging the code. See
+[UDAP Authorization Code](https://vanessuniq.github.io/safire/udap/authorization-code/).
+
+UDAP Tiered OAuth is planned.
 See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
 details.
 
@@ -225,8 +232,9 @@ client.token_response_valid?(token_data, flow: :backend_services)
 ```
 
 Configure scopes on the client or pass `scopes:` to each Backend Services
-request. The legacy `system/*.rs` fallback is deprecated (since v0.4.1, still present in
-v0.5.x) and will be removed in v0.6.0. Backend Services normally uses `system/` scopes. Safire
+request. Since v0.6.0 a request with no usable configured or per-call scopes raises
+`ConfigurationError` before any HTTP request (the v0.4.1–v0.5.x `system/*.rs`
+fallback was removed). Backend Services normally uses `system/` scopes. Safire
 preserves explicit non-system scopes because SMART permits them when context is
 established out of band.
 

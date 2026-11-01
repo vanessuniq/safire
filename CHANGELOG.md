@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Safire::Client#authorization_url`, `#request_access_token`, and
+  `#refresh_token` now support the UDAP Security STU2 authorization code flow
+  for consumer-facing and interactive B2B apps when initialized with
+  `protocol: :udap`. `authorization_url` uses the authoritative signed
+  `authorization_endpoint` and sends exactly `response_type=code`, `client_id`,
+  `redirect_uri`, `scope`, a generated `state`, and an S256 `code_challenge`;
+  it returns `{auth_url:, state:, code_verifier:}`. The application must
+  compare `state` at its callback before exchanging the code. The code exchange
+  and refresh requests authenticate with a UDAP Authentication Token (no
+  `extensions` by default), send `udap=1`, and never send an `Authorization`
+  header or client secret. Requested wildcard scopes that are not advertised
+  produce a value-free warning in `authorization_url` and a `ValidationError`
+  when a refresh requests scope. An `hl7-b2b` extension is rejected for these
+  grants; required authorization extensions that are not sent produce a
+  warning.
+- The demo application includes a UDAP authorization code launch, callback
+  (with `state` verification), and refresh workflow.
+
+### Removed
+
+- **Breaking:** SMART Backend Services no longer falls back to `system/*.rs`.
+  `request_backend_token` raises `ConfigurationError`
+  (`missing_attributes: [:scopes]`) before any HTTP request when neither the
+  per-call `scopes:` nor the configured `scopes` contains a non-blank entry. To
+  keep the old behavior, pass `scopes: ['system/*.rs']` explicitly. This
+  completes the deprecation announced in v0.4.1.
+
 ## [0.5.0] - 2026-11-01
 
 ### Added

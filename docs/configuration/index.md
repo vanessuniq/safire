@@ -11,7 +11,7 @@ permalink: /configuration/
 Safire is configured in two places:
 
 - **Client configuration** — the FHIR server URL, credentials, and OAuth parameters passed to `Safire::Client.new`
-- **Global configuration** — the logger, log level, and HTTP logging behaviour set once via `Safire.configure`
+- **Global configuration** — the logger, log level, HTTP logging behaviour, and `User-Agent` header set once via `Safire.configure`
 
 ## Architecture Overview
 
@@ -58,7 +58,29 @@ flowchart TD
 `certificate_chain` and the UDAP algorithm values are used by
 `Safire::Client#register_client` when `protocol: :udap`.
 
+## Global Configuration
+
+Set these once at application startup with `Safire.configure`. They apply to every client in the process.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `logger` | `Logger` to `$stdout` (or the `SAFIRE_LOGGER` path) | Logger used for Safire's messages |
+| `log_level` | `Logger::INFO` (default logger) | Level applied to the configured logger |
+| `log_http` | `true` | Log outbound HTTP requests and responses (bodies and the `Authorization` header are never logged) |
+| `user_agent` | `"Safire v<VERSION>"` | Value of the `User-Agent` header on every request Safire sends |
+
+```ruby
+# config/initializers/safire.rb
+Safire.configure do |config|
+  config.user_agent = "MyApp/2.1 (Safire v#{Safire::VERSION})"
+end
+```
+
+A `Safire::Client` reads `user_agent` when its first protocol call (for example `server_metadata` or `authorization_url`) builds its HTTP connection. Configure it before using clients; changing it afterwards does not affect a client that has already been used. See [Logging]({% link configuration/logging.md %}) for the logging settings.
+
+Safire does not expose TLS/SSL options through its public API. All connections use Faraday's default certificate verification, and endpoint URIs must be HTTPS (HTTP is allowed only for `localhost` / `127.0.0.1` with `allow_insecure_localhost: true`).
+
 ## In This Section
 
-- [Client Setup]({{ site.baseurl }}/configuration/client-setup/) — creating a client, protocol and client type selection, URI rules, and credential protection
-- [Logging]({{ site.baseurl }}/configuration/logging/) — global logger setup, HTTP request logging, log levels, and environment variables
+- [Client Setup]({% link configuration/client-setup.md %}) — creating a client, protocol and client type selection, URI rules, and credential protection
+- [Logging]({% link configuration/logging.md %}) — global logger setup, HTTP request logging, log levels, and environment variables

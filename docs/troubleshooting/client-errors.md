@@ -233,10 +233,12 @@ Verify the server supports Basic Auth before debugging credentials:
 
 ```ruby
 metadata = client.server_metadata
-unless metadata.token_endpoint_auth_methods_supported.include?('client_secret_basic')
-  raise 'Server does not support client_secret_basic'
+unless metadata.supports_symmetric_auth?
+  raise 'Server does not support confidential symmetric clients (client_secret_basic)'
 end
 ```
+
+`supports_symmetric_auth?` requires the `client-confidential-symmetric` capability. `token_endpoint_auth_methods_supported` is OPTIONAL in SMART discovery, so the helper treats an absent or empty list as allowing `client_secret_basic` and rejects only a non-empty list that omits it.
 
 Safire encodes credentials with `Base64.strict_encode64` — special characters in secrets are handled automatically.
 
@@ -269,12 +271,14 @@ Verify `private_key_jwt` is supported:
 
 ```ruby
 metadata = client.server_metadata
-unless metadata.token_endpoint_auth_methods_supported.include?('private_key_jwt')
-  raise 'Server does not support private_key_jwt'
+unless metadata.supports_asymmetric_auth?
+  raise 'Server does not support confidential asymmetric clients (private_key_jwt)'
 end
 ```
 
-Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets JWT `exp` to 5 minutes from `iat` — if your system clock is significantly skewed from the server, assertions will be rejected.
+`supports_asymmetric_auth?` requires the `client-confidential-asymmetric` capability, `private_key_jwt` in `token_endpoint_auth_methods_supported` (or that list absent or empty), and RS384 or ES384 in `token_endpoint_auth_signing_alg_values_supported` (or that list absent or empty).
+
+Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets the assertion's `exp` to 300 seconds (5 minutes) after the current local time and sends no `iat` claim (SMART requires `exp` to be no more than five minutes in the future) — if your system clock is significantly skewed from the server, assertions will be rejected.
 
 ---
 

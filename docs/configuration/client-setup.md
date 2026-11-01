@@ -272,7 +272,7 @@ config.inspect
 
 ## Next Steps
 
-- [Logging]({{ site.baseurl }}/configuration/logging/) — configure Safire's logger and HTTP request logging
+- [Logging]({% link configuration/logging.md %}) — configure Safire's logger and HTTP request logging
 - [UDAP]({{ site.baseurl }}/udap/) — discover UDAP metadata and register certificate-backed clients
 - [SMART Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) — obtain a `client_id` at runtime using RFC 7591
 - [SMART App Launch Workflows]({{ site.baseurl }}/smart-on-fhir/) — step-by-step authorization flow guides

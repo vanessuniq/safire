@@ -26,18 +26,15 @@ Before generating an authorization URL, Safire fetches the server's SMART config
 def check_server_capabilities
   metadata = @client.server_metadata
 
+  # Checks the client-confidential-symmetric capability and that client_secret_basic
+  # is listed in token_endpoint_auth_methods_supported (or that the list is absent or empty).
   unless metadata.supports_symmetric_auth?
     raise 'Server does not support confidential symmetric clients'
   end
 
-  auth_methods = metadata.token_endpoint_auth_methods_supported
-  unless auth_methods.include?('client_secret_basic')
-    raise 'Server does not support client_secret_basic'
-  end
-
   render json: {
     supports_confidential_symmetric: true,
-    auth_methods:                    auth_methods,
+    auth_methods:                    metadata.token_endpoint_auth_methods_supported, # nil when not advertised
     supports_offline_access:         metadata.scopes_supported&.include?('offline_access')
   }
 end

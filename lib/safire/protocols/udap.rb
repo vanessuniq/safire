@@ -6,11 +6,13 @@ module Safire
     # (per {https://hl7.org/fhir/us/udap-security/STU2/discovery.html STU2 §2})
     # and Dynamic Client Registration (per
     # {https://hl7.org/fhir/us/udap-security/STU2/registration.html STU2 §3}).
+    # It also requests B2B access tokens with the client credentials grant and
+    # UDAP JWT-based client authentication (per
+    # {https://hl7.org/fhir/us/udap-security/STU2/b2b.html STU2 §5}).
     # Discovery results are cached per community within each instance.
     #
-    # Other UDAP flows (B2B client credentials token acquisition, B2C authorization
-    # code, and Tiered OAuth) raise +NotImplementedError+ and remain planned for
-    # future releases.
+    # Other UDAP flows (authorization code, refresh token, and Tiered OAuth)
+    # raise +NotImplementedError+ and remain planned for future releases.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
     # instantiate it directly — use {Safire::Client} instead.
@@ -28,11 +30,20 @@ module Safire
       MANDATORY_REGISTRATION_ALGORITHM = 'RS256'.freeze
       REGISTER_ACTION = 'Registering client via UDAP Dynamic Client Registration...'.freeze
       CANCEL_ACTION = 'Cancelling client registration via UDAP Dynamic Client Registration...'.freeze
+      TOKEN_HEADERS = { content_type: 'application/x-www-form-urlencoded' }.freeze
+      CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'.freeze
+      CLIENT_CREDENTIALS_GRANT = 'client_credentials'.freeze
+      CLIENT_CREDENTIALS_ACTION = 'Requesting UDAP B2B access token (client_credentials grant)...'.freeze
+      SCOPE_TOKEN_PATTERN = /\A[\x21\x23-\x5B\x5D-\x7E]+\z/
       private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :SUCCESSFUL_CANCELLATION_STATUSES,
-                       :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION
+                       :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION, :TOKEN_HEADERS,
+                       :CLIENT_ASSERTION_TYPE, :CLIENT_CREDENTIALS_GRANT, :CLIENT_CREDENTIALS_ACTION,
+                       :SCOPE_TOKEN_PATTERN
 
       def initialize(config)
         @base_url = config.base_url
+        @client_id = config.client_id
+        @scopes = config.scopes
         @allow_insecure_localhost = config.allow_insecure_localhost
         @private_key = config.private_key
         @certificate_chain = config.certificate_chain
@@ -229,6 +240,104 @@ module Safire
         parse_cancellation_response(response)
       rescue Faraday::Error => e
         raise registration_error_from(e)
+      end
+
+      # Requests a B2B access token with the client credentials grant and UDAP
+      # JWT-based client authentication.
+      #
+      # This is the UDAP implementation behind {Safire::Client#request_backend_token},
+      # which serves the client credentials grant for every protocol. The method
+      # name and keyword contract are stable; any future protocol-neutral alias
+      # would be an addition, not a replacement.
+      #
+      # Order of operations: validate caller input (identity, scopes, extensions)
+      # before any network activity; discover trusted UDAP metadata (signed
+      # metadata must validate before the client proceeds,
+      # {https://hl7.org/fhir/us/udap-security/STU2/discovery.html#signed-metadata-elements
+      # STU2 §2.3}); check token-request readiness
+      # ({UdapTokenRequestReadiness}); sign an Authentication Token; then POST
+      # exactly once. Safire never retries a token request.
+      #
+      # The Authentication Token ({UdapAuthenticationToken}) uses the configured
+      # +client_id+ as +iss+ and +sub+, the authoritative signed +token_endpoint+
+      # as +aud+ (and as the POST target), a 300-second lifetime, a fresh +jti+,
+      # and +extensions+ containing +hl7-b2b+ plus any +extensions:+ entries.
+      # STU2 b2b §5.2.1: the B2B Authorization Extension Object "is required for
+      # B2B client apps using the +client_credentials+ flow".
+      #
+      # The form-encoded request body contains exactly +grant_type+, +scope+,
+      # +client_assertion_type+, +client_assertion+, and +udap=1+
+      # ({https://hl7.org/fhir/us/udap-security/STU2/b2b.html#client-credentials-grant
+      # STU2 §5.2.2}). No +Authorization+ header, +client_id+, or
+      # +client_secret+ is sent: clients "SHALL NOT include an HTTP
+      # Authorization header or client secret in its token endpoint request".
+      #
+      # STU2 b2b §5.2.4: "A client application SHALL only use an access token in
+      # a manner consistent with any assertions made when requesting that
+      # token." Request a new token whenever the requestor, purpose of use, or
+      # other +hl7-b2b+ context changes; Safire does not cache tokens.
+      #
+      # Scopes come from +scopes:+ when it yields at least one scope, otherwise
+      # from configured +scopes+. Each source may be an Array of Strings or a
+      # space-delimited String; values are split on whitespace, blanks dropped,
+      # and duplicates removed. STU2 §5.2.2 marks +scope+ required, so Safire
+      # has no default scope. Wildcard scopes must be advertised exactly in
+      # +scopes_supported+
+      # ({https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation
+      # STU2 §7.3}).
+      #
+      # @param scopes [Array<String>, String, nil] requested scopes; falls back to configured +scopes+
+      # @param b2b [Hash] B2B Authorization Extension Object members (+organization_id+,
+      #   +purpose_of_use+, and optional members); Safire adds +version: "1"+.
+      #   See {UdapB2bAuthorizationExtension}
+      # @param extensions [Hash{String, Symbol => Hash}, nil] additional Authorization Extension
+      #   Objects keyed by extension name; must not contain +hl7-b2b+ (use +b2b:+)
+      # @param community [String, nil] optional UDAP community URI for discovery
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
+      #   for signed metadata validation
+      # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation
+      # @param revocation_checker [#call, nil] custom server certificate revocation policy
+      # @param verify_chain [Boolean] whether discovery signed_metadata chain validation is required
+      # @param private_key [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil]
+      #   client signing private key; defaults to configuration
+      # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>, nil]
+      #   leaf-first client signing certificate chain; defaults to configuration
+      # @param jwt_algorithm [String, nil] optional explicit Authentication Token signing algorithm
+      # @return [Hash] token response from the authorization server, including a non-blank
+      #   +"access_token"+; other members (+token_type+, +expires_in+, +scope+) are returned as sent
+      # @raise [Safire::Errors::ConfigurationError] when +client_id+, scopes, +private_key+, or
+      #   +certificate_chain+ are missing, or signing configuration is invalid or incompatible
+      # @raise [Safire::Errors::ValidationError] when +b2b:+ is missing or invalid, +extensions:+
+      #   is invalid, a scope is malformed, a required server extension is missing, or a
+      #   requested wildcard scope is not advertised
+      # @raise [Safire::Errors::DiscoveryError] when trusted UDAP discovery fails or the
+      #   metadata cannot support a client_credentials token request
+      # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
+      # @raise [Safire::Errors::TokenError] when the server rejects the request (OAuth +error+
+      #   codes such as +invalid_scope+ or +invalid_client+ are preserved) or returns a body
+      #   that is not a JSON object with a non-blank +access_token+
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
+      #   or a redirect to a non-HTTPS URL
+      # @see https://hl7.org/fhir/us/udap-security/STU2/b2b.html#obtaining-an-access-token
+      def request_backend_token(scopes: nil, b2b: nil, extensions: nil, community: nil, trusted_anchors: [],
+                                crls: [], revocation_checker: nil, verify_chain: true,
+                                private_key: @private_key, certificate_chain: @certificate_chain,
+                                jwt_algorithm: @jwt_algorithm)
+        validate_token_identity!(private_key, certificate_chain)
+        request = {
+          scopes: resolve_token_scopes(scopes),
+          extensions: client_credentials_extensions(b2b, extensions),
+          community: normalize_community(community)
+        }
+        readiness = client_credentials_readiness(
+          request, trusted_anchors:, crls:, revocation_checker:, verify_chain:
+        )
+        assertion = build_authentication_token(
+          readiness, request[:extensions], private_key:, certificate_chain:, jwt_algorithm:
+        )
+        post_client_credentials_request(readiness.token_endpoint, request[:scopes], assertion.to_jwt)
+      rescue Faraday::Error => e
+        raise token_error_from(e)
       end
 
       private
@@ -428,6 +537,132 @@ module Safire
 
       def registration_error_from(faraday_error)
         oauth_error_from(faraday_error, Errors::RegistrationError)
+      end
+
+      # -- client_credentials token request ----------------------------------
+
+      def validate_token_identity!(private_key, certificate_chain)
+        missing = []
+        missing << :client_id if @client_id.blank?
+        missing << :private_key if private_key.blank?
+        missing << :certificate_chain if certificate_chain.blank?
+        raise Errors::ConfigurationError.new(missing_attributes: missing) if missing.any?
+      end
+
+      def resolve_token_scopes(requested)
+        scopes = normalize_token_scopes(requested)
+        scopes = normalize_token_scopes(@scopes) if scopes.empty?
+        raise Errors::ConfigurationError.new(missing_attributes: [:scopes]) if scopes.empty?
+
+        scopes
+      end
+
+      def normalize_token_scopes(value)
+        entries = value.is_a?(Array) ? value : [value]
+        tokens = entries.flat_map do |entry|
+          next [] if entry.nil?
+
+          invalid_token_scopes!(entry) unless entry.is_a?(String)
+          entry.split
+        end
+        return tokens.uniq if tokens.all? { |token| SCOPE_TOKEN_PATTERN.match?(token) }
+
+        raise Errors::ValidationError.new(
+          attribute: :scope,
+          reason: 'must contain only RFC 6749 scope-token characters'
+        )
+      end
+
+      def invalid_token_scopes!(entry)
+        raise Errors::ConfigurationError.new(
+          invalid_attribute: :scopes,
+          invalid_value: entry.class,
+          valid_values: ['Array<String>', 'space-delimited String']
+        )
+      end
+
+      def client_credentials_extensions(b2b, extensions)
+        if b2b.nil?
+          raise Errors::ValidationError.new(
+            attribute: :b2b,
+            reason: 'is required: UDAP Security STU2 requires the hl7-b2b extension ' \
+                    'for B2B client apps using the client_credentials flow'
+          )
+        end
+
+        hl7_b2b = UdapB2bAuthorizationExtension.new(b2b).to_h
+        { UdapB2bAuthorizationExtension::EXTENSION_KEY => hl7_b2b }.merge(additional_token_extensions(extensions))
+      end
+
+      def additional_token_extensions(extensions)
+        return {} if extensions.nil?
+
+        extensions_error!('must be a Hash or nil') unless extensions.is_a?(Hash)
+        extensions.each_with_object({}) do |(key, value), normalized|
+          name = token_extension_name(key)
+          extensions_error!('must not specify an extension more than once') if normalized.key?(name)
+          extensions_error!('each extension must be a non-empty Hash') unless value.is_a?(Hash) && value.any?
+
+          normalized[name] = value
+        end
+      end
+
+      def token_extension_name(key)
+        unless (key.is_a?(String) || key.is_a?(Symbol)) && key.to_s.present?
+          extensions_error!('keys must be non-blank Strings or Symbols')
+        end
+
+        name = key.to_s
+        return name unless name == UdapB2bAuthorizationExtension::EXTENSION_KEY
+
+        extensions_error!('must not include hl7-b2b; pass the B2B Authorization Extension Object with b2b:')
+      end
+
+      def extensions_error!(reason)
+        raise Errors::ValidationError.new(attribute: :extensions, reason:)
+      end
+
+      def client_credentials_readiness(request, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
+        community = request[:community]
+        discovered = server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
+        UdapTokenRequestReadiness.new(
+          metadata: discovered,
+          grant_type: CLIENT_CREDENTIALS_GRANT,
+          discovery_endpoint: well_known_endpoint(community:),
+          allow_insecure_localhost: @allow_insecure_localhost
+        ).evaluate!(scopes: request[:scopes], extension_keys: request[:extensions].keys)
+      end
+
+      def build_authentication_token(readiness, extensions, private_key:, certificate_chain:, jwt_algorithm:)
+        UdapAuthenticationToken.new(
+          client_id: @client_id,
+          token_endpoint: readiness.token_endpoint,
+          private_key:,
+          certificate_chain:,
+          supported_algorithms: readiness.signing_algorithms,
+          algorithm: jwt_algorithm,
+          extensions:,
+          allow_insecure_localhost: @allow_insecure_localhost
+        )
+      end
+
+      # STU2 b2b §5.2.2: exactly these parameters; no Authorization header,
+      # client_id, or client_secret.
+      def post_client_credentials_request(endpoint, scopes, client_assertion)
+        Safire.logger.info(CLIENT_CREDENTIALS_ACTION)
+
+        response = @http_client.post(
+          endpoint,
+          body: {
+            grant_type: CLIENT_CREDENTIALS_GRANT,
+            scope: scopes.join(' '),
+            client_assertion_type: CLIENT_ASSERTION_TYPE,
+            client_assertion:,
+            udap: '1'
+          },
+          headers: TOKEN_HEADERS
+        )
+        parse_token_response(response.body)
       end
 
       def fetch_metadata(community:, trust_policy:)

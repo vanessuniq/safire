@@ -214,6 +214,19 @@ RSpec.describe Safire::Client do
       expect(protocol_client).to have_received(:cancel_registration)
         .with(metadata, client_uri: 'https://client.example.com')
     end
+
+    it 'delegates request_backend_token to Protocols::Udap' do
+      response = { 'access_token' => 'udap-token' }
+      protocol_client = instance_double(Safire::Protocols::Udap, request_backend_token: response)
+      b2b = { organization_id: 'https://example.com/Organization/1', purpose_of_use: ['TREAT'] }
+
+      allow(Safire::Protocols::Udap).to receive(:new).and_return(protocol_client)
+
+      result = described_class.new(config, protocol: :udap).request_backend_token(scopes: ['system/*.rs'], b2b:)
+
+      expect(result).to eq(response)
+      expect(protocol_client).to have_received(:request_backend_token).with(scopes: ['system/*.rs'], b2b:)
+    end
   end
 
   describe '#cancel_registration' do

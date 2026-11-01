@@ -33,6 +33,12 @@ Common OAuth error codes and their meaning:
 | `invalid_client` | Client ID or credentials not recognized | Verify registration and credentials |
 | `invalid_request` | Missing required parameter | Check `redirect_uri` matches exactly what was registered |
 | `unauthorized_client` | Client not authorized for this grant type | Verify server-side client configuration |
+| `invalid_scope` | Requested scope not supported or not granted (UDAP: also an unsupported wildcard) | Request scopes the server advertises and the client registered for |
+
+For UDAP B2B client credentials requests, `invalid_client` often means the
+Authentication Token was rejected. Check that `client_id` matches the
+registration, that the certificate chain is trusted by the server's community,
+and that the server clock is accurate (the token is valid for 300 seconds).
 
 The `redirect_uri` in the token request must exactly match the one used in the authorization request and the one registered with the server — including trailing slashes.
 

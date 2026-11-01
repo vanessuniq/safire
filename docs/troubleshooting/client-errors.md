@@ -56,10 +56,13 @@ key-compatible algorithm.
 
 Scope handling depends on what the request needs from `scopes_supported`.
 Registration and modification reject an unadvertised requested wildcard with
-`ValidationError`, because STU2 permits requesting a wildcard only when it is
-advertised. When a wildcard is requested but `scopes_supported` provides no
-usable scope strings, Safire raises `DiscoveryError`: it is obligated to
-evaluate the wildcard and the server's advertisement makes that impossible. A
+`ValidationError`. UDAP Security STU2 lets a client request a wildcard scope
+only if wildcards are listed in `scopes_supported`
+([Scope negotiation](https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation),
+§7.3 item 3); requiring the requested wildcard to appear *exactly* is Safire's
+stricter local check. When a wildcard is requested but `scopes_supported`
+provides no usable scope strings, Safire raises `DiscoveryError`, because it
+cannot evaluate the wildcard against the server's advertisement. A
 malformed entry beside usable ones does not trigger this; Safire decides
 against the usable entries and leaves the defect to `UdapMetadata#valid?`. The
 same unusable metadata only warns when every requested scope is non-wildcard,
@@ -230,10 +233,12 @@ Verify the server supports Basic Auth before debugging credentials:
 
 ```ruby
 metadata = client.server_metadata
-unless metadata.token_endpoint_auth_methods_supported.include?('client_secret_basic')
-  raise 'Server does not support client_secret_basic'
+unless metadata.supports_symmetric_auth?
+  raise 'Server does not support confidential symmetric clients (client_secret_basic)'
 end
 ```
+
+`supports_symmetric_auth?` requires the `client-confidential-symmetric` capability. `token_endpoint_auth_methods_supported` is OPTIONAL in SMART discovery, so the helper treats an absent or empty list as allowing `client_secret_basic` and rejects only a non-empty list that omits it.
 
 Safire encodes credentials with `Base64.strict_encode64` — special characters in secrets are handled automatically.
 
@@ -266,12 +271,14 @@ Verify `private_key_jwt` is supported:
 
 ```ruby
 metadata = client.server_metadata
-unless metadata.token_endpoint_auth_methods_supported.include?('private_key_jwt')
-  raise 'Server does not support private_key_jwt'
+unless metadata.supports_asymmetric_auth?
+  raise 'Server does not support confidential asymmetric clients (private_key_jwt)'
 end
 ```
 
-Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets JWT `exp` to 5 minutes from `iat` — if your system clock is significantly skewed from the server, assertions will be rejected.
+`supports_asymmetric_auth?` requires the `client-confidential-asymmetric` capability, `private_key_jwt` in `token_endpoint_auth_methods_supported` (or that list absent or empty), and RS384 or ES384 in `token_endpoint_auth_signing_alg_values_supported` (or that list absent or empty).
+
+Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets the assertion's `exp` to 300 seconds (5 minutes) after the current local time and sends no `iat` claim (SMART requires `exp` to be no more than five minutes in the future) — if your system clock is significantly skewed from the server, assertions will be rejected.
 
 ---
 
@@ -332,6 +339,60 @@ client.request_backend_token(
 ```
 
 See [Backend Services — Prerequisites]({% link smart-on-fhir/backend-services/index.md %}#prerequisites-registration-keys-and-jwks) for key generation steps.
+
+---
+
+## UDAP B2B Client Credentials Errors
+
+See [B2B Client Credentials]({% link udap/b2b-client-credentials.md %}) for the full flow.
+
+### `ConfigurationError`: Missing `client_id`, `scopes`, `private_key`, or `certificate_chain`
+
+```
+Safire::Errors::ConfigurationError: Configuration missing: scopes
+```
+
+A UDAP `request_backend_token` call needs the `client_id` from registration, at
+least one scope, and the signing identity. UDAP Security STU2 marks `scope` as
+required for client credentials requests, and Safire has no default scope.
+Configure scopes or pass `scopes:`. Safire raises this error before any HTTP
+request.
+
+### `ValidationError`: `b2b` is required
+
+```
+Safire::Errors::ValidationError: Validation failed for b2b: is required: ...
+```
+
+STU2 requires the `hl7-b2b` B2B Authorization Extension Object for client
+credentials requests. Pass `b2b:` with at least `organization_id` (an absolute
+URI) and `purpose_of_use` (an array of strings). Do not put `hl7-b2b` inside
+`extensions:`; Safire rejects it there.
+
+### `ValidationError` for `extensions`: required extension missing
+
+The server lists an extension in `udap_authorization_extensions_required` that
+the request does not include. The message names the missing extension keys.
+Build that extension object as defined by its implementation guide or trust
+community and pass it with `extensions:`.
+
+### `DiscoveryError` while requesting a UDAP token
+
+The trusted metadata cannot support a client credentials token request. For
+example, `udap_authn` or `client_credentials` may not be advertised,
+`private_key_jwt` may be missing, the signing algorithm list may be empty, or
+the signed `token_endpoint` may not be an HTTPS URL without a fragment. Check
+the metadata for the same `community:` you passed. Safire did not sign or send
+a token request.
+
+### Warnings during a UDAP token request
+
+| Warning | Meaning |
+|---------|---------|
+| `does not advertise the required RS256 baseline` | Safire signs with another advertised, key-compatible algorithm |
+| `does not include udap_authz` | The server should advertise `udap_authz` when it supports client credentials; the request is still sent |
+| `token request extension count=N not listed in udap_authorization_extensions_supported` | The server MAY ignore unrecognized extensions; `hl7-b2b` is still always sent |
+| `requested non-wildcard scope count=N` | Scope coverage is decided by the server; check the granted `scope` in the response |
 
 ---
 

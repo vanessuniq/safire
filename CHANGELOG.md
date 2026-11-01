@@ -7,11 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-01
+
+### Added
+
+- `Safire::Client#request_backend_token` now supports UDAP Security STU2 B2B
+  access tokens when initialized with `protocol: :udap`. Safire validates
+  caller input before any network request, performs trusted UDAP discovery
+  (signed metadata must validate), checks token-request readiness (`udap_authn`
+  profile, `client_credentials` grant, authoritative HTTPS token endpoint,
+  `private_key_jwt`, signing-algorithm metadata, and required authorization
+  extensions), and POSTs `grant_type=client_credentials`, the required `scope`,
+  `client_assertion_type`, `client_assertion`, and `udap=1` without an
+  `Authorization` header or client secret. Server errors surface as
+  `TokenError` with their OAuth error code; requests are never retried.
+- UDAP Authentication Tokens (certificate-backed JWT client authentication):
+  `iss`/`sub` are the registered `client_id`, `aud` is the signed token
+  endpoint exactly as advertised, the lifetime is 300 seconds, each token has a
+  fresh `jti`, and the JOSE header carries only `alg` and a leaf-first `x5c`.
+  The signing algorithm is negotiated from
+  `token_endpoint_auth_signing_alg_values_supported` and the key type.
+- The `b2b:` argument builds the required STU2 `hl7-b2b` B2B Authorization
+  Extension Object: Safire sets `version` `"1"`, requires an absolute-URI
+  `organization_id` and at least one `purpose_of_use`, accepts the optional
+  members, rejects unknown members, and requires `consent_policy` whenever
+  `consent_reference` is present. Additional extension objects can be passed
+  with `extensions:`.
+- The demo application can request a UDAP B2B token and shows its error paths.
+
 ### Changed
 
 - **Breaking:** UDAP Dynamic Client Registration and modification now enforce
-  the UDAP Security STU2 rule that a wildcard scope may be requested only when
-  it is advertised. A requested scope token containing a literal `*` raises
+  the UDAP Security STU2 scope-negotiation rule that a client may request a
+  wildcard scope only if wildcards are listed in `scopes_supported`, using
+  Safire's stricter exact-advertisement check. A requested scope token
+  containing a literal `*` raises
   `ValidationError` unless it appears exactly in `scopes_supported`, and raises
   `DiscoveryError` when `scopes_supported` provides no usable scope strings
   while a wildcard must be evaluated. Usable advertised entries are still
@@ -19,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deprecation warning. The scope check stays warning-only during cancellation,
   so scope-advertisement drift alone cannot block credential cleanup, and
   non-wildcard scopes remain subject to server-side negotiation with at most a
-  value-free warning.
+  value-free warning. UDAP B2B token requests apply the same wildcard check.
 
 ### Fixed
 
@@ -29,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class, never the verifier value. Verifiers with non-ASCII, invalid-byte, or
   ASCII-incompatible encodings now raise the existing invalid-characters
   `ArgumentError` instead of an encoding error.
+- Documentation examples and error-handling guidance now match the public
+  API: advanced, security, SMART discovery, registration, token-exchange, and
+  troubleshooting pages use the error classes Safire actually raises, no
+  longer claim an `iat` claim in SMART client assertions, include the
+  `allow_insecure_localhost` setting for local HTTP redirects, and fix broken
+  documentation-site links. References to an SSL configuration option that the
+  public API does not expose were removed, and `user_agent` is documented.
 
 ## [0.4.1] - 2026-08-29
 

@@ -1,6 +1,6 @@
 # Safire Demo Application
 
-A Sinatra-based web application that demonstrates the Safire gem for SMART authorization, UDAP discovery, and UDAP Dynamic Client Registration.
+A Sinatra-based web application that demonstrates the Safire gem for SMART authorization, UDAP discovery, UDAP Dynamic Client Registration, and UDAP B2B client credentials tokens.
 
 ## Features
 
@@ -9,6 +9,7 @@ A Sinatra-based web application that demonstrates the Safire gem for SMART autho
 - **SMART Discovery**: View server capabilities from `/.well-known/smart-configuration` including supported scopes, capabilities, and endpoints
 - **UDAP Discovery**: Fetch `/.well-known/udap`, validate `signed_metadata`, inspect STU2 fields, and run community-scoped discovery
 - **UDAP Dynamic Client Registration**: Register and cancel a certificate-backed UDAP client, store the returned UDAP client identifier separately from SMART credentials, and inspect filtered registration responses
+- **UDAP B2B Token Request**: Request a UDAP STU2 B2B `client_credentials` access token with an `hl7-b2b` authorization extension, using the stored UDAP client ID, and inspect a masked token response
 - **Authorization Flows**: Test multiple launch types:
   - Provider Standalone Launch
   - Patient Standalone Launch
@@ -342,6 +343,38 @@ ignored file and explicitly select it, or paste JWTs into the form for one-off
 testing. For cancellation, paste any certifications required by the server into
 the cancellation form; certification JWTs are intentionally not persisted with
 the server record.
+
+### UDAP B2B Token Request
+
+Navigate to a UDAP-enabled server detail page and open **Request B2B Token**
+in the UDAP Security section. The page calls
+`Safire::Client#request_backend_token` on a `protocol: :udap` client (UDAP
+Security STU2 B2B client credentials flow) and signs the Authentication Token
+with the same `UDAP_CLIENT_PRIVATE_KEY_PEM` and
+`UDAP_CLIENT_CERTIFICATE_CHAIN_PEM` used for registration.
+`UDAP_REGISTRATION_SIGNING_ALGORITHM`, when set, also applies to the token
+request. Server trust uses the same `UdapTrustPolicy` as discovery and
+registration.
+
+The form provides:
+
+- the UDAP client ID, prefilled from the server's stored UDAP registration
+  (register a `client_credentials` client first, or enter a client ID issued
+  elsewhere)
+- scopes, prefilled from the stored registration scope or the server scopes
+- the community URI, prefilled from the stored registration
+- `hl7-b2b` members: `organization_id` and `purpose_of_use` (required), and
+  optional `organization_name`, `subject_name`, `subject_id`, `subject_role`,
+  `consent_policy`, and `consent_reference`. Blank optional fields are omitted;
+  list fields accept values separated by spaces, commas, or new lines. Safire
+  adds `version: "1"` and validates the members
+
+The result shows the token type, expiry, and granted scopes. The access token
+is masked (only its first and last four characters and its length are shown),
+and every other non-allowlisted response field, such as `refresh_token`, is
+replaced with `[FILTERED]`. The demo does not store the token in the session.
+Configuration, validation, discovery, certificate, token (including the OAuth
+`error` code), and network errors are shown on the same page.
 
 ### Token Refresh
 

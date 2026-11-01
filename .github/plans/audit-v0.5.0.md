@@ -16,8 +16,17 @@ below has a validated fix in the v0.5.0 stack ancestry.
   the doc fixes, and 5.12.
 - **External validation**: Inferno SMART STU2.2 client suite (Backend
   Services) passed against Safire in Docker (see #356; that run was on `main`
-  code). Inferno UDAP client suite run against #358: in progress — note the kit
-  targets UDAP **STU1**.
+  code). Inferno UDAP client suite (udap-security-test-kit v0.12.2, graded
+  against UDAP **STU1**) against #358 at `51d6210`: every executed test passed
+  (registration verification, token-request verification, token use) after one
+  documented kit configuration change — the stock mock server signs metadata
+  with a certificate whose SAN does not equal the metadata `iss`, violating the
+  STU2 (and STU1) discovery rule, and Safire correctly rejected it. Wrong-key
+  and missing-`hl7-b2b` negative controls failed in Inferno as expected. Full
+  evidence and caveats: [inferno-udap-v0.5.0.md](inferno-udap-v0.5.0.md).
+  Attestation tests (17) and Inferno grading of client discovery were not run.
+- **GitHub CI**: `ruby.yml` manual run 41255776810 on `51d6210` — all three
+  matrix jobs passed.
 
 ## Findings (confirmed defects = release blockers)
 

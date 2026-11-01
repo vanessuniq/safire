@@ -65,7 +65,7 @@ Remaining v0.6.0 tasks: see [v0.6.0.md](v0.6.0.md). v0.7.0: see [v0.7.0.md](v0.7
 |---|---|---|---|---|---|---|
 | Q1 | Drop legacy YARD nav patch | `fix/docs-remove-legacy-yard-patch` | `main` | #334 | #337 | draft PR (other session) |
 | Q2 | Inferno Phase 1 (ran: Inferno suite pass + negative control) | `feature/inferno-smart-phase1` | `main` | #346 | #356 | draft PR |
-| Q3 | Inferno Phase 2 | `feature/inferno-smart-phase2` | #356 | #347 | — | in progress |
+| Q3 | Inferno Phase 2 (ran: 6 scenarios pass + 2 negative controls) | `feature/inferno-smart-phase2` | #356 | #347 | #373 | draft PR |
 
 ## Blockers and unverified claims
 

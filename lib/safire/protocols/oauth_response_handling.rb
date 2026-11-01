@@ -21,6 +21,31 @@ module Safire
         )
       end
 
+      def token_error_from(faraday_error)
+        oauth_error_from(faraday_error, Errors::TokenError)
+      end
+
+      # Validates a successful token endpoint response body.
+      #
+      # RFC 6749 §5.1 marks +access_token+ as REQUIRED in a successful response.
+      # Implementation choice: only an already-parsed Hash (as produced by the
+      # Faraday JSON response middleware) is accepted; a raw String body is
+      # rejected, unlike {#parse_registration_response}.
+      #
+      # @param token_response [Object] the response body
+      # @return [Hash] the response body unchanged
+      # @raise [Safire::Errors::TokenError] if the body is not a Hash, or if
+      #   +access_token+ is missing or blank (field names only, no values)
+      def parse_token_response(token_response)
+        unless token_response.is_a?(Hash)
+          raise Errors::TokenError.new(error_description: 'response is not a JSON object')
+        end
+
+        return token_response if token_response['access_token'].present?
+
+        raise Errors::TokenError.new(received_fields: token_response.keys)
+      end
+
       def parse_registration_response(body)
         response = json_object(body)
         raise Errors::RegistrationError.new(error_description: 'response is not a usable JSON object') unless response

@@ -254,7 +254,7 @@ bin/demo
 # Visit http://localhost:4567
 ```
 
-Demonstrates SMART Dynamic Client Registration, SMART discovery, UDAP discovery with `signed_metadata` trust validation, UDAP Dynamic Client Registration and cancellation, all authorization flows, token refresh, and backend services token requests. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
+Demonstrates SMART Dynamic Client Registration, SMART discovery, UDAP discovery with `signed_metadata` trust validation, UDAP Dynamic Client Registration and cancellation, UDAP B2B client_credentials token requests, all SMART authorization flows, token refresh, and backend services token requests. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
 
 ---
 

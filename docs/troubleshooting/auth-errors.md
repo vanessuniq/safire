@@ -161,3 +161,33 @@ session.delete(:oauth_state)
 ```
 
 If the session has expired by the time the user returns, redirect them back to the launch endpoint with a user-friendly message rather than showing a raw error.
+
+### `invalid_idp` on a UDAP callback
+
+**Symptom:** the callback for a UDAP request made with `authorization_url(idp: ...)`
+carries `error=invalid_idp` instead of a `code`.
+
+**Cause:** the data holder will not use the IdP you named in `idp`. UDAP
+Security STU2 §6.2: it "**MAY** reject the client app's authorization request
+... using the extension error code of `invalid_idp`" when it does not trust the
+IdP or cannot obtain a `client_id` with it.
+
+**Fix:** check `state` as usual, then start a new authorization request. A
+client "**MAY** attempt to obtain authorization again by specifying a different
+IdP base URL in the `idp` authorization request parameter, or by making a new
+authorization request without using the Tiered OAuth workflow":
+
+```ruby
+if params[:error] == 'invalid_idp'
+  auth = client.authorization_url(idp: other_idp)   # or omit idp:
+  session[:udap_state]         = auth[:state]
+  session[:udap_code_verifier] = auth[:code_verifier]
+  redirect_to auth[:auth_url]
+end
+```
+
+Related failures raised by `authorization_url` itself: `ValidationError` with
+`attribute == :idp` when `idp` is not an absolute HTTPS URL without a fragment,
+and `DiscoveryError` when the server does not advertise `udap_to` in
+`udap_profiles_supported` or `"udap"` in `scopes_supported`. See
+[Tiered OAuth]({% link udap/tiered-oauth.md %}).

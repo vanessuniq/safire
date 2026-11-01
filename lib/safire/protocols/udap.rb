@@ -18,8 +18,10 @@ module Safire
     # STU2 §5.3}).
     # Discovery results are cached per community within each instance.
     #
-    # Tiered OAuth (+idp:+) is not implemented and remains planned for a
-    # future release.
+    # It also builds the client-app side of a UDAP Tiered OAuth authorization
+    # request (+idp+ parameter and +udap+ scope, per
+    # {https://hl7.org/fhir/us/udap-security/STU2/user.html STU2 §6.1}); the
+    # data holder's interactions with the IdP (§6.2–§6.3) are out of scope.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
     # instantiate it directly — use {Safire::Client} instead.
@@ -408,7 +410,30 @@ module Safire
       # value-free warning and the request proceeds: STU2 §7.3 names
       # registration and token requests, not authorization requests.
       #
+      # Tiered OAuth
+      # ({https://hl7.org/fhir/us/udap-security/STU2/user.html#client-authorization-request-to-data-holder
+      # STU2 §6.1}): when +idp:+ is given, Safire adds +udap+ to the requested
+      # scopes (once, appended when absent) and adds the extension query
+      # parameter +idp+ (normative: "Add +udap+ to the list of scopes …" and
+      # "Add the extension query parameter +idp+ with a value equal to the base
+      # URL of the preferred OIDC IdP"). +udap+ is always added because "the
+      # meaning of the extension parameter +idp+ is undefined if +udap+ is
+      # absent from the list of requested scopes". See {UdapTieredAuthorizationRequest}
+      # for +idp+ validation. Discovery must advertise +udap_to+ in
+      # +udap_profiles_supported+ and +"udap"+ in +scopes_supported+, otherwise
+      # Safire raises {Errors::DiscoveryError} (implementation choice; see
+      # {UdapAuthorizationRequestReadiness}). Clients that intend to use Tiered
+      # OAuth "SHALL include +udap+ in the list of scopes requested in the
+      # +scope+ parameter of their registration request"; Safire cannot know
+      # that intent at registration time, so include +udap+ in the
+      # registration scopes yourself. The data holder may answer with
+      # +error=invalid_idp+ on the redirect URI; the client "MAY" retry with a
+      # different +idp+ or without Tiered OAuth. Without +idp:+ the request is
+      # unchanged.
+      #
       # @param scopes [Array<String>, String, nil] requested scopes; falls back to configured +scopes+
+      # @param idp [String, nil] base URL (OIDC issuer) of the preferred IdP for Tiered OAuth;
+      #   +nil+ (default) builds a standard authorization request
       # @param community [String, nil] optional UDAP community URI for discovery
       # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
       #   for signed metadata validation
@@ -422,26 +447,31 @@ module Safire
       # @raise [Safire::Errors::ConfigurationError] when +client_id+, +redirect_uri+, or scopes
       #   are missing, or a scope source is not a String or Array
       # @raise [Safire::Errors::ValidationError] when a scope contains characters outside the
-      #   RFC 6749 scope-token set
+      #   RFC 6749 scope-token set, or +idp+ is not an absolute HTTPS URL with a host and no
+      #   fragment (attribute +:idp+)
       # @raise [Safire::Errors::DiscoveryError] when trusted UDAP discovery fails, the server does
-      #   not advertise the +authorization_code+ grant, or +authorization_endpoint+ is missing or unusable
+      #   not advertise the +authorization_code+ grant, +authorization_endpoint+ is missing or unusable,
+      #   or (with +idp+) the server does not advertise +udap_to+ and the +udap+ scope
       # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
       #   or a redirect to a non-HTTPS URL during discovery
       # @see https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow
-      def authorization_url(scopes: nil, community: nil, trusted_anchors: [], crls: [], revocation_checker: nil,
-                            verify_chain: true)
+      # @see https://hl7.org/fhir/us/udap-security/STU2/user.html
+      def authorization_url(scopes: nil, idp: nil, community: nil, trusted_anchors: [], crls: [],
+                            revocation_checker: nil, verify_chain: true)
         validate_authorization_identity!
+        tiered = tiered_oauth_request(idp)
         scopes = resolve_token_scopes(scopes)
+        scopes = tiered.scopes(scopes) if tiered
         community = normalize_community(community)
         discovered = server_metadata(community:, trusted_anchors:, crls:, revocation_checker:, verify_chain:)
         endpoint = UdapAuthorizationRequestReadiness.new(
           metadata: discovered,
           discovery_endpoint: well_known_endpoint(community:),
           allow_insecure_localhost: @allow_insecure_localhost
-        ).evaluate!(scopes:)
+        ).evaluate!(scopes:, tiered_oauth: !tiered.nil?)
 
         Safire.logger.info(AUTHORIZATION_ACTION)
-        build_udap_authorization_response(endpoint, scopes)
+        build_udap_authorization_response(endpoint, scopes, tiered&.params || {})
       end
 
       # Exchanges an authorization code for an access token with UDAP
@@ -628,7 +658,13 @@ module Safire
         raise Errors::ConfigurationError.new(missing_attributes: missing) if missing.any?
       end
 
-      def build_udap_authorization_response(endpoint, scopes)
+      def tiered_oauth_request(idp)
+        return if idp.nil?
+
+        UdapTieredAuthorizationRequest.new(idp:, allow_insecure_localhost: @allow_insecure_localhost)
+      end
+
+      def build_udap_authorization_response(endpoint, scopes, extension_params)
         code_verifier = PKCE.generate_code_verifier
         state = SecureRandom.urlsafe_base64(STATE_BYTES)
         params = {
@@ -639,7 +675,7 @@ module Safire
           state:,
           code_challenge: PKCE.generate_code_challenge(code_verifier),
           code_challenge_method: PKCE_METHOD
-        }
+        }.merge(extension_params)
         { auth_url: append_query(endpoint, params), state:, code_verifier: }
       end
 

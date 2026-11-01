@@ -67,7 +67,11 @@ module Safire
   #   +redirect_uri+ (identical to the authorization request), +code_verifier+, and a signed
   #   Authentication Token (+client_assertion+, no +extensions+ by default) with +udap=1+; no
   #   +Authorization+ header or client secret. Pass the same +community:+ and trust keywords.
-  # * UDAP refresh token and Tiered OAuth are not implemented yet and raise +NotImplementedError+.
+  # * {#refresh_token} — refresh token grant. For +protocol: :udap+ (see
+  #   {Safire::Protocols::Udap#refresh_token}) Safire authenticates with an Authentication Token
+  #   "in the same manner as for initial token requests" (STU2 b2b §5.3); +scope+ is sent only
+  #   when +scopes:+ is given, and then must satisfy the STU2 §7.3 wildcard rule.
+  # * UDAP Tiered OAuth is not implemented yet.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration

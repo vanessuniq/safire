@@ -13,11 +13,13 @@ module Safire
     # interactive B2B apps (per
     # {https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow
     # STU2 §7.2}) and exchanges the resulting codes for access tokens with
-    # UDAP JWT-based client authentication.
+    # UDAP JWT-based client authentication, and refreshes them (RFC 6749 §6,
+    # {https://hl7.org/fhir/us/udap-security/STU2/b2b.html#refresh-tokens
+    # STU2 §5.3}).
     # Discovery results are cached per community within each instance.
     #
-    # Other UDAP flows (refresh token and Tiered OAuth) raise
-    # +NotImplementedError+ and remain planned for future releases.
+    # Tiered OAuth raises +NotImplementedError+ and remains planned for a
+    # future release.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not
     # instantiate it directly — use {Safire::Client} instead.
@@ -45,11 +47,14 @@ module Safire
       PKCE_METHOD = 'S256'.freeze
       AUTHORIZATION_CODE_GRANT = 'authorization_code'.freeze
       AUTHORIZATION_CODE_ACTION = 'Requesting UDAP access token (authorization_code grant)...'.freeze
+      REFRESH_TOKEN_GRANT = 'refresh_token'.freeze
+      REFRESH_TOKEN_ACTION = 'Refreshing UDAP access token (refresh_token grant)...'.freeze
       private_constant :REGISTRATION_HEADERS, :SUCCESSFUL_REGISTRATION_STATUSES, :SUCCESSFUL_CANCELLATION_STATUSES,
                        :MANDATORY_REGISTRATION_ALGORITHM, :REGISTER_ACTION, :CANCEL_ACTION, :TOKEN_HEADERS,
                        :CLIENT_ASSERTION_TYPE, :CLIENT_CREDENTIALS_GRANT, :CLIENT_CREDENTIALS_ACTION,
                        :SCOPE_TOKEN_PATTERN, :AUTHORIZATION_ACTION, :STATE_BYTES, :PKCE_METHOD,
-                       :AUTHORIZATION_CODE_GRANT, :AUTHORIZATION_CODE_ACTION
+                       :AUTHORIZATION_CODE_GRANT, :AUTHORIZATION_CODE_ACTION, :REFRESH_TOKEN_GRANT,
+                       :REFRESH_TOKEN_ACTION
 
       def initialize(config)
         @base_url = config.base_url
@@ -527,6 +532,91 @@ module Safire
         raise token_error_from(e)
       end
 
+      # Exchanges a refresh token for a new access token with UDAP JWT-based
+      # client authentication (RFC 6749 §6).
+      #
+      # STU2 lets authorization servers issue refresh tokens to consumer-facing
+      # apps ({https://hl7.org/fhir/us/udap-security/STU2/consumer.html#refresh-tokens
+      # STU2 §4.3}) and to B2B apps using the authorization code grant
+      # ({https://hl7.org/fhir/us/udap-security/STU2/b2b.html#refresh-tokens
+      # STU2 §5.3}): "Client apps authenticate to the Authorization Server for
+      # refresh requests by constructing and including an Authentication Token
+      # in the same manner as for initial token requests." "Refresh tokens are
+      # not used with the client credentials grant type."
+      #
+      # The form-encoded body contains exactly +grant_type=refresh_token+,
+      # +refresh_token+, optional +scope+, +client_assertion_type+,
+      # +client_assertion+, and +udap=1+; no +Authorization+ header,
+      # +client_id+, or +client_secret+. The Authentication Token is built as
+      # for {#request_access_token} (no +extensions+ claim by default;
+      # +hl7-b2b+ rejected).
+      #
+      # +scope+ is sent only when +scopes:+ yields at least one scope. Configured
+      # scopes are not used: RFC 6749 §6 treats an omitted scope as the scope
+      # originally granted, and a requested scope "MUST NOT include any scope
+      # not originally granted" (RFC text not fetched here). When sent, the
+      # token-request wildcard rule of
+      # {https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation
+      # STU2 §7.3} applies: an unadvertised wildcard raises before signing.
+      #
+      # If +grant_types_supported+ does not list +refresh_token+, Safire logs a
+      # value-free warning and proceeds: the server issued the refresh token
+      # and decides whether to accept it. Other token readiness failures raise
+      # as for {#request_access_token}.
+      #
+      # @param refresh_token [String] refresh token issued by the authorization server
+      # @param scopes [Array<String>, String, nil] optional scopes to request (no fallback to configured scopes)
+      # @param extensions [Hash{String, Symbol => Hash}, nil] optional Authorization Extension
+      #   Objects keyed by extension name; must not contain +hl7-b2b+
+      # @param community [String, nil] optional UDAP community URI for discovery
+      # @param trusted_anchors [Array<OpenSSL::X509::Certificate>] server trust anchors
+      #   for signed metadata validation
+      # @param crls [Array<OpenSSL::X509::CRL>] revocation lists for signed metadata validation
+      # @param revocation_checker [#call, nil] custom server certificate revocation policy
+      # @param verify_chain [Boolean] whether discovery signed_metadata chain validation is required
+      # @param private_key [OpenSSL::PKey::RSA, OpenSSL::PKey::EC, String, nil]
+      #   client signing private key; defaults to configuration
+      # @param certificate_chain [Array<String, OpenSSL::X509::Certificate>, nil]
+      #   leaf-first client signing certificate chain; defaults to configuration
+      # @param jwt_algorithm [String, nil] optional explicit Authentication Token signing algorithm
+      # @return [Hash] token response from the authorization server, including a non-blank
+      #   +"access_token"+; a rotated +"refresh_token"+ may be present and replaces the old one
+      # @raise [Safire::Errors::ConfigurationError] when +client_id+, +private_key+, or
+      #   +certificate_chain+ are missing, a scope source is not a String or Array, or signing
+      #   configuration is invalid
+      # @raise [Safire::Errors::ValidationError] when +refresh_token+ is not a non-blank String,
+      #   a scope is malformed or an unadvertised wildcard, or +extensions:+ is invalid
+      # @raise [Safire::Errors::DiscoveryError] when trusted UDAP discovery fails, the metadata
+      #   cannot support a token request, or +scopes_supported+ is unusable while a wildcard is sent
+      # @raise [Safire::Errors::CertificateError] when the client certificate chain cannot support signing
+      # @raise [Safire::Errors::TokenError] when the server rejects the request (for example
+      #   +invalid_grant+) or returns a body without a non-blank +access_token+
+      # @raise [Safire::Errors::NetworkError] on connection failure, timeout, SSL error,
+      #   or a redirect to a non-HTTPS URL
+      # @see https://hl7.org/fhir/us/udap-security/STU2/b2b.html#refresh-tokens
+      def refresh_token(refresh_token:, scopes: nil, extensions: nil, community: nil, trusted_anchors: [],
+                        crls: [], revocation_checker: nil, verify_chain: true,
+                        private_key: @private_key, certificate_chain: @certificate_chain,
+                        jwt_algorithm: @jwt_algorithm)
+        validate_token_identity!(private_key, certificate_chain)
+        requested_scopes = normalize_token_scopes(scopes).presence
+        request = {
+          grant_type: REFRESH_TOKEN_GRANT,
+          action: REFRESH_TOKEN_ACTION,
+          form: refresh_token_form(refresh_token, requested_scopes),
+          scopes: requested_scopes,
+          extensions: user_grant_extensions(extensions, REFRESH_TOKEN_GRANT),
+          community: normalize_community(community)
+        }
+        submit_user_grant_token_request(
+          request,
+          trust: { trusted_anchors:, crls:, revocation_checker:, verify_chain: },
+          signing: { private_key:, certificate_chain:, jwt_algorithm: }
+        )
+      rescue Faraday::Error => e
+        raise token_error_from(e)
+      end
+
       private
 
       # -- authorization code request ----------------------------------------
@@ -877,6 +967,12 @@ module Safire
         code_verifier
       rescue ArgumentError => e
         raise Errors::ValidationError.new(attribute: :code_verifier, reason: e.message)
+      end
+
+      def refresh_token_form(refresh_token, scopes)
+        form = { grant_type: REFRESH_TOKEN_GRANT, refresh_token: required_token_string!(refresh_token, :refresh_token) }
+        form[:scope] = scopes.join(' ') if scopes
+        form
       end
 
       def submit_user_grant_token_request(request, trust:, signing:)

@@ -119,6 +119,44 @@ RSpec.describe Safire::Protocols::UdapTokenRequestReadiness do
         expect { auth_code.evaluate!(extension_keys: ['hl7-b2b']) }
           .to raise_error(Safire::Errors::DiscoveryError, /authorization_code grant/)
       end
+
+      context 'with the refresh_token grant' do
+        let(:refresh) { described_class.new(metadata:, grant_type: 'refresh_token', discovery_endpoint:) }
+        let(:refresh_warning) do
+          '[UDAP] grant_types_supported does not advertise refresh_token; proceeding because the ' \
+            'authorization server issued the refresh token and decides whether to accept it'
+        end
+
+        before { overrides['udap_authorization_extensions_required'] = nil }
+
+        [['authorization_code'], [], nil, 'refresh_token'].each do |grants|
+          it "warns instead of raising when grant_types_supported is #{grants.inspect}" do
+            overrides['grant_types_supported'] = grants
+
+            expect(refresh.evaluate!(extension_keys: []).token_endpoint).to eq(token_endpoint)
+            expect(messages).to contain_exactly(refresh_warning)
+          end
+        end
+
+        it 'does not warn when refresh_token is advertised' do
+          refresh.evaluate!(extension_keys: [])
+
+          expect(messages).to be_empty
+        end
+
+        it 'reports a later hard failure without emitting the grant warning' do
+          overrides['grant_types_supported'] = ['authorization_code']
+          overrides['token_endpoint'] = 'http://auth.example.com/token'
+
+          expect { refresh.evaluate!(extension_keys: []) }.to raise_error(Safire::Errors::DiscoveryError, /HTTPS/)
+          expect(messages).to be_empty
+        end
+
+        it 'enforces the token-request wildcard rule when scopes are sent' do
+          expect { refresh.evaluate!(scopes: ['user/*.rs'], extension_keys: []) }
+            .to raise_error(Safire::Errors::ValidationError) { |error| expect(error.attribute).to eq(:scope) }
+        end
+      end
     end
 
     describe 'token_endpoint' do

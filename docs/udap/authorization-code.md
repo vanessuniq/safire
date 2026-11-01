@@ -14,7 +14,7 @@ description: "Run the UDAP Security STU2 authorization code flow for consumer-fa
 Safire implements the UDAP Security STU2
 [authorization code flow](https://hl7.org/fhir/us/udap-security/STU2/general.html#authorization-code-flow)
 on a `protocol: :udap` client through the same facade methods as SMART:
-`Safire::Client#authorization_url` and `#request_access_token`.
+`Safire::Client#authorization_url`, `#request_access_token`, and `#refresh_token`.
 
 ## Table of contents
 {: .no_toc .text-delta }
@@ -154,7 +154,7 @@ before it exchanges the code. General §7.2.1:
 ```ruby
 expected = session.delete(:udap_state)
 unless expected && params[:state].is_a?(String) &&
-       Rack::Utils.secure_compare(params[:state], expected)
+       OpenSSL.secure_compare(params[:state], expected)
   halt 401, 'state mismatch'
 end
 halt 400, params[:error] if params[:error]
@@ -229,6 +229,50 @@ The response is returned as sent once it is a JSON object with a non-blank
 `access_token`. It may include `refresh_token`, `id_token`, `scope`, and SMART
 context such as `patient`. The server "**MAY** grant all scopes requested ...
 or a subset thereof" (§7.3), so read `scope`.
+
+## Step 4: refresh the access token
+
+```ruby
+refreshed = client.refresh_token(
+  refresh_token:   stored_refresh_token,
+  trusted_anchors: [udap_ca],
+  crls:            [udap_crl]
+)
+
+stored_refresh_token = refreshed['refresh_token'] || stored_refresh_token
+```
+
+STU2 lets servers issue refresh tokens to consumer-facing apps
+([§4.3](https://hl7.org/fhir/us/udap-security/STU2/consumer.html#refresh-tokens))
+and to B2B apps that use the authorization code grant
+([§5.3](https://hl7.org/fhir/us/udap-security/STU2/b2b.html#refresh-tokens)).
+"Refresh tokens are not used with the client credentials grant type." Clients
+"authenticate to the Authorization Server for refresh requests by constructing
+and including an Authentication Token in the same manner as for initial token
+requests".
+
+Safire POSTs `grant_type=refresh_token`, `refresh_token`, optional `scope`,
+`client_assertion_type`, `client_assertion`, and `udap=1` to the signed
+`token_endpoint`. It sends no `Authorization` header, `client_id`, or client
+secret. The Authentication Token is built as in step 3, with no `extensions`
+claim by default and `hl7-b2b` rejected. Keywords match step 3, except that
+`refresh_token:` replaces `code:` and `code_verifier:`, and `scopes:` is
+optional.
+
+- **Scope.** `scope` is sent only when `scopes:` yields a scope. Configured
+  scopes are **not** used. RFC 6749 §6 treats an omitted scope as the scope
+  originally granted, and a requested scope must not exceed it. If you send
+  scopes, the token-request rule in §7.3 applies: an unadvertised wildcard
+  raises `ValidationError` before anything is signed, and unusable
+  `scopes_supported` raises `DiscoveryError` when a wildcard is sent. This is
+  stricter than step 1, which only warns.
+- **Grant advertisement.** If `grant_types_supported` does not list
+  `refresh_token`, Safire logs a warning and still sends the request. The
+  server issued the refresh token, so it decides whether to accept it. Other
+  readiness checks raise as in step 3. If `udap_authorization_extensions_required`
+  lists extensions, Safire warns as in step 3.
+- **Rotation.** If the response contains a new `refresh_token`, store it in
+  place of the old one.
 
 ## Discovery readiness
 

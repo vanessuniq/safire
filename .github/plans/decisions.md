@@ -259,3 +259,17 @@ headings):
   instead of the client_credentials `ValidationError`.
 - **Alternatives:** hard-fail like client_credentials (would make
   authorization_code impossible against such servers); silently ignore.
+
+## D-21 ActiveSupport 7.1 floor keeps three advisories (exception)
+
+- **Context (audit B-11, #370):** `gemfiles/activesupport_71.gemfile.lock`
+  (the CI floor job) resolves activesupport 7.1.6, the last 7.1.x release;
+  CVE-2026-33169, CVE-2026-33170, CVE-2026-33176 have no 7.1.x fix. The gem's
+  runtime requirement is `activesupport >= 7.1, < 9`; consumers choose their
+  own resolved version.
+- **Decision:** documented exception for v0.5.0 (the lock only drives the CI
+  floor job). Raising the floor to `>= 7.2.3.1` changes the supported-version
+  policy and is left to the maintainer. **Open for maintainer decision.**
+- **Related enhancement:** CI audits only the root `Gemfile.lock`; adding
+  `--gemfile-lock` audits for the demo and floor locks is proposed in #370's
+  PR, not implemented.

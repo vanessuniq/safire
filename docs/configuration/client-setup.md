@@ -71,9 +71,9 @@ Selects the authorization protocol. Defaults to `:smart`.
 | Value | Status | Description |
 |-------|--------|-------------|
 | `:smart` | Implemented | SMART App Launch 2.2.0 |
-| `:udap` | Partial | UDAP Security STU2 discovery and Dynamic Client Registration — `server_metadata` validates `signed_metadata`, supports optional `community:`, and accepts trust policy keywords (`trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:`); `register_client` and `cancel_registration` submit certificate-backed UDAP registration lifecycle requests; auth/token flows raise `NotImplementedError` |
+| `:udap` | Partial | UDAP Security STU2 discovery and Dynamic Client Registration — `server_metadata` validates `signed_metadata`, supports optional `community:`, and accepts trust policy keywords (`trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:`); `register_client` and `cancel_registration` submit certificate-backed UDAP registration lifecycle requests; `request_backend_token` requests B2B `client_credentials` tokens with UDAP JWT client authentication; authorization code and refresh flows raise `NotImplementedError` |
 
-For UDAP, `client_type:` is not applicable. Passing any explicit value, either at initialization or through `client.client_type=`, raises `Safire::Errors::ConfigurationError`. Future UDAP authentication flows will use signed JWT assertions rather than SMART client types.
+For UDAP, `client_type:` is not applicable. Passing any explicit value, either at initialization or through `client.client_type=`, raises `Safire::Errors::ConfigurationError`. UDAP token requests authenticate with signed Authentication Tokens (certificate-backed JWT client authentication) rather than SMART client types.
 
 ```ruby
 client = Safire::Client.new(
@@ -138,8 +138,8 @@ certificate objects, so subsequent caller mutations cannot alter the configured
 identity. Safire performs PEM parsing, private-key matching, validity checks,
 and URI SAN checks when a software statement is built.
 
-Configured credentials are intended to serve as defaults for UDAP Dynamic
-Client Registration, with per-call overrides for applications that select
+Configured credentials serve as defaults for UDAP Dynamic Client Registration
+and UDAP B2B token requests, with per-call overrides for applications that select
 signing identities dynamically. UDAP discovery does not access these signing
 credentials.
 
@@ -272,7 +272,7 @@ config.inspect
 
 ## Next Steps
 
-- [Logging]({{ site.baseurl }}/configuration/logging/) — configure Safire's logger and HTTP request logging
+- [Logging]({% link configuration/logging.md %}) — configure Safire's logger and HTTP request logging
 - [UDAP]({{ site.baseurl }}/udap/) — discover UDAP metadata and register certificate-backed clients
 - [SMART Dynamic Client Registration]({{ site.baseurl }}/smart-on-fhir/dynamic-client-registration/) — obtain a `client_id` at runtime using RFC 7591
 - [SMART App Launch Workflows]({{ site.baseurl }}/smart-on-fhir/) — step-by-step authorization flow guides

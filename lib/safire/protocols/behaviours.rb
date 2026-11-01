@@ -40,7 +40,7 @@ module Safire
         raise NotImplementedError, "#{self.class}#token_response_valid? is not implemented"
       end
 
-      # Requests an access token using the client credentials grant (SMART Backend Services).
+      # Requests an access token using the client credentials grant (SMART Backend Services or UDAP B2B).
       # @abstract
       def request_backend_token(...)
         raise NotImplementedError, "#{self.class}#request_backend_token is not implemented"

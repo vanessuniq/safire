@@ -86,7 +86,7 @@ client = Safire::Client.new(config)
 > `client_type:` is not used for backend services — `request_backend_token` always authenticates via JWT assertion regardless of `client_type`.
 
 {: .warning }
-> Safire v0.4.x retains a deprecated `system/*.rs` fallback when scopes are
+> Safire v0.4.1 through v0.5.x retains a deprecated `system/*.rs` fallback when scopes are
 > absent. It logs a warning and will be removed in v0.6.0, when the same call
 > will raise `ConfigurationError`.
 

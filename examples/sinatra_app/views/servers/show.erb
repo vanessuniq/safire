@@ -152,6 +152,16 @@
               </a>
             </article>
           <% end %>
+
+          <article class="action-card">
+            <span class="action-kicker">Client Credentials</span>
+            <h3>B2B Token</h3>
+            <p>Request a <code>client_credentials</code> token with an <code>hl7-b2b</code> authorization extension.</p>
+            <a href="/demo/<%= @server.id %>/udap-token"
+               class="btn <%= @server.udap_client_id.present? ? 'btn-primary' : 'btn-secondary' %>">
+              Request B2B Token
+            </a>
+          </article>
         </div>
       </section>
     <% end %>

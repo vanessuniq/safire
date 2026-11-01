@@ -1,6 +1,6 @@
 # Safire Roadmap
 
-## Latest Published Release — v0.4.1
+## Latest Published Release — v0.5.0
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
 
@@ -41,19 +41,16 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   discovery, certification envelope handling, RFC 7591-shaped registration
   response parsing, and cancellation confirmation through an empty
   `grant_types` response
-- **UDAP Registration Wildcard Enforcement** (on `main`, unreleased; see
-  [CHANGELOG.md](CHANGELOG.md#unreleased)) — new registration and modification
+- **UDAP Registration Wildcard Enforcement** — new registration and modification
   reject a requested wildcard scope not advertised exactly in
   `scopes_supported` (`ValidationError`), and reject unusable
   `scopes_supported` when a wildcard must be evaluated (`DiscoveryError`),
   replacing the v0.4.1 deprecation warning; cancellation remains warning-only
   so scope-advertisement drift cannot block credential cleanup
-- **UDAP Authentication Tokens** (on `main`, unreleased; see
-  [CHANGELOG.md](CHANGELOG.md#unreleased)) — certificate-backed JWT client
+- **UDAP Authentication Tokens** — certificate-backed JWT client
   authentication for token endpoint requests, using authoritative signed
   discovery metadata
-- **B2B Client Credentials** (on `main`, unreleased; see
-  [CHANGELOG.md](CHANGELOG.md#unreleased)) — headless system-to-system
+- **B2B Client Credentials** — headless system-to-system
   authorization through `Client#request_backend_token` on `protocol: :udap`,
   with the STU2 `hl7-b2b` authorization extension and discovery-constrained
   scopes, signing algorithms, and extension support
@@ -63,7 +60,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **Protocol-Aware Workflows** — Sinatra demo supports protocol-aware server
   setup, SMART discovery, registration, authorization, and token workflows,
   plus UDAP signed metadata discovery, the registration/cancellation
-  lifecycle, and (on `main`, unreleased) B2B client_credentials token requests
+  lifecycle, and B2B client_credentials token requests
 
 ---
 

@@ -57,6 +57,13 @@ module SafireCompliance
           </tr>
           <% end %>
         </table>
+        <% if report.dig(:harness, :orchestration_error) %>
+        <p><strong>Orchestration error:</strong> <%= h(report.dig(:harness, :orchestration_error)) %></p>
+        <% end %>
+        <% if Array(report[:missing_inferno_results]).any? %>
+        <p><strong>Missing required Inferno results:</strong>
+           <%= h(Array(report[:missing_inferno_results]).join(', ')) %></p>
+        <% end %>
         <p>Harness FHIR read with the issued token (performed by the harness, not Safire):
            HTTP <%= h(report.dig(:harness, :fhir_read_status)) %></p>
       </body>

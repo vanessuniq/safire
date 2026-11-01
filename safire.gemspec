@@ -6,11 +6,12 @@ Gem::Specification.new do |spec|
   spec.version               = Safire::VERSION
   spec.authors               = ['Vanessa Fotso']
   spec.email                 = ['vanessuniq@gmail.com']
-  spec.summary               = 'SMART App Launch and UDAP discovery and registration for Ruby'
+  spec.summary               = 'SMART App Launch and UDAP Security client library for Ruby'
   spec.description           = 'A Ruby gem implementing SMART App Launch 2.2.0 and UDAP Security STU2 for ' \
                                'healthcare client applications. It supports SMART OAuth 2.0 authorization, PKCE, ' \
-                               'private_key_jwt assertions, Backend Services, UDAP signed metadata discovery, and ' \
-                               'certificate-backed UDAP Dynamic Client Registration.'
+                               'private_key_jwt assertions, Backend Services, UDAP signed metadata discovery, ' \
+                               'certificate-backed UDAP Dynamic Client Registration, and UDAP B2B client_credentials ' \
+                               'tokens with JWT client authentication.'
   spec.homepage              = 'https://github.com/vanessuniq/safire'
   spec.license               = 'Apache-2.0'
   spec.required_ruby_version = '>= 3.2'

@@ -49,7 +49,7 @@ auth_endpoint = metadata[:authorization_endpoint]
 ```
 
 {: .note }
-> Cache the serialised hash (`to_hash`), not the `SmartMetadata` object itself — the object holds an HTTPClient reference that does not serialise cleanly.
+> Cache the serialised hash (`to_hash`), not the `SmartMetadata` object itself. A plain Hash of the discovered fields serialises predictably with any cache store and does not tie cached entries to Safire's internal class layout.
 
 ---
 
@@ -131,9 +131,8 @@ class TokenManager
   end
 
   def self.refresh_token(session)
-    client        = build_client(session)
-    token_params  = { refresh_token: session[:refresh_token] }
-    response      = client.refresh_token(token_params)
+    client   = build_client(session) # your Safire::Client setup (see "Complete Rails Example")
+    response = client.refresh_token(refresh_token: session[:refresh_token])
 
     session[:access_token]     = response['access_token']
     session[:refresh_token]    = response['refresh_token'] || session[:refresh_token]
@@ -146,24 +145,39 @@ end
 
 ### Retry with Exponential Backoff
 
-For transient failures during token exchange:
+Retry only failures that are likely to be transient:
+
+- `Safire::Errors::NetworkError` — connection failure, timeout, or SSL error (no HTTP response was received).
+- `Safire::Errors::TokenError` with a `status` of 5xx or 429 — the server answered but was unavailable or rate-limiting.
+
+Do not retry other `TokenError`s (such as `invalid_grant` or `invalid_client`); they will fail the same way again.
 
 ```ruby
-def exchange_with_retry(client, params, max_attempts: 3)
+TRANSIENT_STATUSES = [429, 500, 502, 503, 504].freeze
+
+def with_token_retry(max_attempts: 3)
   attempts = 0
 
   begin
     attempts += 1
-    client.exchange_code_for_token(params)
-  rescue Safire::Errors::TokenError => e
+    yield
+  rescue Safire::Errors::NetworkError, Safire::Errors::TokenError => e
     raise if attempts >= max_attempts
-    raise unless e.message.match?(/timeout|503|429/i)
+    raise if e.is_a?(Safire::Errors::TokenError) && !TRANSIENT_STATUSES.include?(e.status)
 
     sleep(2**attempts)
     retry
   end
 end
+
+# Refreshing an access token
+token_response = with_token_retry do
+  client.refresh_token(refresh_token: session[:refresh_token])
+end
 ```
+
+{: .warning }
+> Do not wrap `request_access_token(code:, code_verifier:)` in a retry. Authorization codes are single-use: after a timeout or a 5xx the server may already have consumed the code, so a second attempt fails with `invalid_grant`. Start a new authorization request instead. Likewise, if your server rotates refresh tokens, a retried refresh after a timeout can fail because the original refresh token was already used.
 
 ### Custom Scopes Per Request
 

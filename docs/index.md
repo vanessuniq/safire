@@ -3,7 +3,7 @@ layout: default
 title: Home
 nav_order: 1
 permalink: /
-description: "Safire implements SMART App Launch 2.2.0 plus UDAP Security STU2 discovery and Dynamic Client Registration for Ruby clients."
+description: "Safire implements SMART App Launch 2.2.0 plus UDAP Security STU2 discovery, Dynamic Client Registration, and B2B client credentials for Ruby clients."
 ---
 
 # Safire Documentation
@@ -11,7 +11,7 @@ description: "Safire implements SMART App Launch 2.2.0 plus UDAP Security STU2 d
 [![Gem Version](https://badge.fury.io/rb/safire.svg)](https://badge.fury.io/rb/safire)
 [![CI](https://github.com/vanessuniq/safire/workflows/CI/badge.svg)](https://github.com/vanessuniq/safire/actions)
 
-A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app-launch/)** flows and **[UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html)** discovery and Dynamic Client Registration for clients.
+A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app-launch/)** flows and **[UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html)** discovery, Dynamic Client Registration, and B2B client credentials for clients.
 
 ## Quick Navigation
 
@@ -20,7 +20,7 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 | [Getting Started]({{ site.baseurl }}/installation/) | Install Safire and quick start guide |
 | [Configuration]({{ site.baseurl }}/configuration/) | All configuration options and parameters |
 | [SMART]({{ site.baseurl }}/smart-on-fhir/) | App Launch (Public, Confidential Symmetric, Confidential Asymmetric) and Backend Services |
-| [UDAP]({{ site.baseurl }}/udap/) | UDAP Security discovery plus certificate-backed Dynamic Client Registration |
+| [UDAP]({{ site.baseurl }}/udap/) | UDAP Security discovery, certificate-backed Dynamic Client Registration, and B2B client credentials |
 | [Security Guide]({{ site.baseurl }}/security/) | HTTPS, credential protection, token storage, key rotation |
 | [Advanced Examples]({{ site.baseurl }}/advanced/) | Caching, multi-server, token management, complete Rails integration |
 | [Troubleshooting]({{ site.baseurl }}/troubleshooting/) | Common issues and solutions |
@@ -42,8 +42,10 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 - Discovery (`/.well-known/udap`) with optional community scoping
 - Dynamic Client Registration metadata validation and normalization
 - X.509-backed software-statement signing for registration, modification, and cancellation
+- B2B `client_credentials` access tokens with UDAP JWT client authentication
+  (Authentication Tokens) and the `hl7-b2b` Authorization Extension Object
 
-JWT assertion authentication and Tiered OAuth remain planned. See
+The UDAP authorization code and refresh grants and Tiered OAuth remain planned. See
 [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
 details.
 
@@ -56,7 +58,8 @@ bin/demo
 ```
 
 Visit http://localhost:4567 to test SMART registration and authorization flows,
-UDAP signed metadata discovery, and the UDAP registration lifecycle.
+UDAP signed metadata discovery, the UDAP registration lifecycle, and UDAP B2B
+client_credentials token requests.
 
 See [`examples/sinatra_app/README.md`](https://github.com/vanessuniq/safire/tree/main/examples/sinatra_app) for details.
 

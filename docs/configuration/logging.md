@@ -82,5 +82,5 @@ This only affects the **default logger**. If you set `config.logger` in `Safire.
 
 ## Next Steps
 
-- [Client Setup]({{ site.baseurl }}/configuration/client-setup/) — client parameters, protocol, and credential protection
+- [Client Setup]({% link configuration/client-setup.md %}) — client parameters, protocol, and credential protection
 - [Troubleshooting]({{ site.baseurl }}/troubleshooting/) — common issues and solutions

@@ -1,0 +1,167 @@
+<% presenter = @udap_token_presenter %>
+
+<div class="page-header">
+  <div>
+    <h1>UDAP B2B Token Request</h1>
+    <p class="server-url"><%= h(@server.base_url) %></p>
+  </div>
+  <div class="page-actions">
+    <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Server</a>
+  </div>
+</div>
+
+<section class="registration-workspace">
+  <div class="status-grid">
+    <article class="status-tile <%= presenter.credentials_configured? ? 'status-ready' : 'status-warning' %>">
+      <span class="eyebrow">Client Signing</span>
+      <strong><%= presenter.credentials_configured? ? 'Ready' : 'Not configured' %></strong>
+      <% unless presenter.credentials_configured? %>
+        <p>UDAP client signing credentials are not configured.</p>
+      <% end %>
+    </article>
+
+    <article class="status-tile <%= presenter.development_trust_mode? ? 'status-warning' : 'status-ready' %>">
+      <span class="eyebrow">Server Trust</span>
+      <strong><%= presenter.development_trust_mode? ? 'Development mode' : 'Chain verification' %></strong>
+      <% if presenter.development_trust_mode? %>
+        <p>Signed metadata chain or revocation checks are disabled.</p>
+      <% end %>
+    </article>
+
+    <article class="status-tile">
+      <span class="eyebrow">Stored UDAP Client</span>
+      <strong><%= @server.udap_client_id.present? ? 'Registered' : 'None' %></strong>
+      <% if @server.udap_client_id.present? %>
+        <code><%= h(@server.udap_client_id) %></code>
+      <% end %>
+    </article>
+  </div>
+
+  <% if presenter.display_error %>
+    <div class="warning-box" role="alert">
+      <strong>UDAP token request failed (<%= h(presenter.error_label) %>).</strong>
+      <% if presenter.oauth_error_code %>
+        <span>OAuth error: <code><%= h(presenter.oauth_error_code) %></code></span>
+      <% end %>
+      <span><%= h(presenter.display_error.message) %></span>
+    </div>
+  <% end %>
+
+  <% if presenter.success? %>
+    <div class="success-box">
+      <strong>Token obtained.</strong>
+      <span>The access token is masked; this demo does not store or display bearer tokens in full.</span>
+    </div>
+
+    <section class="result-panel">
+      <h2>Token Result</h2>
+      <dl class="details-list">
+        <dt>Access Token</dt>
+        <dd><code><%= h(presenter.masked_access_token) %></code></dd>
+
+        <dt>Token Type</dt>
+        <dd><%= h(presenter.safe_token_response['token_type'] || 'Not specified') %></dd>
+
+        <dt>Expires In</dt>
+        <% expires_in = presenter.safe_token_response['expires_in'] %>
+        <dd><%= h(expires_in.nil? ? 'Not specified' : "#{expires_in} seconds") %></dd>
+
+        <dt>Granted Scope</dt>
+        <dd>
+          <% if presenter.granted_scopes.any? %>
+            <% presenter.granted_scopes.each do |scope| %>
+              <span class="badge badge-scope"><%= h(scope) %></span>
+            <% end %>
+          <% else %>
+            <em>Not returned; compare with the requested scope</em>
+          <% end %>
+        </dd>
+      </dl>
+      <pre class="json-display"><%= h(JSON.pretty_generate(presenter.safe_token_response)) %></pre>
+    </section>
+  <% end %>
+
+  <form action="/demo/<%= @server.id %>/udap-token" method="post" class="demo-form udap-token-form">
+    <%= csrf_field %>
+    <div class="form-section">
+      <h3>Client</h3>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="client_id">UDAP Client ID</label>
+          <input type="text" id="client_id" name="client_id" value="<%= h(presenter.client_id) %>" class="form-input" required>
+          <small>Prefilled from this server's stored UDAP registration when one exists.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="community">Community URI</label>
+          <input type="text" id="community" name="community" value="<%= h(presenter.community) %>" class="form-input">
+        </div>
+
+        <div class="form-group form-group-wide">
+          <label for="scope">Scope</label>
+          <input type="text" id="scope" name="scope" value="<%= h(presenter.scope) %>" class="form-input" required>
+          <small>Space or comma-separated scopes. Wildcard scopes must be advertised in <code>scopes_supported</code>.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3>B2B Authorization Extension (<code>hl7-b2b</code>)</h3>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="organization_id">Organization ID (URI)</label>
+          <input type="text" id="organization_id" name="organization_id" value="<%= h(presenter.field_value('organization_id')) %>"
+                 class="form-input" placeholder="https://fhir.example.com/Organization/123" required>
+        </div>
+
+        <div class="form-group">
+          <label for="organization_name">Organization Name</label>
+          <input type="text" id="organization_name" name="organization_name" value="<%= h(presenter.field_value('organization_name')) %>" class="form-input">
+        </div>
+
+        <div class="form-group form-group-wide">
+          <label for="purpose_of_use">Purpose of Use</label>
+          <textarea id="purpose_of_use" name="purpose_of_use" class="form-input" rows="2" required
+                    placeholder="urn:oid:2.16.840.1.113883.5.8#TREAT"><%= h(presenter.field_value('purpose_of_use')) %></textarea>
+          <small>One or more codes, separated by spaces, commas, or new lines.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="subject_name">Subject Name</label>
+          <input type="text" id="subject_name" name="subject_name" value="<%= h(presenter.field_value('subject_name')) %>" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label for="subject_id">Subject ID</label>
+          <input type="text" id="subject_id" name="subject_id" value="<%= h(presenter.field_value('subject_id')) %>" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label for="subject_role">Subject Role</label>
+          <input type="text" id="subject_role" name="subject_role" value="<%= h(presenter.field_value('subject_role')) %>" class="form-input">
+          <small>Subject ID and role require a subject name.</small>
+        </div>
+
+        <div class="form-group form-group-wide">
+          <label for="consent_policy">Consent Policy URIs</label>
+          <textarea id="consent_policy" name="consent_policy" class="form-input" rows="2"><%= h(presenter.field_value('consent_policy')) %></textarea>
+        </div>
+
+        <div class="form-group form-group-wide">
+          <label for="consent_reference">Consent Reference URLs</label>
+          <textarea id="consent_reference" name="consent_reference" class="form-input" rows="2"><%= h(presenter.field_value('consent_reference')) %></textarea>
+          <small>Requires at least one consent policy.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" <%= 'disabled' unless presenter.credentials_configured? %>>
+        Request B2B Token
+      </button>
+      <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</section>

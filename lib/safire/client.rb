@@ -44,16 +44,19 @@ module Safire
   # UDAP clients authenticate via signed JWT assertions (Authentication Token / AnT) with an
   # X.509 certificate chain in the x5c JOSE header; the authentication method is not
   # user-configurable for UDAP. DCR is typically performed once to obtain a client_id, which is
-  # then reused as iss/sub in every subsequent AnT. The unregistered client flow (§8.1) allows
-  # client_credentials grant without prior DCR when identity can be fully determined from
-  # certificate attributes alone.
+  # then reused as iss/sub in every subsequent AnT.
   #
-  # @note Future kwargs (not yet implemented for UDAP):
+  # The grant is selected by the method called, not by configuration:
   #
-  #   flow: [Symbol] the authorization flow for UDAP clients (protocol: :udap):
-  #     :b2b          — client_credentials grant, server-to-server
-  #     :b2c          — authorization_code grant, user-facing
-  #     :tiered_oauth — authorization_code + IdP identity delegation
+  # * {#request_backend_token} — client_credentials grant for both protocols. For
+  #   +protocol: :smart+ it performs SMART Backend Services. For +protocol: :udap+ it performs
+  #   the UDAP Security STU2 B2B client credentials flow (see
+  #   {Safire::Protocols::Udap#request_backend_token}): configured +client_id+, scopes
+  #   (+scopes:+ or configured; required), a required +b2b:+ Hash for the +hl7-b2b+
+  #   Authorization Extension Object, optional additional +extensions:+, and the same
+  #   +community:+ and server trust keywords as {#register_client}.
+  # * UDAP authorization code, refresh token, and Tiered OAuth are not implemented yet and
+  #   raise +NotImplementedError+.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration
@@ -176,6 +179,29 @@ module Safire
   #     crls: [udap_crl]
   #   )
   #   cancellation['grant_types'] # => []
+  #
+  # @example UDAP B2B – client_credentials token with the hl7-b2b extension
+  #   client = Safire::Client.new(
+  #     {
+  #       base_url: 'https://fhir.example.com',
+  #       client_id: registration['client_id'],
+  #       scopes: ['system/Patient.rs'],
+  #       private_key: File.read('client-key.pem'),
+  #       certificate_chain: [File.read('client-cert.pem'), File.read('issuing-ca.pem')]
+  #     },
+  #     protocol: :udap
+  #   )
+  #
+  #   token_data = client.request_backend_token(
+  #     b2b: {
+  #       organization_id: 'https://fhir.example.com/Organization/123',
+  #       organization_name: 'Example Clinic',
+  #       purpose_of_use: ['urn:oid:2.16.840.1.113883.5.8#TREAT']
+  #     },
+  #     trusted_anchors: [udap_ca],
+  #     crls: [udap_crl]
+  #   )
+  #   token_data['access_token']
   class Client
     extend Forwardable
 

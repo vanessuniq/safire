@@ -328,6 +328,60 @@ See [Backend Services — Prerequisites]({% link smart-on-fhir/backend-services/
 
 ---
 
+## UDAP B2B Client Credentials Errors
+
+See [B2B Client Credentials]({% link udap/b2b-client-credentials.md %}) for the full flow.
+
+### `ConfigurationError`: Missing `client_id`, `scopes`, `private_key`, or `certificate_chain`
+
+```
+Safire::Errors::ConfigurationError: Configuration missing: scopes
+```
+
+A UDAP `request_backend_token` call needs the `client_id` from registration, at
+least one scope, and the signing identity. UDAP Security STU2 marks `scope` as
+required for client credentials requests, and Safire has no default scope.
+Configure scopes or pass `scopes:`. Safire raises this error before any HTTP
+request.
+
+### `ValidationError`: `b2b` is required
+
+```
+Safire::Errors::ValidationError: Validation failed for b2b: is required: ...
+```
+
+STU2 requires the `hl7-b2b` B2B Authorization Extension Object for client
+credentials requests. Pass `b2b:` with at least `organization_id` (an absolute
+URI) and `purpose_of_use` (an array of strings). Do not put `hl7-b2b` inside
+`extensions:`; Safire rejects it there.
+
+### `ValidationError` for `extensions`: required extension missing
+
+The server lists an extension in `udap_authorization_extensions_required` that
+the request does not include. The message names the missing extension keys.
+Build that extension object as defined by its implementation guide or trust
+community and pass it with `extensions:`.
+
+### `DiscoveryError` while requesting a UDAP token
+
+The trusted metadata cannot support a client credentials token request. For
+example, `udap_authn` or `client_credentials` may not be advertised,
+`private_key_jwt` may be missing, the signing algorithm list may be empty, or
+the signed `token_endpoint` may not be an HTTPS URL without a fragment. Check
+the metadata for the same `community:` you passed. Safire did not sign or send
+a token request.
+
+### Warnings during a UDAP token request
+
+| Warning | Meaning |
+|---------|---------|
+| `does not advertise the required RS256 baseline` | Safire signs with another advertised, key-compatible algorithm |
+| `does not include udap_authz` | The server should advertise `udap_authz` when it supports client credentials; the request is still sent |
+| `token request extension count=N not listed in udap_authorization_extensions_supported` | The server MAY ignore unrecognized extensions; `hl7-b2b` is still always sent |
+| `requested non-wildcard scope count=N` | Scope coverage is decided by the server; check the granted `scope` in the response |
+
+---
+
 ## Network Errors
 
 ### `NetworkError`: Connection refused or timeout

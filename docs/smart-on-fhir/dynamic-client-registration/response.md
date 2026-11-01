@@ -5,14 +5,14 @@ parent: Dynamic Client Registration
 grand_parent: SMART
 nav_order: 2
 permalink: /smart-on-fhir/dynamic-client-registration/response/
-description: "What register_client returns: client_id, client_secret, echoed fields, building a runtime Safire::Client from the response, and handling DiscoveryError, RegistrationError, and NetworkError."
+description: "What register_client returns: client_id, client_secret, echoed fields, building a runtime Safire::Client from the response, and handling DiscoveryError, RegistrationError, NetworkError, and ConfigurationError."
 ---
 
 # Registration Response
 {: .no_toc }
 
 <div class="code-example" markdown="1">
-On success, `register_client` returns the server's response as a Hash. On failure, it raises `DiscoveryError`, `RegistrationError`, or `NetworkError`.
+On success, `register_client` returns the server's response as a Hash. On failure, it raises `DiscoveryError`, `RegistrationError`, `NetworkError`, or `ConfigurationError`.
 </div>
 
 ## Table of contents
@@ -92,7 +92,7 @@ client = Safire::Client.new(
 
 ## Error Handling
 
-`register_client` raises one of three error classes. All inherit from `Safire::Errors::Error`, so you can rescue any Safire error with a single clause when needed.
+`register_client` raises one of four error classes. All inherit from `Safire::Errors::Error`, so you can rescue any Safire error with a single clause when needed.
 
 ### `Safire::Errors::DiscoveryError`
 
@@ -102,7 +102,8 @@ Raised when no `registration_endpoint:` was passed and the server either does no
 rescue Safire::Errors::DiscoveryError => e
   puts e.message   # "Failed to discover SMART configuration from https://...: server does not advertise a 'registration_endpoint'..."
   puts e.endpoint  # "https://fhir.example.com/.well-known/smart-configuration"
-  puts e.status    # HTTP status code, or nil if the server was unreachable
+  puts e.status    # HTTP status code from discovery, or nil when the failure is not an HTTP status
+                   # (e.g. a missing registration_endpoint); an unreachable server raises NetworkError
 ```
 
 ### `Safire::Errors::RegistrationError`
@@ -142,6 +143,16 @@ rescue Safire::Errors::NetworkError => e
   puts e.error_description # underlying transport error message
 ```
 
+### `Safire::Errors::ConfigurationError`
+
+Raised before any request when the registration endpoint (passed as `registration_endpoint:` or discovered) is not an HTTPS URL, is malformed, or contains a fragment. HTTP `localhost` is accepted only when the client was configured with `allow_insecure_localhost: true`.
+
+```ruby
+rescue Safire::Errors::ConfigurationError => e
+  puts e.message                   # "Configuration requires HTTPS for: registration_endpoint ..."
+  puts e.non_https_uri_attributes  # [:registration_endpoint]
+```
+
 ### Full rescue example
 
 ```ruby
@@ -157,5 +168,7 @@ rescue Safire::Errors::RegistrationError => e
   logger.error("Server rejected registration: #{e.message}")
 rescue Safire::Errors::NetworkError => e
   logger.error("Network failure during registration: #{e.message}")
+rescue Safire::Errors::ConfigurationError => e
+  logger.error("Invalid registration endpoint: #{e.message}")
 end
 ```

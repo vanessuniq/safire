@@ -71,15 +71,18 @@ rescue Safire::Errors::DiscoveryError => e
   case e.message
   when /404/
     puts 'FHIR server does not support SMART App Launch'
-  when /timeout/i
-    puts 'Discovery request timed out'
   when /not a usable JSON object/
     puts 'Server returned invalid SMART configuration'
   else
     puts "Discovery failed: #{e.message}"
   end
+rescue Safire::Errors::NetworkError => e
+  # Transport failures (connection refused, timeout, SSL error) are not DiscoveryErrors
+  puts "Discovery request failed: #{e.message}"
 end
 ```
+
+`DiscoveryError` covers HTTP error statuses and unusable responses from the server. Connection failures, timeouts, and SSL errors raise `Safire::Errors::NetworkError` instead.
 
 **Graceful fallback** — fall back to known endpoints when discovery is unavailable:
 
@@ -91,7 +94,7 @@ def discover_with_fallback(client)
     token_endpoint:         metadata.token_endpoint,
     source:                 :discovery
   }
-rescue Safire::Errors::DiscoveryError => e
+rescue Safire::Errors::DiscoveryError, Safire::Errors::NetworkError => e
   Rails.logger.warn("Discovery failed, using fallback: #{e.message}")
   {
     authorization_endpoint: ENV['FALLBACK_AUTH_ENDPOINT'],

@@ -39,10 +39,19 @@
 
   <% if presenter.authorization_error %>
     <div class="warning-box" role="alert">
-      <strong>Authorization denied by the server. No token was requested.</strong>
+      <% if presenter.invalid_idp? %>
+        <strong>The data holder rejected the preferred IdP (Tiered OAuth). No token was requested.</strong>
+      <% else %>
+        <strong>Authorization denied by the server. No token was requested.</strong>
+      <% end %>
       <span>OAuth error: <code><%= h(presenter.authorization_error[:error]) %></code></span>
       <% if presenter.authorization_error[:error_description] %>
         <span><%= h(presenter.authorization_error[:error_description]) %></span>
+      <% end %>
+      <% if presenter.invalid_idp? %>
+        <span>The data holder does not trust that IdP or cannot obtain a client_id for it.
+          Start a new authorization with a different Preferred IdP, or leave Preferred IdP blank
+          to authorize without Tiered OAuth.</span>
       <% end %>
     </div>
   <% end %>
@@ -132,6 +141,19 @@
           <label for="scope">Scope</label>
           <input type="text" id="scope" name="scope" value="<%= h(presenter.scope) %>" class="form-input" required>
           <small>Space or comma-separated scopes, for example <code>openid fhirUser patient/Patient.rs</code>.</small>
+        </div>
+
+        <div class="form-group form-group-wide">
+          <label for="idp">Preferred IdP (Tiered OAuth, optional)</label>
+          <input type="url" id="idp" name="idp" value="<%= h(presenter.idp) %>" class="form-input"
+                 placeholder="https://idp.example.com/oidc">
+          <small>
+            Base URL (OIDC issuer) of the identity provider the data holder should ask to authenticate the user.
+            Leave blank for a standard request. When set, Safire adds the <code>udap</code> scope and the
+            <code>idp</code> parameter, and requires the data holder to advertise <code>udap_to</code> in
+            <code>udap_profiles_supported</code> and <code>udap</code> in <code>scopes_supported</code>.
+            The client should also be registered with the <code>udap</code> scope.
+          </small>
         </div>
 
         <div class="form-group form-group-wide">

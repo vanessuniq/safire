@@ -383,7 +383,8 @@ class SafireDemo < Sinatra::Base
     erb :'demo/udap_authorization'
   end
 
-  # UDAP authorization code flow - build the authorization request and redirect
+  # UDAP authorization code flow - build the authorization request and redirect.
+  # A non-blank Preferred IdP requests Tiered OAuth (STU2 user.md §6.1).
   post '/demo/:server_id/udap-authorization' do
     @udap_authorization_presenter = build_udap_authorization_presenter
     auth_data = start_udap_authorization
@@ -904,6 +905,7 @@ class SafireDemo < Sinatra::Base
     presenter = @udap_authorization_presenter
     build_udap_user_client(presenter.client_id).authorization_url(
       scopes: presenter.scopes,
+      idp: presenter.tiered_oauth_idp,
       community: presenter.community.presence,
       **udap_trust_policy.server_metadata_kwargs
     )

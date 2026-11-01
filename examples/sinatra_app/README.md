@@ -10,7 +10,7 @@ A Sinatra-based web application that demonstrates the Safire gem for SMART autho
 - **UDAP Discovery**: Fetch `/.well-known/udap`, validate `signed_metadata`, inspect STU2 fields, and run community-scoped discovery
 - **UDAP Dynamic Client Registration**: Register and cancel a certificate-backed UDAP client, store the returned UDAP client identifier separately from SMART credentials, and inspect filtered registration responses
 - **UDAP B2B Token Request**: Request a UDAP STU2 B2B `client_credentials` access token with an `hl7-b2b` authorization extension, using the stored UDAP client ID, and inspect a masked token response
-- **UDAP Authorization Code**: Run the UDAP STU2 `authorization_code` flow with PKCE through the demo callback, exchange the code with a signed Authentication Token, refresh the token, and inspect masked token responses
+- **UDAP Authorization Code**: Run the UDAP STU2 `authorization_code` flow with PKCE through the demo callback, optionally with a Tiered OAuth preferred IdP, exchange the code with a signed Authentication Token, refresh the token, and inspect masked token responses
 - **Authorization Flows**: Test multiple launch types:
   - Provider Standalone Launch
   - Patient Standalone Launch
@@ -424,6 +424,39 @@ not log tokens. Configuration, validation, discovery, certificate, token
 (including the OAuth `error` code), and network errors are shown on the same
 page. **Reset Session** discards a pending authorization and the stored
 refresh token.
+
+#### Tiered OAuth (preferred IdP)
+
+The start form has an optional **Preferred IdP (Tiered OAuth)** field. Leave
+it blank for a standard request. When it is set, the demo passes it as `idp:`
+to `authorization_url`, and Safire adds the `udap` scope and the `idp` query
+parameter (UDAP STU2 User §6.1). See the
+[Tiered OAuth guide](../../docs/udap/tiered-oauth.md).
+
+Additional prerequisites:
+
+- the client was registered with `udap` in its registration `scope` (STU2
+  §6.1: clients that intend to use Tiered OAuth "SHALL include `udap` in the
+  list of scopes requested in the `scope` parameter of their registration
+  request"). Add `udap` to the scope on the UDAP registration form
+- the server advertises `udap_to` in `udap_profiles_supported` and `udap` in
+  `scopes_supported`
+
+Errors shown on the start page, with no redirect:
+
+- `ValidationError` (attribute `idp`) when the IdP is not an absolute HTTPS
+  URL with a host and no fragment. HTTP is accepted only for
+  `localhost`/`127.0.0.1` when the demo runs with a loopback callback
+- `DiscoveryError` when the server does not advertise `udap_to` or the `udap`
+  scope
+
+If the data holder rejects the IdP, it returns `error=invalid_idp` to the
+callback. The demo checks `state` first, exactly as for any callback, then
+shows a specific message: per STU2 §6.2 the client "MAY attempt to obtain
+authorization again by specifying a different IdP base URL in the `idp`
+authorization request parameter, or by making a new authorization request
+without using the Tiered OAuth workflow". No token is requested; start a new
+authorization from the form. The demo does not retry automatically.
 
 ### Token Refresh
 

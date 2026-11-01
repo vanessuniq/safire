@@ -1,5 +1,7 @@
 # Safire v0.5.0 pre-release alignment audit — baseline (everything except the new UDAP token-request feature)
 
+> **Point-in-time snapshot** of the baseline audit at `ca42bd8`. Paths under `/tmp/audit/` were scratch files in the audit sandbox and are not in the repository; the commands and their outputs are quoted inline. Current status of each finding is tracked in [audit-v0.5.0.md](audit-v0.5.0.md).
+
 - Inspected commit: `origin/integration/v0.5.0` = `ca42bd8f894a29d2e36088eaa85be4f68ea639b5` ("Merge feature/udap-authentication-token into integration/v0.5.0"). Re-checked after the rate-limit interruption: the branch had not moved.
 - Mode: read-only audit. No repository files were changed and nothing was pushed. Generated artifacts (docs/api, .yardoc, the demo's .env and data/, the built gem, the demo Gemfile.lock rewrite) were removed or reverted. The worktree is clean apart from the ignored `spec/examples.txt` that rspec writes.
 - Scratch scripts and logs: `/tmp/audit/scratch/*.rb`, `/tmp/audit/*.log`, `/tmp/audit/demo-probe.log`, `/tmp/audit/site` (Jekyll output).

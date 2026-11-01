@@ -114,7 +114,7 @@ the server accepts the combined token, so this permissive inference must not be
 reused as a hard-failure decision without a separate normative rule.
 
 SMART Backend Services scope intent remains client-owned. The
-[SMART STU2.2 token request](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#request)
+[SMART STU2.2 token request](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#step-3-access-token)
 lists `scope` as required, so a missing scope is a hard failure rather than a
 warning. v0.4.x and v0.5.x preserved the historical `system/*.rs` fallback
 with a deprecation warning; since v0.6.0 the fallback is removed and a request
@@ -171,10 +171,9 @@ This matrix covers the public protocol operations currently implemented by the
 | UDAP `authorization_url` | Supply client ID, redirect URI, and scopes; Safire adds `state` and S256 PKCE; the application compares `state` at the callback | Trusted discovery; `authorization_code` in `grant_types_supported`; usable signed `authorization_endpoint` | Missing client ID, scopes, or redirect URI; unusable discovery or endpoint | Unadvertised wildcard scopes warn (value-free) | Caller may invoke `UdapMetadata#valid?` | User authorization and granted scopes |
 | UDAP `request_access_token` / `refresh_token` | Supply the code and PKCE verifier (or refresh token), a matching signing identity, and only advertised wildcard scopes when a refresh requests scope | Token-request readiness as for `request_backend_token`, for the `authorization_code` or `refresh_token` grant | Missing inputs or signing identity; `hl7-b2b` supplied for these grants; unadvertised wildcard on refresh; readiness failures; transport, OAuth, unusable response, or missing access-token failure | Required extensions not sent, unadvertised `refresh_token` grant, and RS256 not advertised warn | Caller may invoke `UdapMetadata#valid?` | Code/refresh acceptance and issued tokens |
 
-SMART cancellation, UDAP Tiered OAuth, and UDAP token-response diagnostics are
-not implemented. They raise
-`NotImplementedError` through the shared protocol contract rather than implying
-runtime support.
+SMART cancellation and UDAP token-response diagnostics are not implemented;
+they raise `NotImplementedError` through the shared protocol contract rather
+than implying runtime support. UDAP Tiered OAuth (`idp:`) is not implemented.
 
 ### Rules for Future Operations
 

@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) discovery, certificate-backed Dynamic Client Registration, and B2B `client_credentials` access tokens with UDAP JWT client authentication. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
+Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) discovery, certificate-backed Dynamic Client Registration, B2B `client_credentials` access tokens, and the authorization code flow with refresh, using UDAP JWT client authentication. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
 
 ---
 
@@ -262,7 +262,7 @@ bin/demo
 # Visit http://localhost:4567
 ```
 
-Demonstrates SMART Dynamic Client Registration, SMART discovery, UDAP discovery with `signed_metadata` trust validation, UDAP Dynamic Client Registration and cancellation, UDAP B2B client_credentials token requests, all SMART authorization flows, token refresh, and backend services token requests. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
+Demonstrates SMART Dynamic Client Registration, SMART discovery, UDAP discovery with `signed_metadata` trust validation, UDAP Dynamic Client Registration and cancellation, UDAP B2B client_credentials token requests, the UDAP authorization code launch, callback, and refresh, all SMART authorization flows, token refresh, and backend services token requests. See [`examples/sinatra_app/README.md`](examples/sinatra_app/README.md) for details.
 
 ---
 

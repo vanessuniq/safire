@@ -3,7 +3,7 @@ layout: default
 title: UDAP
 nav_order: 5
 permalink: /udap/
-description: "UDAP Security STU2 discovery, Dynamic Client Registration, and B2B client credentials in Safire."
+description: "UDAP Security STU2 discovery, Dynamic Client Registration, B2B client credentials, and the authorization code flow in Safire."
 has_children: true
 ---
 
@@ -211,7 +211,7 @@ UDAP client.
 |---------|----------------------------|--------------------------|
 | Discovery | SMART configuration JSON | Signed UDAP metadata with X.509 trust validation |
 | Dynamic registration | RFC 7591 metadata request | STU2 X.509-backed software statement |
-| Implemented client flows | App Launch and Backend Services | Registration lifecycle and B2B client credentials |
+| Implemented client flows | App Launch and Backend Services | Registration lifecycle, B2B client credentials, and authorization code with refresh |
 | Client selection | `client_type:` | `protocol: :udap`; no `client_type:` |
 | Trust model | Per-server client registration and registered keys/secrets | Certificate trust communities and signed metadata |
 

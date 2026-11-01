@@ -50,6 +50,7 @@ RSpec.describe SafireCompliance::BackendServicesRun do
 
     expect(run.call).to eq(0)
     expect(report['overall']).to eq('pass')
+    expect(report['metadata']['test_session_id']).to eq('session-1')
   end
 
   it 'writes a failed report when polling times out' do

@@ -22,7 +22,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **POST-Based Authorization** — form-encoded authorization requests
 - **JWT Assertion Builder** — signed JWT assertions with configurable `kid` and expiry
 - **PKCE** — automatic code verifier and challenge generation
-- **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; client-selected scopes with a deprecated v0.4.x compatibility fallback
+- **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; client-selected scopes with a compatibility fallback deprecated since v0.4.1 (removed in v0.6.0)
 - **Dynamic Client Registration** — runtime client registration per [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591); endpoint discovered from SMART metadata or supplied explicitly; supports initial access token
 
 ### UDAP Security (STU2 / v2.0.0)

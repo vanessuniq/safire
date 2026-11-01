@@ -1,0 +1,152 @@
+<% presenter = @udap_authorization_presenter %>
+
+<div class="page-header">
+  <div>
+    <h1>UDAP Authorization Code</h1>
+    <p class="server-url"><%= h(@server.base_url) %></p>
+  </div>
+  <div class="page-actions">
+    <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Server</a>
+  </div>
+</div>
+
+<section class="registration-workspace">
+  <div class="status-grid">
+    <article class="status-tile <%= presenter.credentials_configured? ? 'status-ready' : 'status-warning' %>">
+      <span class="eyebrow">Client Signing</span>
+      <strong><%= presenter.credentials_configured? ? 'Ready' : 'Not configured' %></strong>
+      <% unless presenter.credentials_configured? %>
+        <p>UDAP client signing credentials are not configured.</p>
+      <% end %>
+    </article>
+
+    <article class="status-tile <%= presenter.development_trust_mode? ? 'status-warning' : 'status-ready' %>">
+      <span class="eyebrow">Server Trust</span>
+      <strong><%= presenter.development_trust_mode? ? 'Development mode' : 'Chain verification' %></strong>
+      <% if presenter.development_trust_mode? %>
+        <p>Signed metadata chain or revocation checks are disabled.</p>
+      <% end %>
+    </article>
+
+    <article class="status-tile">
+      <span class="eyebrow">Stored UDAP Client</span>
+      <strong><%= @server.udap_client_id.present? ? 'Registered' : 'None' %></strong>
+      <% if @server.udap_client_id.present? %>
+        <code><%= h(@server.udap_client_id) %></code>
+      <% end %>
+    </article>
+  </div>
+
+  <% if presenter.authorization_error %>
+    <div class="warning-box" role="alert">
+      <strong>Authorization denied by the server. No token was requested.</strong>
+      <span>OAuth error: <code><%= h(presenter.authorization_error[:error]) %></code></span>
+      <% if presenter.authorization_error[:error_description] %>
+        <span><%= h(presenter.authorization_error[:error_description]) %></span>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if presenter.display_error %>
+    <div class="warning-box" role="alert">
+      <strong>UDAP authorization code request failed (<%= h(presenter.error_label) %>).</strong>
+      <% if presenter.oauth_error_code %>
+        <span>OAuth error: <code><%= h(presenter.oauth_error_code) %></code></span>
+      <% end %>
+      <span><%= h(presenter.display_error.message) %></span>
+    </div>
+  <% end %>
+
+  <% if presenter.success? %>
+    <div class="success-box">
+      <strong><%= presenter.result_kind == :refresh ? 'Token refreshed.' : 'Authorization code exchanged.' %></strong>
+      <span>Tokens are masked; this demo never displays bearer tokens in full and keeps only the refresh token in the session.</span>
+    </div>
+
+    <section class="result-panel">
+      <h2>Token Result</h2>
+      <dl class="details-list">
+        <dt>Access Token</dt>
+        <dd><code><%= h(presenter.masked_access_token) %></code></dd>
+
+        <dt>Refresh Token</dt>
+        <dd><%= presenter.refresh_token_issued? ? 'Issued (not displayed)' : 'Not issued' %></dd>
+
+        <dt>Token Type</dt>
+        <dd><%= h(presenter.safe_token_response['token_type'] || 'Not specified') %></dd>
+
+        <dt>Expires In</dt>
+        <% expires_in = presenter.safe_token_response['expires_in'] %>
+        <dd><%= h(expires_in.nil? ? 'Not specified' : "#{expires_in} seconds") %></dd>
+
+        <dt>Granted Scope</dt>
+        <dd>
+          <% if presenter.granted_scopes.any? %>
+            <% presenter.granted_scopes.each do |scope| %>
+              <span class="badge badge-scope"><%= h(scope) %></span>
+            <% end %>
+          <% else %>
+            <em>Not returned; compare with the requested scope</em>
+          <% end %>
+        </dd>
+      </dl>
+      <pre class="json-display"><%= h(JSON.pretty_generate(presenter.safe_token_response)) %></pre>
+    </section>
+  <% end %>
+
+  <% if presenter.refresh_available? %>
+    <form action="/demo/<%= @server.id %>/udap-authorization/refresh" method="post" class="demo-form udap-refresh-form">
+      <%= csrf_field %>
+      <div class="form-section">
+        <h3>Refresh Token</h3>
+        <div class="form-group form-group-wide">
+          <label for="refresh_scope">Scope (optional)</label>
+          <input type="text" id="refresh_scope" name="refresh_scope" value="" class="form-input">
+          <small>Leave blank to keep the originally granted scope. A narrower scope may be requested.</small>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Refresh Token</button>
+      </div>
+    </form>
+  <% end %>
+
+  <form action="/demo/<%= @server.id %>/udap-authorization" method="post" class="demo-form udap-authorization-form">
+    <%= csrf_field %>
+    <div class="form-section">
+      <h3>Authorization Request</h3>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="client_id">UDAP Client ID</label>
+          <input type="text" id="client_id" name="client_id" value="<%= h(presenter.client_id) %>" class="form-input" required>
+          <small>Prefilled from this server's stored UDAP registration. Register with the <code>authorization_code</code> grant.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="community">Community URI</label>
+          <input type="text" id="community" name="community" value="<%= h(presenter.community) %>" class="form-input">
+        </div>
+
+        <div class="form-group form-group-wide">
+          <label for="scope">Scope</label>
+          <input type="text" id="scope" name="scope" value="<%= h(presenter.scope) %>" class="form-input" required>
+          <small>Space or comma-separated scopes, for example <code>openid fhirUser patient/Patient.rs</code>.</small>
+        </div>
+
+        <div class="form-group form-group-wide">
+          <label>Redirect URI</label>
+          <code><%= h(presenter.redirect_uri) %></code>
+          <small>This demo's callback. It must be one of the client's registered <code>redirect_uris</code>.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" <%= 'disabled' unless presenter.credentials_configured? %>>
+        Start Authorization
+      </button>
+      <a href="/servers/<%= @server.id %>" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</section>

@@ -61,8 +61,24 @@ Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
 | 6.2 | UDAP authorization request | `feature/udap-authorization-url` | interim #358 → `release-0.5.0` later | #342 | #380 | draft PR |
 | 6.3 | UDAP authorization code token exchange | `feature/udap-authorization-code-token` | #380 | #342 | #381 | draft PR |
 | 6.4 | UDAP refresh token | `feature/udap-refresh-token` | #381 | #342 | #382 | draft PR |
+| 6.5 | Integration (merge-only): #382 + #359 | `integration/v0.6.0` | #382 | #343 | #390 | draft PR; 1702 ex. green at `de62bd7` |
+| 6.6 | Demo UDAP authorization code (stricter demo state check) | `feature/demo-udap-authorization-code` | #390 | #342 | #391 | draft PR |
+| 6.7 | Release notes (joins #391) | `docs/v0.6.0-release-notes` | #391 | #343 | #393 | draft PR; 1735 ex. green at `9a00689` |
+| 6.A | Pre-release alignment audit | — | #393 | #343 | — | running on `9a00689` |
+| 6.R | Release preparation | `release-0.6.0` | last fix | #343 | — | planned (after audit fixes) |
 
-Remaining v0.6.0 tasks: see [v0.6.0.md](v0.6.0.md). v0.7.0: see [v0.7.0.md](v0.7.0.md).
+#359 and #380 were retargeted to `release-0.5.0` after merging it in (D-05); #359
+resolved six wording conflicts in favor of its v0.6.0 text.
+
+### v0.7.0
+
+| # | Task | Branch | Base | Issue | PR | Status |
+|---|---|---|---|---|---|---|
+| 7.1 | Tiered OAuth authorization request (`idp:`) | `feature/udap-tiered-oauth-request` | interim `integration/v0.6.0` → `release-0.6.0` later | #344 | #392 | draft PR |
+| 7.3 | Demo IdP field + `invalid_idp` handling | `feature/demo-udap-tiered-oauth` | #392 (merges #393 for the demo base) | #344 | — | in progress |
+| 7.4 | Release notes | `docs/v0.7.0-release-notes` | 7.3 | #345 | — | planned |
+| 7.A / 7.R | Audit, fixes, release prep | — | — | #345 | — | planned |
+
 
 ### Quality and Compliance
 

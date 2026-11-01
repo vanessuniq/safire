@@ -260,6 +260,16 @@ RSpec.describe Safire::Protocols::UdapSigningCredentials do
       expect(credentials.leaf_certificate).to be_frozen
     end
 
+    it 'returns a frozen copy of an automatically selected algorithm' do
+      first = build_credentials
+      second = build_credentials
+
+      expect(first.algorithm).to be_frozen
+      expect(first.jose_header['alg']).to be_frozen
+      expect { first.algorithm.replace('none') }.to raise_error(FrozenError)
+      expect(second.algorithm).to eq('RS256')
+    end
+
     it 'snapshots the supplied certificate chain' do
       chain = [leaf_cert]
       credentials = build_credentials(certificate_chain: chain)

@@ -15,6 +15,33 @@ RSpec.describe Safire::Protocols::UdapScopeNegotiation do
     allow(Safire.logger).to receive(:warn) { |message| messages << message }
   end
 
+  shared_examples 'warning-only wildcard negotiation' do
+    it 'warns without raising for deduplicated unadvertised wildcards' do
+      described_class.new(scopes_supported: ['system/Patient.rs'], operation:, discovery_endpoint: endpoint)
+                     .evaluate!(['system/*.rs', 'patient/*.rs', 'system/*.rs'])
+
+      expect(messages).to contain_exactly(
+        "[UDAP] requested wildcard scope count=2; no exact advertisement in scopes_supported; #{lifecycle}"
+      )
+    end
+
+    [nil, [], 'system/*.rs', [nil, '']].each do |advertised|
+      it "warns without raising when scopes_supported is #{advertised.inspect}" do
+        described_class.new(scopes_supported: advertised, operation:, discovery_endpoint: endpoint)
+                       .evaluate!(['system/*.rs', 'system/Patient.rs'])
+
+        expect(messages).to eq(
+          [
+            '[UDAP] requested wildcard scope count=1; exact advertisement cannot be confirmed because ' \
+            "scopes_supported provides no usable scope strings; #{lifecycle}",
+            '[UDAP] requested non-wildcard scope count=1; coverage cannot be confirmed because ' \
+            'scopes_supported provides no usable scope strings; proceeding with server-side scope negotiation'
+          ]
+        )
+      end
+    end
+  end
+
   def capture_error
     negotiation.evaluate!(requested)
     nil
@@ -42,7 +69,7 @@ RSpec.describe Safire::Protocols::UdapScopeNegotiation do
       expect(messages).to be_empty
     end
 
-    %i[register token cancel].each do |op|
+    %i[register token cancel authorize].each do |op|
       context "with operation #{op.inspect}" do
         let(:operation) { op }
 
@@ -150,34 +177,28 @@ RSpec.describe Safire::Protocols::UdapScopeNegotiation do
       let(:operation) { :cancel }
       let(:lifecycle) { 'cancellation proceeds and remains warning-only so existing access can be removed' }
 
-      it 'warns without raising for deduplicated unadvertised wildcards' do
-        described_class.new(scopes_supported: ['system/Patient.rs'], operation:, discovery_endpoint: endpoint)
-                       .evaluate!(['system/*.rs', 'patient/*.rs', 'system/*.rs'])
+      it_behaves_like 'warning-only wildcard negotiation'
+    end
 
-        expect(messages).to contain_exactly(
-          "[UDAP] requested wildcard scope count=2; no exact advertisement in scopes_supported; #{lifecycle}"
-        )
+    context 'with operation :authorize' do
+      let(:operation) { :authorize }
+      let(:lifecycle) do
+        'the authorization request proceeds because UDAP Security STU2 scope negotiation ' \
+          'names registration and token requests only; the authorization server decides'
       end
 
-      [nil, [], 'system/*.rs', [nil, '']].each do |advertised|
-        it "warns without raising when scopes_supported is #{advertised.inspect}" do
-          described_class.new(scopes_supported: advertised, operation:, discovery_endpoint: endpoint)
-                         .evaluate!(['system/*.rs', 'system/Patient.rs'])
+      it_behaves_like 'warning-only wildcard negotiation'
 
-          expect(messages).to eq(
-            [
-              '[UDAP] requested wildcard scope count=1; exact advertisement cannot be confirmed because ' \
-              "scopes_supported provides no usable scope strings; #{lifecycle}",
-              '[UDAP] requested non-wildcard scope count=1; coverage cannot be confirmed because ' \
-              'scopes_supported provides no usable scope strings; proceeding with server-side scope negotiation'
-            ]
-          )
-        end
+      it 'does not raise when a wildcard is requested and the advertisement is unusable' do
+        expect do
+          described_class.new(scopes_supported: { 'scope' => 'patient/*.rs' }, operation:, discovery_endpoint: endpoint)
+                         .evaluate!(['patient/*.rs'])
+        end.not_to raise_error
       end
     end
 
     it 'never includes requested scope values in any warning' do
-      %i[register token cancel].each do |op|
+      %i[register token cancel authorize].each do |op|
         described_class.new(scopes_supported: ['system/Patient.r'], operation: op, discovery_endpoint: endpoint)
                        .evaluate!([sensitive_scope, 'custom:tenant-a'])
       end

@@ -130,6 +130,72 @@ RSpec.describe Safire::Protocols::UdapAuthorizationRequestReadiness do
       end
     end
 
+    describe 'Tiered OAuth advertisement' do
+      let(:scopes) { %w[openid patient/Patient.rs udap] }
+
+      before do
+        overrides['udap_profiles_supported'] = %w[udap_dcr udap_authn udap_to]
+        overrides['scopes_supported'] = %w[openid udap patient/*.rs]
+      end
+
+      def evaluate_tiered
+        readiness.evaluate!(scopes:, tiered_oauth: true)
+      end
+
+      it 'returns the endpoint when udap_to and the udap scope are advertised' do
+        expect(evaluate_tiered).to eq(authorization_endpoint)
+        expect(messages).to be_empty
+      end
+
+      [
+        ['omits udap_to', %w[udap_dcr udap_authn]],
+        ['is empty', []],
+        ['is not an array', 'udap_to'],
+        ['is nil', nil]
+      ].each do |label, value|
+        it "raises DiscoveryError when udap_profiles_supported #{label}" do
+          overrides['udap_profiles_supported'] = value
+
+          expect { evaluate_tiered }.to raise_error(Safire::Errors::DiscoveryError) { |error|
+            expect(error.endpoint).to eq(discovery_endpoint)
+            expect(error.error_description)
+              .to eq('server does not advertise the udap_to profile in udap_profiles_supported')
+          }
+        end
+      end
+
+      [
+        ['omits udap', %w[openid patient/*.rs]],
+        ['is empty', []],
+        ['is not an array', 'udap'],
+        ['is nil', nil],
+        ['holds udap only as a prefix', %w[openid udap_scope]]
+      ].each do |label, value|
+        it "raises DiscoveryError when scopes_supported #{label}" do
+          overrides['scopes_supported'] = value
+
+          expect { evaluate_tiered }.to raise_error(Safire::Errors::DiscoveryError) { |error|
+            expect(error.endpoint).to eq(discovery_endpoint)
+            expect(error.error_description).to eq('server does not advertise the udap scope in scopes_supported')
+          }
+        end
+      end
+
+      it 'checks the authorization grant before Tiered OAuth advertisement' do
+        overrides['grant_types_supported'] = ['client_credentials']
+        overrides['udap_profiles_supported'] = %w[udap_dcr udap_authn]
+
+        expect { evaluate_tiered }.to raise_error(Safire::Errors::DiscoveryError, /authorization_code grant/)
+      end
+
+      it 'does not check Tiered OAuth advertisement for a standard request' do
+        overrides['udap_profiles_supported'] = %w[udap_dcr udap_authn]
+        overrides['scopes_supported'] = %w[openid patient/*.rs]
+
+        expect(readiness.evaluate!(scopes: %w[openid patient/Patient.rs])).to eq(authorization_endpoint)
+      end
+    end
+
     describe 'scope negotiation (warning-only)' do
       let(:lifecycle) do
         'the authorization request proceeds because UDAP Security STU2 scope negotiation ' \

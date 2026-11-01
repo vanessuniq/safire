@@ -1,6 +1,6 @@
 # Safire Roadmap
 
-## Latest Published Release — v0.5.0
+## Latest Published Release — v0.6.0
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
 
@@ -22,7 +22,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **POST-Based Authorization** — form-encoded authorization requests
 - **JWT Assertion Builder** — signed JWT assertions with configurable `kid` and expiry
 - **PKCE** — automatic code verifier and challenge generation
-- **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; explicit client-selected scopes required (missing scopes raise `ConfigurationError` since v0.6.0, on `main`, unreleased)
+- **Backend Services** — `client_credentials` grant for system-to-system flows; JWT assertion (RS384/ES384); no user interaction, redirect, or PKCE required; explicit client-selected scopes required (missing scopes raise `ConfigurationError` since v0.6.0)
 - **Dynamic Client Registration** — runtime client registration per [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591); endpoint discovered from SMART metadata or supplied explicitly; supports initial access token
 
 ### UDAP Security (STU2 / v2.0.0)
@@ -54,8 +54,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   authorization through `Client#request_backend_token` on `protocol: :udap`,
   with the STU2 `hl7-b2b` authorization extension and discovery-constrained
   scopes, signing algorithms, and extension support
-- **UDAP Authorization Code Flows** (on `main`, unreleased; see
-  [CHANGELOG.md](CHANGELOG.md#unreleased)) — consumer-facing and interactive
+- **UDAP Authorization Code Flows** — consumer-facing and interactive
   B2B authorization with `state`, S256 PKCE, Authentication Token client
   authentication, code exchange, and refresh
 
@@ -64,7 +63,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **Protocol-Aware Workflows** — Sinatra demo supports protocol-aware server
   setup, SMART discovery, registration, authorization, and token workflows,
   plus UDAP signed metadata discovery, the registration/cancellation
-  lifecycle, B2B client_credentials token requests, and (on `main`, unreleased)
+  lifecycle, B2B client_credentials token requests, and
   the UDAP authorization code launch, callback, and refresh
 
 ---

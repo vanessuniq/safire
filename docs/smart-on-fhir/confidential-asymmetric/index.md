@@ -106,8 +106,7 @@ flowchart LR
         C2["sub: client_id"]
         C3["aud: token_endpoint"]
         C4["jti: unique random ID"]
-        C5["iat: issued at"]
-        C6["exp: iat + 5 minutes"]
+        C5["exp: now + 300 s (max 5 minutes)"]
     end
 
     PK["Private Key\n(RSA or EC)"]

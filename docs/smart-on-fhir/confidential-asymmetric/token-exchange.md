@@ -190,16 +190,12 @@ rescue Safire::Errors::TokenError => e
   end
 ```
 
-**Missing credentials** — if `private_key` or `kid` is absent, Safire raises before the HTTP call:
+**Missing credentials** — if `private_key` or `kid` is absent, Safire raises `Safire::Errors::ConfigurationError` (not `TokenError`) before the HTTP call. `e.missing_attributes` lists the absent settings (for example `[:kid]`):
 
 ```ruby
-rescue Safire::Errors::TokenError => e
-  if e.message.include?('Missing required asymmetric credentials')
-    Rails.logger.error("Asymmetric auth misconfigured: #{e.message}")
-    render plain: 'Server configuration error', status: :internal_server_error
-  else
-    raise
-  end
+rescue Safire::Errors::ConfigurationError => e
+  Rails.logger.error("Asymmetric auth misconfigured: #{e.message}")
+  render plain: 'Server configuration error', status: :internal_server_error
 ```
 
 ---

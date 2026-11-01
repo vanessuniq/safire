@@ -165,18 +165,26 @@ RSpec.describe 'SMART Backend Services End-to-End Flow', type: :integration do
       expect(tokens['scope']).to eq('system/Patient.rs')
     end
 
-    it 'preserves the deprecated system/*.rs fallback when no scopes are configured' do
+    it 'raises ConfigurationError without any HTTP request when no scopes are configured or passed' do
       allow(Safire.logger).to receive(:warn)
+      cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes, :token_endpoint))
+
+      expect { Safire::Client.new(cfg).request_backend_token }
+        .to raise_error(Safire::Errors::ConfigurationError) { |e| expect(e.missing_attributes).to eq([:scopes]) }
+      expect(WebMock).not_to have_requested(:any, //)
+      expect(Safire.logger).not_to have_received(:warn)
+    end
+
+    it 'uses per-call scopes when no scopes are configured' do
       stub_token_post(
-        body_matcher: hash_including('scope' => 'system/*.rs'),
-        response_body: backend_token_response.merge('scope' => 'system/*.rs')
+        body_matcher: hash_including('scope' => 'system/Observation.rs'),
+        response_body: backend_token_response.merge('scope' => 'system/Observation.rs')
       )
       cfg = Safire::ClientConfig.new(backend_config_attrs.except(:scopes))
-      Safire::Client.new(cfg).request_backend_token
 
-      expect(WebMock).to have_requested(:post, token_endpoint)
-        .with(body: hash_including('scope' => 'system/*.rs'))
-      expect(Safire.logger).to have_received(:warn).once
+      tokens = Safire::Client.new(cfg).request_backend_token(scopes: ['system/Observation.rs'])
+
+      expect(tokens['scope']).to eq('system/Observation.rs')
     end
 
     it 'submits an explicit wildcard that is absent from non-exhaustive discovery metadata' do

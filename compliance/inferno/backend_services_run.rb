@@ -60,7 +60,8 @@ module SafireCompliance
     # @return [Integer] exit status: 0 when every Inferno result and every local check passed
     def call
       configure_safire_logging
-      write_report(@session_id, orchestrate)
+      results = orchestrate # sets @session_id; evaluate before reading it
+      write_report(@session_id, results)
     rescue *ORCHESTRATION_ERRORS => e
       # Still write a (failed) report so the workflow uploads something to diagnose.
       @orchestration_error = "#{e.class}: #{e.message}"

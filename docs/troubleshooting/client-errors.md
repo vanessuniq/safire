@@ -275,7 +275,7 @@ end
 
 `supports_asymmetric_auth?` requires the `client-confidential-asymmetric` capability, `private_key_jwt` in `token_endpoint_auth_methods_supported` (or that list absent or empty), and RS384 or ES384 in `token_endpoint_auth_signing_alg_values_supported` (or that list absent or empty).
 
-Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets JWT `exp` to 5 minutes from `iat` — if your system clock is significantly skewed from the server, assertions will be rejected.
+Verify the public key registered with the server matches the private key you are using, and that the `kid` value matches the key ID the server expects. Safire sets the assertion's `exp` to 300 seconds (5 minutes) after the current local time and sends no `iat` claim (SMART requires `exp` to be no more than five minutes in the future) — if your system clock is significantly skewed from the server, assertions will be rejected.
 
 ---
 

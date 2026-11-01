@@ -99,15 +99,17 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
   - Inferno test results published as a GitHub Actions artifact (static HTML report
     generated from Inferno's JSON output)
 
-  **Phase 2 — Authorization code flows (browser automation via Capybara)**
+  **Phase 2 — Authorization code flows (front-channel user agent)**
   - Standalone Patient Launch for all three client types: public (PKCE-only),
     confidential symmetric (`client_secret_basic`), and confidential asymmetric
     (`private_key_jwt`)
-  - EHR Launch: Inferno redirects the user agent to the demo app's `GET /launch`
-    endpoint with `iss` and `launch` as query parameters, exercising the EHR-initiated
-    authorization code flow as a separate Inferno test group
-  - Infrastructure: Docker Compose for a local Inferno instance, Capybara and headless
-    Chrome for OAuth consent screen automation
+  - EHR Launch for the same client types: Inferno publishes launch URLs
+    carrying `iss` and `launch`, the harness opens them, and the client's
+    authorization request must echo the `launch` value
+  - Infrastructure: Docker Compose for a local Inferno instance; Inferno's
+    simulated authorization endpoint redirects without a consent page, so a
+    redirect-following HTTP user agent drives the flow (no browser
+    automation). A consent UI in a future kit would require revisiting this
 
   **Note on Client Registration:** Inferno's reference server documentation states that
   there is currently no registration process and apps must use preconfigured client IDs,

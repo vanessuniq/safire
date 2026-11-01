@@ -293,7 +293,7 @@ by the client. Configure them on `ClientConfig` or pass them per request:
 client.request_backend_token(scopes: ['system/Patient.rs'])
 ```
 
-Safire v0.4.x temporarily falls back to `system/*.rs` and logs a deprecation
+Safire v0.4.1 through v0.5.x temporarily falls back to `system/*.rs` and logs a deprecation
 warning when both sources are absent. This compatibility behavior is removed in
 v0.6.0, when the call will raise `ConfigurationError` instead.
 

@@ -38,7 +38,7 @@ token_data = client.request_backend_token(scopes: ['system/Patient.rs'])
 ```
 
 {: .warning }
-> The v0.4.x compatibility fallback to `system/*.rs` is deprecated. Always
+> The compatibility fallback to `system/*.rs` (v0.4.1 through v0.5.x) is deprecated. Always
 > configure scopes or pass `scopes:`; requests without either will raise
 > `ConfigurationError` in v0.6.0.
 

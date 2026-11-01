@@ -225,8 +225,8 @@ client.token_response_valid?(token_data, flow: :backend_services)
 ```
 
 Configure scopes on the client or pass `scopes:` to each Backend Services
-request. The legacy `system/*.rs` fallback is deprecated in v0.4.x and will be
-removed in v0.6.0. Backend Services normally uses `system/` scopes. Safire
+request. The legacy `system/*.rs` fallback is deprecated (since v0.4.1, still present in
+v0.5.x) and will be removed in v0.6.0. Backend Services normally uses `system/` scopes. Safire
 preserves explicit non-system scopes because SMART permits them when context is
 established out of band.
 

@@ -29,7 +29,7 @@ flowchart TD
     A -->|"resolves config"| B
     A -->|"validates protocol + client_type"| C
     C -->|":smart (default)"| D
-    C -->|":udap"| G["Protocols::Udap\n— discovery implemented\n— DCR implemented\n— auth flows planned"]
+    C -->|":udap"| G["Protocols::Udap\n— discovery implemented\n— DCR implemented\n— B2B client_credentials implemented\n— auth code flows planned"]
     D -->|"lazily fetches"| E
     E -->|"HTTP"| F
 ```
@@ -46,10 +46,10 @@ flowchart TD
 | `protocol:` | Symbol | No | `:smart` | Authorization protocol — `:smart` or `:udap` |
 | `client_type:` | Symbol | No | `nil` (→ `:public` for SMART) | SMART client type — `:public`, `:confidential_symmetric`, or `:confidential_asymmetric`; not applicable for `:udap` (any explicit value raises `ConfigurationError`) |
 | `client_secret` | String | No | — | Required for `:confidential_symmetric` |
-| `private_key` | OpenSSL::PKey / String | No | — | RSA/EC private key; used by SMART asymmetric clients and as the UDAP client signing key |
+| `private_key` | OpenSSL::PKey / String | No | — | RSA/EC private key; used by SMART asymmetric clients and as the UDAP client signing key (software statements and Authentication Tokens) |
 | `certificate_chain` | Array of PEM strings / OpenSSL::X509::Certificate | No | — | Non-empty, leaf-first, issuer-ordered client certificate chain for UDAP software-statement signing |
 | `kid` | String | No | — | Key ID matching the public key registered with the server |
-| `jwt_algorithm` | String | No | auto | SMART: `RS384` or `ES384`; UDAP registration: `RS256`, `RS384`, `ES256`, or `ES384`, constrained by the key and server metadata |
+| `jwt_algorithm` | String | No | auto | SMART: `RS384` or `ES384`; UDAP software statements and Authentication Tokens: `RS256`, `RS384`, `ES256`, or `ES384`, constrained by the key and the server's advertised algorithms |
 | `jwks_uri` | String | No | — | SMART-only URL to the client's public JWKS, included as `jku` in SMART JWT assertions |
 | `scopes` | Array | No | — | Default scopes for authorization requests; SMART Backend Services normally uses `system/` scopes and requires explicit values unless passed per request (the v0.4.x fallback is deprecated) |
 | `authorization_endpoint` | String | No | — | Override the discovered authorization endpoint |

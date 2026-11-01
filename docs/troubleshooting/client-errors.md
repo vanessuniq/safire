@@ -56,10 +56,13 @@ key-compatible algorithm.
 
 Scope handling depends on what the request needs from `scopes_supported`.
 Registration and modification reject an unadvertised requested wildcard with
-`ValidationError`, because STU2 permits requesting a wildcard only when it is
-advertised. When a wildcard is requested but `scopes_supported` provides no
-usable scope strings, Safire raises `DiscoveryError`: it is obligated to
-evaluate the wildcard and the server's advertisement makes that impossible. A
+`ValidationError`. UDAP Security STU2 lets a client request a wildcard scope
+only if wildcards are listed in `scopes_supported`
+([Scope negotiation](https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation),
+§7.3 item 3); requiring the requested wildcard to appear *exactly* is Safire's
+stricter local check. When a wildcard is requested but `scopes_supported`
+provides no usable scope strings, Safire raises `DiscoveryError`, because it
+cannot evaluate the wildcard against the server's advertisement. A
 malformed entry beside usable ones does not trigger this; Safire decides
 against the usable entries and leaves the defect to `UdapMetadata#valid?`. The
 same unusable metadata only warns when every requested scope is non-wildcard,

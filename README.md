@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/vanessuniq/safire/branch/main/graph/badge.svg)](https://codecov.io/gh/vanessuniq/safire)
 [![Documentation](https://img.shields.io/badge/docs-yard-blue.svg)](https://vanessuniq.github.io/safire)
 
-Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) discovery plus certificate-backed Dynamic Client Registration. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
+Safire is a Ruby gem for healthcare client applications that implements [SMART App Launch 2.2.0](https://hl7.org/fhir/smart-app-launch/) and [UDAP Security STU2 / v2.0.0](https://hl7.org/fhir/us/udap-security/STU2/index.html) discovery, certificate-backed Dynamic Client Registration, and B2B `client_credentials` access tokens with UDAP JWT client authentication. It handles SMART OAuth 2.0 authorization against HL7 FHIR servers, covering PKCE, private key JWT assertions, and the Backend Services system-to-system flow, so you can focus on your application rather than protocol plumbing.
 
 ---
 
@@ -79,12 +79,44 @@ cancellation = udap_client.cancel_registration(
 
 UDAP registration uses the trusted fields needed for that workflow rather than
 turning the full `UdapMetadata#valid?` conformance diagnostic into an automatic
-gate. Registration and modification require a requested wildcard scope to be
-advertised exactly in `scopes_supported`, as UDAP Security STU2 requires;
-during cancellation that check stays warning-only, so scope-advertisement
-drift alone never blocks cleanup.
+gate. UDAP Security STU2 lets a client request a wildcard scope only if
+wildcards are listed in `scopes_supported`
+([General Guidance: Scope negotiation](https://hl7.org/fhir/us/udap-security/STU2/general.html#scope-negotiation));
+Safire applies a stricter local check and requires the requested wildcard to be
+advertised exactly. Registration, modification, and token requests enforce it;
+during cancellation it stays warning-only, so scope-advertisement drift alone
+never blocks cleanup.
 
-UDAP JWT client authentication and Tiered OAuth are planned. See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for details.
+With a registered `client_id`, request a B2B access token with the
+`client_credentials` grant. Safire signs a UDAP Authentication Token with the
+client certificate chain, includes the required `hl7-b2b` Authorization
+Extension Object, and POSTs to the authoritative signed `token_endpoint`:
+
+```ruby
+b2b_client = Safire::Client.new(
+  {
+    base_url:          'https://fhir.example.com',
+    client_id:         registration['client_id'],
+    private_key:       File.read('client-key.pem'),
+    certificate_chain: [File.read('client-cert.pem'), File.read('issuing-ca.pem')],
+    scopes:            ['system/Patient.rs']
+  },
+  protocol: :udap
+)
+
+token = b2b_client.request_backend_token(
+  b2b: {
+    organization_id: 'https://client.example.com/Organization/1',
+    purpose_of_use:  ['urn:oid:2.16.840.1.113883.5.8#TREAT']
+  },
+  trusted_anchors: [ca_cert],
+  crls:            [ca_crl]
+)
+```
+
+The UDAP authorization code and refresh grants and Tiered OAuth are planned.
+See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
+details.
 
 ---
 
@@ -209,7 +241,7 @@ Safire.configure do |config|
 end
 ```
 
-See the [Configuration Guide](https://vanessuniq.github.io/safire/configuration/) for all options including `user_agent`, `log_level`, and SSL settings.
+See the [Configuration Guide](https://vanessuniq.github.io/safire/configuration/) for all options, including `user_agent`, `log_level`, and `log_http`.
 
 ---
 
@@ -246,7 +278,7 @@ cd docs && bundle install && bundle exec jekyll serve
 
 ## Contributing
 
-Bug reports and pull requests are welcome. Please read [CONTRIBUTION.md](https://github.com/vanessuniq/safire/blob/main/CONTRIBUTION.md) before opening a PR — it covers branch naming, commit message style, and the sign-off requirement.
+Bug reports and pull requests are welcome. Please read [CONTRIBUTION.md](https://github.com/vanessuniq/safire/blob/main/CONTRIBUTION.md) before opening a PR — it covers branch naming, commit message style (including the `Signed-off-by` trailer), testing, and the pull request process.
 
 ---
 

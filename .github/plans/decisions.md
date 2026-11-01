@@ -84,6 +84,10 @@ headings):
   (extra public API for one grant); a `flow:` constructor kwarg (grant choice
   per call is more natural and avoids mode state). Reviewer may prefer a
   dedicated name; changing it before v0.5.0 is cheap.
+- **Review note (#348):** renaming after release is breaking. Status: keep
+  `request_backend_token` for v0.5.0; YARD states the contract so a later
+  protocol-neutral alias would be additive. **Open for maintainer decision
+  before the v0.5.0 release PR merges.**
 
 ## D-07 Authentication Token (AnT) construction
 

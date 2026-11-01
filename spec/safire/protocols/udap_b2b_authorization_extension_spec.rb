@@ -138,6 +138,36 @@ RSpec.describe Safire::Protocols::UdapB2bAuthorizationExtension do
                               'must not be specified more than once')
     end
 
+    it 'rejects a String/Symbol duplicate even when one value is nil, in either order' do
+      base = minimal_input.except(:organization_id)
+      [
+        base.merge('organization_id' => nil, organization_id: organization_id),
+        base.merge(organization_id: organization_id, 'organization_id' => nil),
+        base.merge('subject_name' => nil, subject_name: nil)
+      ].each do |input|
+        expect { described_class.new(input) }
+          .to raise_error(Safire::Errors::ValidationError, /must not be specified more than once/)
+      end
+    end
+
+    it 'rejects URIs with malformed percent escapes or illegal characters' do
+      ['urn:example:bad%ZZ', 'https://example.com/%ZZ', 'urn:example:a"b', 'https://example.com/a%2'].each do |bad|
+        expect { described_class.new(minimal_input.merge(organization_id: bad)) }
+          .to raise_error(Safire::Errors::ValidationError) { |error| expect(error.attribute).to eq(:organization_id) }
+        expect { described_class.new(minimal_input.merge(consent_policy: [bad])) }
+          .to raise_error(Safire::Errors::ValidationError) { |error| expect(error.attribute).to eq(:consent_policy) }
+        expect do
+          described_class.new(minimal_input.merge(consent_policy: ['urn:example:policy'], consent_reference: [bad]))
+        end.to raise_error(Safire::Errors::ValidationError) { |error| expect(error.attribute).to eq(:consent_reference) }
+      end
+    end
+
+    it 'accepts well-formed percent-encoded URIs' do
+      result = described_class.new(minimal_input.merge(organization_id: 'https://example.com/org%20one')).to_h
+
+      expect(result['organization_id']).to eq('https://example.com/org%20one')
+    end
+
     it 'rejects unknown keys without echoing the value' do
       expect { described_class.new(minimal_input.merge(secret_member: 'sensitive-value')) }
         .to raise_error(Safire::Errors::ValidationError) { |error|

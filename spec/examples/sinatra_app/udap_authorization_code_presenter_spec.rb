@@ -115,6 +115,33 @@ RSpec.describe UdapAuthorizationCodePresenter do
 
       expect(presenter.authorization_error).to eq(error: 'access_denied', error_description: nil)
       expect(presenter.display_error).to be_nil
+      expect(presenter.invalid_idp?).to be(false)
+    end
+
+    it 'recognizes the Tiered OAuth invalid_idp authorization error' do
+      presenter = build_presenter(authorization_error: { error: 'invalid_idp', error_description: nil })
+
+      expect(presenter.invalid_idp?).to be(true)
+      expect(build_presenter.invalid_idp?).to be(false)
+    end
+  end
+
+  describe 'Tiered OAuth preferred IdP' do
+    it 'is blank by default so no Tiered OAuth is requested' do
+      presenter = build_presenter
+
+      expect(presenter.idp).to eq('')
+      expect(presenter.tiered_oauth_idp).to be_nil
+    end
+
+    it 'treats a whitespace-only IdP as no Tiered OAuth' do
+      expect(build_presenter(params: { 'idp' => "  \t" }).tiered_oauth_idp).to be_nil
+    end
+
+    it 'strips surrounding whitespace from a submitted IdP' do
+      presenter = build_presenter(params: { idp: ' https://idp.example.com/oidc ' })
+
+      expect(presenter.tiered_oauth_idp).to eq('https://idp.example.com/oidc')
     end
   end
 end

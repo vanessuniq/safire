@@ -4,8 +4,10 @@ require_relative 'udap_token_display'
 
 # Presentation model for the demo app's UDAP authorization code workflow.
 #
-# Prefills the start form from the server's stored UDAP registration, reports
-# authorization-response errors returned to the callback, and prepares token
+# Prefills the start form from the server's stored UDAP registration, carries
+# the optional Tiered OAuth preferred IdP (UDAP STU2 user.md §6.1), reports
+# authorization-response errors returned to the callback (including the Tiered
+# OAuth +invalid_idp+ error, STU2 §6.2), and prepares token
 # responses for display without rendering bearer credentials: the access token
 # is masked, and the refresh token, ID token, and any unknown field are
 # replaced with +[FILTERED]+.
@@ -14,6 +16,9 @@ class UdapAuthorizationCodePresenter
 
   DISPLAYABLE_RESPONSE_FIELDS = %w[token_type expires_in scope patient encounter].freeze
   private_constant :DISPLAYABLE_RESPONSE_FIELDS
+
+  # Extension error code a data holder returns when it rejects the requested IdP (STU2 §6.2).
+  INVALID_IDP_ERROR = 'invalid_idp'
 
   attr_reader :server, :redirect_uri, :token_response, :error, :authorization_error, :result_kind
 
@@ -59,6 +64,22 @@ class UdapAuthorizationCodePresenter
     return param('community').to_s.strip if param_supplied?('community')
 
     server.udap_community.to_s
+  end
+
+  # Preferred IdP base URL for Tiered OAuth, as entered (surrounding whitespace removed).
+  # Never prefilled: Tiered OAuth is opt-in per request.
+  def idp
+    param('idp').to_s.strip
+  end
+
+  # @return [String, nil] the IdP to pass as +idp:+, or nil (no Tiered OAuth) when blank
+  def tiered_oauth_idp
+    idp.presence
+  end
+
+  # @return [Boolean] whether the data holder rejected the requested IdP (STU2 §6.2)
+  def invalid_idp?
+    authorization_error&.[](:error) == INVALID_IDP_ERROR
   end
 
   # @return [Array<String>] requested scopes split on commas and whitespace

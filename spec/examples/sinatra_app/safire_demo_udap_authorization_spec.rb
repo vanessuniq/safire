@@ -375,6 +375,95 @@ RSpec.describe SafireDemo do
     end
   end
 
+  describe 'UDAP Tiered OAuth (STU2 user.md §6)' do
+    let(:idp) { 'https://idp.example.com/oidc' }
+    let(:tiered_metadata) do
+      udap_metadata.merge(
+        'udap_profiles_supported' => %w[udap_dcr udap_authn udap_authz udap_to],
+        'scopes_supported' => %w[openid fhirUser patient/Patient.rs udap]
+      )
+    end
+
+    it 'shows the optional Preferred IdP field and the udap_to note on the start form' do
+      response = request.get('/demo/udap-auth/udap-authorization', host_env)
+
+      expect(response.body).to include('Preferred IdP (Tiered OAuth, optional)')
+      expect(response.body).to include('name="idp" value=""')
+      expect(response.body).to include('Safire adds the <code>udap</code> scope')
+      expect(response.body).to include('<code>udap_to</code>')
+    end
+
+    it 'adds the idp parameter and the udap scope when a preferred IdP is given' do
+      stub_discovery(body: tiered_metadata)
+
+      response = start_flow(start_params.merge(idp: " #{idp} "))[:response]
+      query = auth_query(response)
+
+      expect(response.location).to start_with("#{authorization_endpoint}?")
+      expect(query['idp']).to eq(idp)
+      expect(query['scope']).to eq('openid fhirUser patient/Patient.rs udap')
+      expect(query).to include('response_type' => 'code', 'code_challenge_method' => 'S256')
+    end
+
+    it 'sends a standard request without udap or idp when the preferred IdP is blank' do
+      stub_discovery
+
+      query = auth_query(start_flow(start_params.merge(idp: '   '))[:response])
+
+      expect(query).not_to have_key('idp')
+      expect(query['scope']).to eq('openid fhirUser patient/Patient.rs')
+    end
+
+    it 'renders a ValidationError for an invalid IdP without discovery or redirect' do
+      response = start_flow(start_params.merge(idp: 'http://idp.example.com/oidc'))[:response]
+
+      expect(response.status).to eq(200)
+      expect(response.body).to include('UDAP authorization code request failed (Validation error).')
+      expect(response.body).to include('idp')
+      expect(response.body).to include('name="idp" value="http://idp.example.com/oidc"')
+      expect(WebMock).not_to have_requested(:any, /udap-auth\.example\.com/)
+    end
+
+    it 'renders a DiscoveryError when the server does not advertise udap_to' do
+      stub_discovery(body: udap_metadata.merge('scopes_supported' => %w[openid udap]))
+
+      response = start_flow(start_params.merge(idp:))[:response]
+
+      expect(response.status).to eq(200)
+      expect(response.body).to include('UDAP authorization code request failed (Discovery error).')
+      expect(response.body).to include('udap_to')
+    end
+
+    it 'reports invalid_idp after verifying state, suggests a retry, and requests no token' do
+      stub_discovery(body: tiered_metadata)
+      stub_token
+      flow = start_flow(start_params.merge(idp:))
+      state = auth_query(flow[:response])['state']
+
+      response = callback(flow[:cookie], state:, error: 'invalid_idp', error_description: 'IdP not trusted')
+
+      expect(response.status).to eq(200)
+      expect(response.body).to include('The data holder rejected the preferred IdP (Tiered OAuth).')
+      expect(response.body).to include('<code>invalid_idp</code>')
+      expect(response.body).to include('with a different Preferred IdP, or leave Preferred IdP blank')
+      expect(response.body).not_to include('Authorization denied by the server.')
+      expect(WebMock).not_to have_requested(:post, token_endpoint)
+    end
+
+    it 'refuses an invalid_idp callback whose state does not match' do
+      stub_discovery(body: tiered_metadata)
+      stub_token
+      flow = start_flow(start_params.merge(idp:))
+      state = auth_query(flow[:response])['state']
+
+      response = callback(flow[:cookie], state: "#{state}x", error: 'invalid_idp')
+
+      expect(response.status).to be_between(300, 399)
+      expect(response.location).to end_with('/')
+      expect(WebMock).not_to have_requested(:post, token_endpoint)
+    end
+  end
+
   describe 'POST /demo/:server_id/udap-authorization/refresh' do
     it 'refreshes with the stored refresh token and renders a masked result' do
       stub_discovery

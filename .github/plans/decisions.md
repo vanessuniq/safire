@@ -241,3 +241,21 @@ headings):
 - **Decision [I]:** keep Hash-only in v0.5.0 (no behavior change in the
   refactor); UDAP token responses use the same parser. Recorded as a candidate
   consistency enhancement for the audit, not a defect.
+
+## D-20 v0.6.0: extensions on authorization_code / refresh token requests
+
+- **Context:** b2b.md §5.2.1 claims table, `extensions` row: "The HL7 B2B
+  Authorization Extension Object defined below is required for B2B client apps
+  using the `client_credentials` flow; omit for client apps using the
+  `authorization_code` flow" [N]. discovery.md §2.2 defines
+  `udap_authorization_extensions_required` as extensions "required by the
+  Authorization Server in every token request" [N]. The texts conflict when a
+  server lists required extensions and the client uses authorization_code;
+  the "omit" clause is also ambiguous (omit `hl7-b2b`, or omit `extensions`).
+- **Decision [I]:** for `authorization_code` and `refresh_token`, Safire omits
+  `extensions` unless the caller passes `extensions:` explicitly; an
+  `hl7-b2b` key is rejected for these grants (`ValidationError`); a non-empty
+  `udap_authorization_extensions_required` produces a value-free warning
+  instead of the client_credentials `ValidationError`.
+- **Alternatives:** hard-fail like client_credentials (would make
+  authorization_code impossible against such servers); silently ignore.

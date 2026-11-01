@@ -296,4 +296,4 @@ client.refresh_token(
 
 ---
 
-*See also: [Configuration Guide]({{ site.baseurl }}/configuration/) for `ssl_options` and `log_http` settings that affect security behaviour.*
+*See also: [Configuration Guide]({{ site.baseurl }}/configuration/) and [Logging]({% link configuration/logging.md %}) for the `log_http` setting and what HTTP logging filters.*

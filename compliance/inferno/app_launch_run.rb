@@ -258,7 +258,10 @@ module SafireCompliance
 
     def judge_negative(by_id)
       target = expected_test_ids.fetch(@scenario[:expect_fail])
-      verdict([unexpected(target, by_id[target], @scenario[:expect_results])].compact + failed_local_checks)
+      reasons = [unexpected(target, by_id[target], @scenario[:expect_results])].compact
+      rejection = "token.#{@scenario[:fault]}_rejected"
+      reasons << "local check #{rejection} was not recorded" if @checks.entries.none? { |c| c[:id] == rejection }
+      verdict(reasons + failed_local_checks)
     end
 
     def verdict(reasons) = [reasons.empty? ? 'pass' : 'fail', reasons.uniq]

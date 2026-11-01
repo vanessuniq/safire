@@ -36,6 +36,10 @@ The script:
    sessions in the Inferno UI). `INFERNO_SCENARIOS=standalone-public,ehr-public`
    limits Phase 2 to the named scenarios.
 
+The pass/fail decision of both drivers (missing results, negative-control
+expectations, orchestration errors) is unit-tested without Inferno in
+`spec/safire_compliance/`.
+
 The `Inferno SMART` GitHub Actions workflow runs the same script on manual
 dispatch and weekly, and uploads the four report files as the
 `inferno-smart-client` artifact. It does not run on pull requests.

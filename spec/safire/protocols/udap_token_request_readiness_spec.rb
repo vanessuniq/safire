@@ -244,6 +244,38 @@ RSpec.describe Safire::Protocols::UdapTokenRequestReadiness do
         }
       end
 
+      context 'with the authorization_code grant' do
+        let(:grant_type) { 'authorization_code' }
+
+        it 'warns with a count instead of raising when required extensions are not sent' do
+          overrides['udap_authorization_extensions_required'] = %w[hl7-b2b acme-secret-ext hl7-b2b]
+
+          expect(readiness.evaluate!(extension_keys: []).token_endpoint).to eq(token_endpoint)
+          expect(messages).to contain_exactly(
+            '[UDAP] udap_authorization_extensions_required lists extension count=2 not sent with the ' \
+            'authorization_code token request; UDAP Security STU2 says to omit the hl7-b2b extension for ' \
+            'authorization_code clients, so the request proceeds and the authorization server decides'
+          )
+          expect(messages.join).not_to include('acme-secret-ext')
+        end
+
+        it 'does not warn when every required extension is sent' do
+          overrides['udap_authorization_extensions_supported'] = %w[hl7-b2b acme]
+          overrides['udap_authorization_extensions_required'] = ['acme']
+
+          readiness.evaluate!(extension_keys: ['acme'])
+
+          expect(messages).to be_empty
+        end
+
+        it 'still raises DiscoveryError for a malformed required list' do
+          overrides['udap_authorization_extensions_required'] = 'hl7-b2b'
+
+          expect { readiness.evaluate!(extension_keys: []) }
+            .to raise_error(Safire::Errors::DiscoveryError, /must be an array of strings/)
+        end
+      end
+
       it 'raises before scope negotiation and without warnings' do
         overrides['udap_authorization_extensions_required'] = ['tefca-ias']
         overrides['udap_profiles_supported'] = %w[udap_dcr udap_authn]

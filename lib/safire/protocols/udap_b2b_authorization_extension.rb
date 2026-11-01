@@ -94,7 +94,9 @@ module Safire
         consent_policy
         consent_reference
       ].freeze
-      URI_SCHEME_PATTERN = /\A[A-Za-z][A-Za-z0-9+.-]*:\S+\z/
+      # RFC 3986 §3.1 scheme, then only unreserved/reserved characters or
+      # well-formed percent-encoded octets (RFC 3986 §2.1–2.3).
+      URI_SCHEME_PATTERN = %r{\A[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9\-._~!$&'()*+,;=:@/?\#\[\]]|%\h\h)+\z}
       WEB_SCHEMES = %w[http https].freeze
 
       private_constant :VERSION_VALUE, :STRING_FIELDS, :SUBJECT_DEPENDENT_FIELDS,
@@ -130,9 +132,10 @@ module Safire
       def normalize_input(input)
         fail_validation!(:'hl7-b2b', 'must be a Hash') unless input.is_a?(Hash)
 
+        seen = Set.new
         input.each_with_object({}) do |(key, value), members|
           name = member_name(key)
-          fail_validation!(name.to_sym, 'must not be specified more than once') if members.key?(name)
+          fail_validation!(name.to_sym, 'must not be specified more than once') unless seen.add?(name)
 
           members[name] = value unless value.nil?
         end

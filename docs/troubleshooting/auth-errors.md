@@ -130,10 +130,10 @@ auth_data = client.authorization_url(
 ```
 
 {: .note }
-> **Backend Services:** In v0.4.1 through v0.5.x, `request_backend_token` logs a deprecation
-> warning and uses `system/*.rs` when scopes are absent. Configure scopes or
-> pass `scopes:` explicitly now. Starting in v0.6.0, the same missing-scope
-> condition will raise `ConfigurationError`.
+> **Backend Services:** Since v0.6.0, `request_backend_token` raises
+> `ConfigurationError` (`missing_attributes == [:scopes]`) when scopes are
+> absent; the earlier `system/*.rs` fallback has been removed. Configure
+> `scopes:` on `ClientConfig` or pass `scopes:` per request.
 
 ### State mismatch on callback
 

@@ -113,13 +113,16 @@ may collectively cover a requested permission set. STU2 does not guarantee that
 the server accepts the combined token, so this permissive inference must not be
 reused as a hard-failure decision without a separate normative rule.
 
-SMART Backend Services scope intent remains client-owned. From v0.4.1 through
-v0.5.x, Safire
-preserves the historical `system/*.rs` fallback only for compatibility and
-logs a deprecation warning whenever it is used. Callers should configure or
-pass scopes explicitly; absent scopes become a runtime `ConfigurationError` in
-v0.6.0. SMART discovery `scopes_supported` is non-exhaustive and is not used as
-an exact allow-list for token requests.
+SMART Backend Services scope intent remains client-owned. The
+[SMART STU2.2 token request](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#request)
+lists `scope` as required, so a missing scope is a hard failure rather than a
+warning. v0.4.x and v0.5.x preserved the historical `system/*.rs` fallback
+with a deprecation warning; since v0.6.0 the fallback is removed and a request
+whose per-call and configured scopes contain no non-blank entry raises
+`ConfigurationError` (`missing_attributes: [:scopes]`, value-free message)
+before any HTTP request. A blank per-call override still defers to configured
+scopes. SMART discovery `scopes_supported` is non-exhaustive and is not used
+as an exact allow-list for token requests.
 
 `system/` scopes are the normal Backend Services context. The
 [SMART STU2.2 Backend Services scope requirements](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#scopes)

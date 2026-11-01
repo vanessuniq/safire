@@ -66,7 +66,7 @@ openssl ecparam -name secp384r1 -genkey -noout -out private_key_ec.pem
 openssl ec -in private_key_ec.pem -pubout -out public_key_ec.pem
 ```
 
-Add `*.pem` and `*.key` to `.gitignore`. See the [Security Guide]({{ site.baseurl }}/security/#private-keys-confidential-asymmetric) for loading keys securely in production.
+Add `*.pem` and `*.key` to `.gitignore`. See the [Security Guide]({% link security.md %}#private-keys-and-client-certificates) for loading keys securely in production.
 
 ### Publishing Your Public Key (JWKS)
 

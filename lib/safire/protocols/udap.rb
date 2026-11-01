@@ -18,7 +18,7 @@ module Safire
     # STU2 §5.3}).
     # Discovery results are cached per community within each instance.
     #
-    # Tiered OAuth raises +NotImplementedError+ and remains planned for a
+    # Tiered OAuth (+idp:+) is not implemented and remains planned for a
     # future release.
     #
     # This is an internal class used exclusively by {Safire::Client}. Do not

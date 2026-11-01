@@ -38,7 +38,7 @@ token_data = client.request_backend_token(scopes: ['system/Patient.rs'])
 ```
 
 {: .important }
-> The [SMART STU2.2 token request](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#request)
+> The [SMART STU2.2 token request](https://hl7.org/fhir/smart-app-launch/STU2.2/backend-services.html#step-3-access-token)
 > lists `scope` as **required**. Since v0.6.0, Safire never supplies a default
 > scope: per-call `scopes:` are used when they contain a non-blank entry,
 > otherwise the configured `scopes`, otherwise `request_backend_token` raises

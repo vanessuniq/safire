@@ -42,7 +42,7 @@ flowchart TD
 |-----------|------|----------|---------|-------------|
 | `base_url` | String | Yes | — | FHIR server base URL |
 | `client_id` | String | No | — | OAuth2 client identifier — required by all authorization flows; validated at call time, not at construction |
-| `redirect_uri` | String | No | — | Registered callback URL — required for App Launch flows; not used in Backend Services |
+| `redirect_uri` | String | No | — | Registered callback URL — required for SMART App Launch and UDAP authorization code flows; not used in Backend Services or UDAP client_credentials |
 | `protocol:` | Symbol | No | `:smart` | Authorization protocol — `:smart` or `:udap` |
 | `client_type:` | Symbol | No | `nil` (→ `:public` for SMART) | SMART client type — `:public`, `:confidential_symmetric`, or `:confidential_asymmetric`; not applicable for `:udap` (any explicit value raises `ConfigurationError`) |
 | `client_secret` | String | No | — | Required for `:confidential_symmetric` |
@@ -56,8 +56,9 @@ flowchart TD
 | `token_endpoint` | String | No | — | Override the discovered token endpoint |
 
 `certificate_chain` and the UDAP algorithm values are used by
-`Safire::Client#register_client`, `#cancel_registration`, and
-`#request_backend_token` when `protocol: :udap`.
+`Safire::Client#register_client`, `#cancel_registration`,
+`#request_backend_token`, `#request_access_token`, and `#refresh_token` when
+`protocol: :udap`.
 
 ## Global Configuration
 

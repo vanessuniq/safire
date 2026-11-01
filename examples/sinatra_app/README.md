@@ -290,8 +290,8 @@ If a SMART server advertises `client_credentials` grant support, the "Backend Se
 
 Requires `ASYMMETRIC_PRIVATE_KEY_PEM` and `ASYMMETRIC_KID` to be configured (same key pair used for confidential asymmetric App Launch).
 The demo rejects an empty scope submission and preserves the requested scopes
-when requesting another token, so it never relies on Safire's deprecated
-implicit Backend Services fallback. It also rejects non-system scopes because
+when requesting another token, matching Safire, which raises `ConfigurationError` when
+no scopes are configured or passed. It also rejects non-system scopes because
 the demo does not establish the out-of-band user or patient context that SMART
 permits advanced Backend Services integrations to coordinate.
 

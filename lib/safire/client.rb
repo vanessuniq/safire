@@ -55,8 +55,15 @@ module Safire
   #   (+scopes:+ or configured; required), a required +b2b:+ Hash for the +hl7-b2b+
   #   Authorization Extension Object, optional additional +extensions:+, and the same
   #   +community:+ and server trust keywords as {#register_client}.
-  # * UDAP authorization code, refresh token, and Tiered OAuth are not implemented yet and
-  #   raise +NotImplementedError+.
+  # * {#authorization_url} — authorization code request. For +protocol: :udap+ it builds the
+  #   UDAP Security STU2 §7.2 request (see {Safire::Protocols::Udap#authorization_url}) for
+  #   consumer-facing and interactive B2B apps: configured +client_id+ and +redirect_uri+,
+  #   scopes (+scopes:+ or configured; required), generated +state+ and S256 PKCE, sent to the
+  #   signed +authorization_endpoint+ found by trusted discovery (same +community:+ and trust
+  #   keywords as {#register_client}). The return shape matches SMART:
+  #   +{ auth_url:, state:, code_verifier: }+. The application must compare the callback +state+.
+  # * UDAP authorization code exchange, refresh token, and Tiered OAuth are not implemented yet
+  #   and raise +NotImplementedError+.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration

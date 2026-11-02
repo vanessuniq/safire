@@ -197,7 +197,19 @@ RSpec.describe Safire::Client do
     end
 
     it 'raises NotImplementedError for unimplemented UDAP flows' do
-      expect { udap_client.authorization_url }.to raise_error(NotImplementedError)
+      expect { udap_client.request_access_token(code: 'code', code_verifier: 'verifier') }
+        .to raise_error(NotImplementedError)
+    end
+
+    it 'delegates authorization_url to Protocols::Udap' do
+      auth_data = { auth_url: 'https://fhir.example.com/authorize?state=s', state: 's', code_verifier: 'v' }
+      protocol_client = instance_double(Safire::Protocols::Udap, authorization_url: auth_data)
+      allow(Safire::Protocols::Udap).to receive(:new).and_return(protocol_client)
+
+      result = described_class.new(config, protocol: :udap).authorization_url(scopes: ['openid'], community: 'urn:c')
+
+      expect(result).to eq(auth_data)
+      expect(protocol_client).to have_received(:authorization_url).with(scopes: ['openid'], community: 'urn:c')
     end
 
     it 'delegates cancel_registration to Protocols::Udap' do

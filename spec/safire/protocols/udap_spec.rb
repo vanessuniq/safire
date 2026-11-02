@@ -10,6 +10,7 @@ RSpec.describe Safire::Protocols::Udap do
       Safire::ClientConfig,
       base_url:,
       client_id: nil,
+      redirect_uri: nil,
       scopes: nil,
       allow_insecure_localhost:,
       private_key: configured_private_key,
@@ -460,12 +461,6 @@ RSpec.describe Safire::Protocols::Udap do
   end
 
   # ---------- Unimplemented Behaviours ----------
-
-  describe '#authorization_url' do
-    it 'raises NotImplementedError' do
-      expect { udap.authorization_url }.to raise_error(NotImplementedError)
-    end
-  end
 
   describe '#request_access_token' do
     it 'raises NotImplementedError' do

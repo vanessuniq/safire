@@ -1,6 +1,6 @@
 # Safire Roadmap
 
-## Latest Published Release — v0.6.0
+## Latest Published Release — v0.7.0
 
 Safire is in early development (pre-release). The API is functional but not yet stable — breaking changes may occur before v1.0.0. Published to [RubyGems](https://rubygems.org/gems/safire).
 
@@ -57,8 +57,7 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **UDAP Authorization Code Flows** — consumer-facing and interactive
   B2B authorization with `state`, S256 PKCE, Authentication Token client
   authentication, code exchange, and refresh
-- **UDAP Tiered OAuth (client side)** (on `main`, unreleased; see
-  [CHANGELOG.md](CHANGELOG.md#unreleased)) — `authorization_url(idp:)` adds the
+- **UDAP Tiered OAuth (client side)** — `authorization_url(idp:)` adds the
   `udap` scope and the preferred IdP's base URL, after checking that the data
   holder advertises `udap_to` and the `udap` scope; `invalid_idp` handling is
   documented. Data-holder-to-IdP interactions (STU2 §6.2–6.3) are a server-side

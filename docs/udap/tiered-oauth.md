@@ -53,7 +53,9 @@ is unchanged.
   ```ruby
   client.register_client(
     { client_name: 'My App', grant_types: ['authorization_code'],
+      contacts: ['mailto:security@app.example.com'],
       redirect_uris: ['https://app.example.com/callback'],
+      logo_uri: 'https://app.example.com/logo.png',
       scope: 'openid fhirUser patient/Patient.rs udap' },
     client_uri: 'https://app.example.com', trusted_anchors: [udap_ca], crls: [udap_crl]
   )

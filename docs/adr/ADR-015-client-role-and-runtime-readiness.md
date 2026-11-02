@@ -173,7 +173,9 @@ This matrix covers the public protocol operations currently implemented by the
 
 SMART cancellation and UDAP token-response diagnostics are not implemented;
 they raise `NotImplementedError` through the shared protocol contract rather
-than implying runtime support. UDAP Tiered OAuth (`idp:`) is not implemented.
+than implying runtime support. UDAP Tiered OAuth is implemented on the client
+side only (`authorization_url(idp:)`: invalid `idp` is a `ValidationError`;
+missing `udap_to` or `udap` scope advertisement is a `DiscoveryError`).
 
 ### Rules for Future Operations
 

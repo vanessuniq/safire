@@ -48,7 +48,10 @@ A lean Ruby gem implementing **[SMART App Launch](https://hl7.org/fhir/smart-app
 - Authorization code flow with state, S256 PKCE, code exchange, and refresh,
   authenticated with UDAP Authentication Tokens
 
-UDAP Tiered OAuth remains planned. See
+- Client-side Tiered OAuth: `authorization_url(idp:)` requests user
+  authentication at a preferred OpenID Connect IdP
+
+See
 [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
 details.
 

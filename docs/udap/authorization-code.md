@@ -93,6 +93,7 @@ Keyword arguments:
 | Keyword | Purpose |
 |---------|---------|
 | `scopes:` | Array of scope strings or a space-delimited String. Falls back to configured `scopes` when it yields no scope |
+| `idp:` | Optional base URL of a preferred OpenID Connect IdP. Requests [Tiered OAuth](#tiered-oauth) |
 | `community:` | Optional trust-community URI for discovery |
 | `trusted_anchors:`, `crls:`, `revocation_checker:`, `verify_chain:` | Server trust policy for `signed_metadata`, as in discovery and registration |
 
@@ -141,6 +142,15 @@ wildcard that is not listed exactly in `scopes_supported`, and still builds the
 URL. The authorization server decides. Warnings contain a count, not scope
 values. Registration and client credentials token requests keep the hard
 `ValidationError`.
+
+### Tiered OAuth
+
+To ask the data holder to authenticate the user at a preferred OpenID Connect
+IdP ([STU2 §6](https://hl7.org/fhir/us/udap-security/STU2/user.html)), pass
+`idp:`. Safire adds the `udap` scope and the `idp` query parameter, and
+requires the server to advertise `udap_to` and the `udap` scope. Register
+with `udap` in `scope` first, and be ready for an `invalid_idp` error on the
+callback. See [Tiered OAuth]({% link udap/tiered-oauth.md %}).
 
 ## Step 2: callback and `state`
 
@@ -316,6 +326,7 @@ start a new authorization request after a failed exchange.
 ## Limitations
 
 - Safire does not parse the callback or compare `state` for you.
-- Tiered OAuth (`idp` parameter, `udap` scope) is not implemented.
+- Tiered OAuth covers the client-app request only; see
+  [Tiered OAuth]({% link udap/tiered-oauth.md %}#limitations).
 - Tests use WebMock. They do not exercise a real UDAP authorization server, a
   consent UI, or trust-community certificate policies.

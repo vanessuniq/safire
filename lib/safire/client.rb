@@ -62,6 +62,9 @@ module Safire
   #   signed +authorization_endpoint+ found by trusted discovery (same +community:+ and trust
   #   keywords as {#register_client}). The return shape matches SMART:
   #   +{ auth_url:, state:, code_verifier: }+. The application must compare the callback +state+.
+  #   Pass +idp:+ (base URL of the preferred OIDC IdP) to request UDAP Tiered OAuth (STU2 §6.1):
+  #   Safire adds the +udap+ scope and the +idp+ parameter and requires the server to advertise
+  #   +udap_to+ and the +udap+ scope.
   # * {#request_access_token} — authorization code exchange. For +protocol: :udap+ (see
   #   {Safire::Protocols::Udap#request_access_token}) Safire POSTs +code+, the configured
   #   +redirect_uri+ (identical to the authorization request), +code_verifier+, and a signed
@@ -71,7 +74,8 @@ module Safire
   #   {Safire::Protocols::Udap#refresh_token}) Safire authenticates with an Authentication Token
   #   "in the same manner as for initial token requests" (STU2 b2b §5.3); +scope+ is sent only
   #   when +scopes:+ is given, and then must satisfy the STU2 §7.3 wildcard rule.
-  # * UDAP Tiered OAuth is not implemented yet.
+  # * UDAP Tiered OAuth covers the client-app authorization request only; data holder ↔ IdP
+  #   interactions are the data holder's responsibility.
   #
   # @!attribute [r] config
   #   @return [Safire::ClientConfig] the resolved client configuration

@@ -26,6 +26,19 @@ module Safire
     #   readiness: the user agent must only be sent to a protected endpoint,
     #   and RFC 6749 §3.1 says the endpoint URI "MUST NOT include a fragment
     #   component" (RFC text not fetched in this environment).
+    # - Only for a Tiered OAuth request (+tiered_oauth: true+): +udap_to+ is
+    #   not in +udap_profiles_supported+, or +"udap"+ is not in
+    #   +scopes_supported+ (including empty or non-array values). Normative
+    #   basis: discovery.md §2.2, the profiles array "SHALL also include
+    #   +"udap_to"+" if the server supports the Tiered OAuth workflow, and
+    #   {https://hl7.org/fhir/us/udap-security/STU2/user.html#client-authorization-request-to-data-holder
+    #   STU2 §6.1}: "A data holder that supports UDAP Tiered OAuth SHALL
+    #   include +"udap"+ in the array of scopes returned for the
+    #   +scopes_supported+ parameter". Hard-failing is an implementation
+    #   choice (client apps "MAY use this workflow with data holders that
+    #   support it, as indicated in the data holder's UDAP metadata"): Safire
+    #   does not send a Tiered OAuth request to a server that does not
+    #   advertise it. A warning-only alternative was considered and rejected.
     #
     # Value-free warnings — the request can still be sent and the server
     # remains authoritative:
@@ -53,8 +66,10 @@ module Safire
 
       GRANT_TYPE = 'authorization_code'.freeze
       DISCOVERY_LABEL = 'UDAP metadata'.freeze
+      TIERED_OAUTH_PROFILE = 'udap_to'.freeze
+      TIERED_OAUTH_SCOPE = 'udap'.freeze
 
-      private_constant :GRANT_TYPE, :DISCOVERY_LABEL
+      private_constant :GRANT_TYPE, :DISCOVERY_LABEL, :TIERED_OAUTH_PROFILE, :TIERED_OAUTH_SCOPE
 
       # @param metadata [UdapMetadata] trusted discovery metadata with signed
       #   endpoint claims already applied
@@ -73,16 +88,19 @@ module Safire
       #
       # @param scopes [Array<String>] normalized, non-blank requested scope
       #   tokens (non-empty)
+      # @param tiered_oauth [Boolean] whether the request uses UDAP Tiered OAuth
+      #   (+idp+ parameter); enables the +udap_to+ and +"udap"+ scope checks
       # @return [String] authoritative authorization endpoint, unchanged
       # @raise [Errors::DiscoveryError] when trusted metadata cannot support an
       #   authorization code request
       # @raise [ArgumentError] when +scopes+ is not a non-empty array
-      def evaluate!(scopes:)
+      def evaluate!(scopes:, tiered_oauth: false)
         raise ArgumentError, 'authorization requests require a non-empty scopes array' unless
           scopes.is_a?(Array) && scopes.any?
 
         validate_grant_type!
         endpoint = validate_authorization_endpoint!
+        validate_tiered_oauth! if tiered_oauth
         UdapScopeNegotiation.new(
           scopes_supported: @metadata.scopes_supported,
           operation: :authorize,
@@ -98,6 +116,16 @@ module Safire
         return if grants.is_a?(Array) && grants.include?(GRANT_TYPE)
 
         discovery_error!("server does not advertise the #{GRANT_TYPE} grant in grant_types_supported")
+      end
+
+      def validate_tiered_oauth!
+        unless @metadata.supports_tiered_oauth?
+          discovery_error!("server does not advertise the #{TIERED_OAUTH_PROFILE} profile in udap_profiles_supported")
+        end
+        scopes = @metadata.scopes_supported
+        return if scopes.is_a?(Array) && scopes.include?(TIERED_OAUTH_SCOPE)
+
+        discovery_error!("server does not advertise the #{TIERED_OAUTH_SCOPE} scope in scopes_supported")
       end
 
       def validate_authorization_endpoint!

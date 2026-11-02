@@ -173,6 +173,71 @@ RSpec.describe 'UDAP Authorization Code Flow', type: :integration do
     expect(WebMock).not_to have_requested(:post, token_endpoint)
   end
 
+  describe 'Tiered OAuth (STU2 §6.1)' do
+    let(:trusted_idp) { 'https://trusted-idp.example.com/oidc' }
+    let(:udap_metadata) do
+      super().merge(
+        'udap_profiles_supported' => %w[udap_dcr udap_authn udap_to],
+        'scopes_supported' => %w[openid fhirUser udap patient/*.rs]
+      )
+    end
+
+    # Simulated data holder: rejects an untrusted IdP with the invalid_idp
+    # extension error on the redirect URI (STU2 §6.2 MAY), otherwise approves.
+    def simulate_tiered_authorization(auth_url)
+      params = Addressable::URI.parse(auth_url).query_values
+      return { 'error' => 'invalid_idp', 'state' => params['state'] } if params.key?('idp') &&
+                                                                         params['idp'] != trusted_idp
+
+      simulate_user_approval(auth_url)
+    end
+
+    it 'retries with a different idp after invalid_idp and completes the code exchange' do
+      first = client.authorization_url(idp: 'https://unknown-idp.example.com', verify_chain: false)
+      first_params = Addressable::URI.parse(first[:auth_url]).query_values
+      expect(first_params['scope'].split).to eq(%w[openid fhirUser patient/Patient.rs patient/Observation.rs udap])
+
+      rejected = simulate_tiered_authorization(first[:auth_url])
+      expect(callback_state_valid?(rejected, first[:state])).to be(true)
+      expect(rejected['error']).to eq('invalid_idp')
+
+      retry_session = client.authorization_url(idp: trusted_idp, verify_chain: false)
+      expect(Addressable::URI.parse(retry_session[:auth_url]).query_values['idp']).to eq(trusted_idp)
+      callback = simulate_tiered_authorization(retry_session[:auth_url])
+      expect(callback_state_valid?(callback, retry_session[:state])).to be(true)
+
+      tokens = client.request_access_token(code: callback['code'], code_verifier: retry_session[:code_verifier],
+                                           verify_chain: false)
+      expect(tokens).to include('access_token' => 'access-1')
+      expect(token_requests.last).not_to have_key('idp')
+      expect(warnings).to be_empty
+    end
+
+    it 'can retry without Tiered OAuth after invalid_idp' do
+      first = client.authorization_url(idp: 'https://unknown-idp.example.com', verify_chain: false)
+      expect(simulate_tiered_authorization(first[:auth_url])['error']).to eq('invalid_idp')
+
+      plain = Addressable::URI.parse(client.authorization_url(verify_chain: false)[:auth_url]).query_values
+      expect(plain).not_to have_key('idp')
+      expect(plain['scope'].split).not_to include('udap')
+    end
+
+    context 'when the server does not advertise Tiered OAuth' do
+      let(:udap_metadata) { super().merge('udap_profiles_supported' => %w[udap_dcr udap_authn]) }
+
+      it 'raises DiscoveryError instead of sending the request' do
+        expect { client.authorization_url(idp: trusted_idp, verify_chain: false) }
+          .to raise_error(Safire::Errors::DiscoveryError, /udap_to/)
+      end
+    end
+
+    it 'rejects an insecure idp before discovery' do
+      expect { client.authorization_url(idp: 'http://idp.example.com', verify_chain: false) }
+        .to raise_error(Safire::Errors::ValidationError) { |error| expect(error.attribute).to eq(:idp) }
+      expect(WebMock).not_to have_requested(:get, well_known_url)
+    end
+  end
+
   it 'rejects an insecure redirect_uri when the client is configured' do
     expect { Safire::Client.new(config.merge(redirect_uri: 'http://app.example.com/callback'), protocol: :udap) }
       .to raise_error(Safire::Errors::ConfigurationError)

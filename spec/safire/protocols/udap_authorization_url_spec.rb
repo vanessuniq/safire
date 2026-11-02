@@ -223,6 +223,143 @@ RSpec.describe Safire::Protocols::Udap, '#authorization_url' do
     end
   end
 
+  describe 'Tiered OAuth (idp)' do
+    let(:idp) { 'https://preferred-idp.example.com/optionalPathComponent' }
+    let(:metadata_overrides) do
+      {
+        'udap_profiles_supported' => %w[udap_dcr udap_authn udap_to],
+        'scopes_supported' => %w[openid fhirUser udap patient/*.rs]
+      }
+    end
+
+    context 'with a valid idp' do
+      before { stub_discovery }
+
+      it 'adds udap to the scope and the idp extension parameter' do
+        params = query_params(udap.authorization_url(idp:))
+
+        expect(params['scope']).to eq('openid fhirUser patient/Patient.rs udap')
+        expect(params['idp']).to eq(idp)
+      end
+
+      it 'adds only idp to the STU2 §7.2 parameters' do
+        params = query_params(udap.authorization_url(idp:))
+
+        expect(params.keys).to contain_exactly(
+          'response_type', 'client_id', 'redirect_uri', 'scope', 'state', 'code_challenge',
+          'code_challenge_method', 'idp'
+        )
+      end
+
+      it 'does not duplicate udap when already requested and keeps the order' do
+        params = query_params(udap.authorization_url(scopes: 'udap openid udap', idp:))
+
+        expect(params['scope']).to eq('udap openid')
+      end
+
+      it 'percent-encodes the idp value' do
+        expect(udap.authorization_url(idp:)[:auth_url])
+          .to include('idp=https%3A%2F%2Fpreferred-idp.example.com%2FoptionalPathComponent')
+      end
+
+      it 'keeps state and S256 PKCE unchanged' do
+        result = udap.authorization_url(idp:)
+        params = query_params(result)
+        challenge = Base64.urlsafe_encode64(Digest::SHA256.digest(result[:code_verifier]), padding: false)
+
+        expect(result.keys).to contain_exactly(:auth_url, :state, :code_verifier)
+        expect(params).to include('state' => result[:state], 'code_challenge' => challenge,
+                                  'code_challenge_method' => 'S256')
+      end
+
+      it 'emits no warnings' do
+        udap.authorization_url(idp:)
+
+        expect(warnings).to be_empty
+      end
+    end
+
+    context 'without idp' do
+      before { stub_discovery }
+
+      it 'does not add udap or idp' do
+        params = query_params(udap.authorization_url)
+
+        expect(params['scope']).to eq('openid fhirUser patient/Patient.rs')
+        expect(params).not_to include('idp')
+      end
+    end
+
+    context 'without idp against a server lacking Tiered OAuth advertisement' do
+      let(:metadata_overrides) { {} }
+
+      it 'builds the standard request' do
+        stub_discovery
+
+        expect(query_params(udap.authorization_url)).not_to include('idp')
+      end
+    end
+
+    [
+      ['uses HTTP', 'http://idp.example.com', /must use HTTPS/],
+      ['is relative', '/idp', /must be an absolute URL/],
+      ['has a fragment', 'https://idp.example.com#x', /must not include a fragment/],
+      ['is not a String', :idp, /must be a String/],
+      ['is blank', ' ', /must be an absolute URL/],
+      ['is empty', '', /must be an absolute URL/]
+    ].each do |label, value, reason|
+      it "raises ValidationError on :idp before discovery when idp #{label}" do
+        expect { udap.authorization_url(idp: value) }.to raise_error(Safire::Errors::ValidationError, reason) { |e|
+          expect(e.attribute).to eq(:idp)
+        }
+        expect(WebMock).not_to have_requested(:get, well_known_url)
+      end
+    end
+
+    context 'with an HTTP loopback idp' do
+      let(:loopback_idp) { 'http://localhost:9000/idp' }
+
+      before { stub_discovery }
+
+      it 'rejects it without allow_insecure_localhost' do
+        expect { udap.authorization_url(idp: loopback_idp) }
+          .to raise_error(Safire::Errors::ValidationError, /must use HTTPS/)
+      end
+
+      context 'when allow_insecure_localhost is enabled' do
+        let(:allow_insecure_localhost) { true }
+
+        it 'accepts it for development' do
+          expect(query_params(udap.authorization_url(idp: loopback_idp))['idp']).to eq(loopback_idp)
+        end
+      end
+    end
+
+    context 'when the server does not advertise udap_to' do
+      let(:metadata_overrides) { super().merge('udap_profiles_supported' => %w[udap_dcr udap_authn]) }
+
+      it 'raises DiscoveryError' do
+        stub_discovery
+
+        expect { udap.authorization_url(idp:) }.to raise_error(Safire::Errors::DiscoveryError) { |error|
+          expect(error.endpoint).to eq(well_known_url)
+          expect(error.error_description).to match(/udap_to profile/)
+        }
+      end
+    end
+
+    context 'when the server does not advertise the udap scope' do
+      let(:metadata_overrides) { super().merge('scopes_supported' => %w[openid fhirUser patient/*.rs]) }
+
+      it 'raises DiscoveryError' do
+        stub_discovery
+
+        expect { udap.authorization_url(idp:) }
+          .to raise_error(Safire::Errors::DiscoveryError, /udap scope in scopes_supported/)
+      end
+    end
+  end
+
   describe 'configuration' do
     context 'without client_id or redirect_uri' do
       let(:client_id) { nil }

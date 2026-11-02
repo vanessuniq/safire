@@ -117,5 +117,5 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 | ActiveSupport | ≥ 7.1, < 9 |
 | Rails (optional) | ≥ 7.1 |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 2.0.0 (STU2 discovery, Dynamic Client Registration lifecycle, JWT client authentication, and B2B client credentials authorization code flows with refresh, and client-side Tiered OAuth implemented) |
+| UDAP Security | 2.0.0 (STU2 discovery, Dynamic Client Registration lifecycle, JWT client authentication, B2B client credentials, authorization code flows with refresh, and client-side Tiered OAuth implemented) |
 | FHIR | R4, R4B |

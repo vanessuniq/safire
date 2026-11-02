@@ -11,7 +11,8 @@ Gem::Specification.new do |spec|
                                'healthcare client applications. It supports SMART OAuth 2.0 authorization, PKCE, ' \
                                'private_key_jwt assertions, Backend Services, UDAP signed metadata discovery, ' \
                                'certificate-backed UDAP Dynamic Client Registration, UDAP B2B client_credentials ' \
-                               'tokens, and the UDAP authorization code flow with JWT client authentication.'
+                               'tokens, and the UDAP authorization code flow (including client-side ' \
+                               'Tiered OAuth) with JWT client authentication.'
   spec.homepage              = 'https://github.com/vanessuniq/safire'
   spec.license               = 'Apache-2.0'
   spec.required_ruby_version = '>= 3.2'

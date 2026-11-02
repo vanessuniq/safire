@@ -121,7 +121,13 @@ each authenticated with a UDAP Authentication Token. Your callback must compare
 the returned `state` before exchanging the code. See
 [UDAP Authorization Code](https://vanessuniq.github.io/safire/udap/authorization-code/).
 
-UDAP Tiered OAuth is planned.
+To ask the data holder to authenticate the user at a preferred OpenID Connect
+identity provider (UDAP Tiered OAuth, client side), pass `idp:` with the IdP's
+base URL to `authorization_url`. Safire adds the `udap` scope and the `idp`
+parameter, and requires the server to advertise `udap_to` and the `udap` scope.
+Handle `error=invalid_idp` at your callback by retrying with another IdP or
+without Tiered OAuth. See
+[Tiered OAuth](https://vanessuniq.github.io/safire/udap/tiered-oauth/).
 See [ROADMAP.md](https://github.com/vanessuniq/safire/blob/main/ROADMAP.md) for
 details.
 

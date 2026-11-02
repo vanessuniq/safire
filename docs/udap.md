@@ -3,7 +3,7 @@ layout: default
 title: UDAP
 nav_order: 5
 permalink: /udap/
-description: "UDAP Security STU2 discovery, Dynamic Client Registration, B2B client credentials, and the authorization code flow in Safire."
+description: "UDAP Security STU2 discovery, Dynamic Client Registration, B2B client credentials, the authorization code flow, and client-side Tiered OAuth in Safire."
 has_children: true
 ---
 
@@ -16,8 +16,8 @@ Safire implements UDAP Security STU2 discovery, signed metadata validation,
 community scoping, certificate-backed Dynamic Client Registration for new
 registration, modification, and cancellation, and B2B access tokens with the
 client credentials grant and JWT client authentication, and the authorization
-code flow with refresh for consumer-facing and interactive B2B apps. Tiered
-OAuth remains planned.
+code flow with refresh for consumer-facing and interactive B2B apps, including
+the client side of Tiered OAuth (`idp:`).
 </div>
 
 ## Overview
@@ -203,15 +203,16 @@ Object built from `b2b:`, and POSTs it to the authoritative signed
 
 UDAP clients support `authorization_url`, `request_access_token`, and
 `refresh_token` (see
-[Authorization Code]({% link udap/authorization-code.md %})). Tiered OAuth is
-not implemented, and `token_response_valid?` raises `NotImplementedError` on a
+[Authorization Code]({% link udap/authorization-code.md %})), and
+`authorization_url(idp:)` requests Tiered OAuth (see
+[Tiered OAuth]({% link udap/tiered-oauth.md %})). `token_response_valid?` raises `NotImplementedError` on a
 UDAP client.
 
 | Feature | SMART App Launch in Safire | UDAP Security in Safire |
 |---------|----------------------------|--------------------------|
 | Discovery | SMART configuration JSON | Signed UDAP metadata with X.509 trust validation |
 | Dynamic registration | RFC 7591 metadata request | STU2 X.509-backed software statement |
-| Implemented client flows | App Launch and Backend Services | Registration lifecycle, B2B client credentials, and authorization code with refresh |
+| Implemented client flows | App Launch and Backend Services | Registration lifecycle, B2B client credentials, authorization code with refresh, and client-side Tiered OAuth |
 | Client selection | `client_type:` | `protocol: :udap`; no `client_type:` |
 | Trust model | Per-server client registration and registered keys/secrets | Certificate trust communities and signed metadata |
 

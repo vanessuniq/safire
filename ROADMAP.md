@@ -57,6 +57,12 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 - **UDAP Authorization Code Flows** — consumer-facing and interactive
   B2B authorization with `state`, S256 PKCE, Authentication Token client
   authentication, code exchange, and refresh
+- **UDAP Tiered OAuth (client side)** (on `main`, unreleased; see
+  [CHANGELOG.md](CHANGELOG.md#unreleased)) — `authorization_url(idp:)` adds the
+  `udap` scope and the preferred IdP's base URL, after checking that the data
+  holder advertises `udap_to` and the `udap` scope; `invalid_idp` handling is
+  documented. Data-holder-to-IdP interactions (STU2 §6.2–6.3) are a server-side
+  role and are out of scope for this client library
 
 ### Demo Application
 
@@ -69,10 +75,6 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 ---
 
 ## Planned Features
-
-### v0.7.0 — UDAP Tiered OAuth
-
-- **Tiered OAuth** — identity chaining for multi-system access
 
 ### Quality and Compliance
 
@@ -115,5 +117,5 @@ Feedback, bug reports, and pull requests are welcome via the [issue tracker](htt
 | ActiveSupport | ≥ 7.1, < 9 |
 | Rails (optional) | ≥ 7.1 |
 | SMART App Launch | 2.2.0 (STU2) |
-| UDAP Security | 2.0.0 (STU2 discovery, Dynamic Client Registration lifecycle, JWT client authentication, and B2B client credentials implemented; and authorization code flows with refresh implemented; Tiered OAuth planned) |
+| UDAP Security | 2.0.0 (STU2 discovery, Dynamic Client Registration lifecycle, JWT client authentication, and B2B client credentials authorization code flows with refresh, and client-side Tiered OAuth implemented) |
 | FHIR | R4, R4B |

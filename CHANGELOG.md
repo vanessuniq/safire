@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Safire::Client#authorization_url` accepts `idp:` on `protocol: :udap`
+  clients to request UDAP Security STU2 Tiered OAuth (client side, §6.1).
+  Safire adds the `udap` scope (without duplicating it) and the `idp` query
+  parameter with the preferred OpenID Connect IdP's base URL. `idp` must be an
+  absolute HTTPS URL without a fragment (HTTP loopback only with
+  `allow_insecure_localhost`); otherwise `ValidationError` before any network
+  request. When `idp` is given, the data holder must advertise `udap_to` in
+  `udap_profiles_supported` and `udap` in `scopes_supported`; otherwise
+  `DiscoveryError`. Without `idp`, behavior is unchanged. Documentation covers
+  `invalid_idp` handling. Data-holder-to-IdP interactions remain out of scope.
+- The demo's UDAP authorization page has an optional preferred-IdP field and a
+  specific message for `invalid_idp`.
+
 ## [0.6.0] - 2026-11-01
 
 ### Added

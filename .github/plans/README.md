@@ -21,7 +21,9 @@ Milestones: [v0.5.0](https://github.com/vanessuniq/safire/milestone/1) ·
 
 ## Live task table
 
-Last updated: 2026-11-01 (coordinator). Task numbers 5.5 and 5.8 were
+Last updated: 2026-11-02 (coordinator). This table is a snapshot maintained by the
+coordinator while the stacks are drafts; GitHub milestones and PR state are the
+source of truth once anything merges. Task numbers 5.5 and 5.8 were
 reassigned to existing PRs #335 and #336 (other session) and are not reused.
 
 Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
@@ -51,7 +53,7 @@ Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
 | 5.A | Pre-release alignment audit ([audit-v0.5.0.md](audit-v0.5.0.md)) | — | — | #340 | — | complete: 17 findings, all validated in stack |
 | 5.F1 | Feature-audit fixes F-01–F-03 | `docs/fix-v0.5.0-feature-audit` | #379 | #383–#385 | #386 | draft PR |
 | 5.F2 | Re-audit fix F-04 | `docs/fix-v0.5.0-fallback-wording` | #386 | #387 | #388 | draft PR |
-| 5.R | **Release preparation v0.5.0** | `release-0.5.0` | #388 | #340 | #389 | draft PR; CI green at `f5e0373` (run 41308808682) |
+| 5.R | **Release preparation v0.5.0** (+ addressable bump `b4f4fb9`, #402) | `release-0.5.0` | #388 | #340 #402 | #389 | draft PR; CI green at `b4f4fb9` (run 41369220772) |
 
 ### v0.6.0
 
@@ -64,8 +66,9 @@ Status legend: `planned` · `in progress` · `draft PR` · `blocked` ·
 | 6.5 | Integration (merge-only): #382 + #359 | `integration/v0.6.0` | #382 | #343 | #390 | draft PR; 1702 ex. green at `de62bd7` |
 | 6.6 | Demo UDAP authorization code (stricter demo state check) | `feature/demo-udap-authorization-code` | #390 | #342 | #391 | draft PR |
 | 6.7 | Release notes (joins #391) | `docs/v0.6.0-release-notes` | #391 | #343 | #393 | draft PR; 1735 ex. green at `9a00689` |
-| 6.A | Pre-release alignment audit | — | #393 | #343 | — | running on `9a00689` |
-| 6.R | Release preparation | `release-0.6.0` | last fix | #343 | — | planned (after audit fixes) |
+| 6.A | Pre-release alignment audit ([audit-v0.6.0.md](audit-v0.6.0.md)) | — | — | #343 | — | complete: no runtime defects; 4 docs blockers G-01–G-04 |
+| 6.F | Audit fixes G-01–G-04 | `docs/fix-v0.6.0-audit` | #393 | #395–#398 | #399 | draft PR |
+| 6.R | **Release preparation v0.6.0** (+ addressable bump `19774db`, #402) | `release-0.6.0` | #399 | #343 #402 | #400 | draft PR; CI green at `19774db` (run 41369630478) |
 
 #359 and #380 were retargeted to `release-0.5.0` after merging it in (D-05); #359
 resolved six wording conflicts in favor of its v0.6.0 text.
@@ -74,11 +77,12 @@ resolved six wording conflicts in favor of its v0.6.0 text.
 
 | # | Task | Branch | Base | Issue | PR | Status |
 |---|---|---|---|---|---|---|
-| 7.1 | Tiered OAuth authorization request (`idp:`) | `feature/udap-tiered-oauth-request` | interim `integration/v0.6.0` → `release-0.6.0` later | #344 | #392 | draft PR |
-| 7.3 | Demo IdP field + `invalid_idp` handling | `feature/demo-udap-tiered-oauth` | #392 (merges #393 for the demo base) | #344 | — | in progress |
-| 7.4 | Release notes | `docs/v0.7.0-release-notes` | 7.3 | #345 | — | planned |
-| 7.A / 7.R | Audit, fixes, release prep | — | — | #345 | — | planned |
-
+| 7.1 | Tiered OAuth authorization request (`idp:`) | `feature/udap-tiered-oauth-request` | `release-0.6.0` | #344 | #392 | draft PR |
+| 7.3 | Demo IdP field + `invalid_idp` handling | `feature/demo-udap-tiered-oauth` | #392 | #344 | #394 | draft PR |
+| 7.4 | Release notes | `docs/v0.7.0-release-notes` | #394 | #345 | #401 | draft PR |
+| 7.A | Pre-release alignment audit ([audit-v0.7.0.md](audit-v0.7.0.md)) | — | — | #345 | — | complete: no runtime defects; H-01–H-03 |
+| 7.F | Audit fixes H-01 (addressable), H-02, H-03 | `fix/v0.7.0-audit` | #401 | #402–#404 | #405 | draft PR |
+| 7.R | **Release preparation v0.7.0** | `release-0.7.0` | #405 | #345 | #406 | draft PR; CI green at `f5084d3` (run 41370591443) |
 
 ### Quality and Compliance
 
@@ -88,11 +92,27 @@ resolved six wording conflicts in favor of its v0.6.0 text.
 | Q2 | Inferno Phase 1 (ran: Inferno suite pass + negative control) | `feature/inferno-smart-phase1` | `main` | #346 | #356 | draft PR |
 | Q3 | Inferno Phase 2 (ran: 6 scenarios pass + 2 negative controls) | `feature/inferno-smart-phase2` | #356 | #347 | #373 | draft PR |
 
+## Open maintainer decisions (not defects; settle before the v0.5.0 release merges)
+
+- **D-06** — UDAP methods reuse the facade names (`request_backend_token` for
+  B2B client credentials; `authorization_url`/`request_access_token`/`refresh_token`).
+- **D-08** — `hl7-b2b` strictness (unknown members and `subject_id`/`subject_role`
+  without `subject_name` rejected).
+- **D-07** — Authentication Token lifetime exactly 300 s (the STU2 maximum).
+- **D-21** — ActiveSupport 7.1 CI floor keeps three advisories (no 7.1.x fix).
+- **#402** — whether to raise the gemspec's `addressable` runtime floor.
+- **#356** — pin workflow actions by digest; failure alerting for the weekly
+  Inferno run.
+
 ## Blockers and unverified claims
 
-- `main` fails `bundler-audit` (rack advisories). Every PR based on `main`
-  shows a red "Security audit" CI step not caused by its diff until #349
-  merges; the v0.5.0 integration branch includes #349 (D-18).
+- No release PR is blocked: every confirmed audit finding (v0.5.0: 17 + H-01;
+  v0.6.0: 4; v0.7.0: 3) has a validated fix in its release PR's ancestry.
+  Issues stay open until their PRs merge to `main`.
+
+- `main` fails `bundler-audit` (rack advisories, #349; and addressable, #402).
+  Every PR based on `main` shows a red "Security audit" step not caused by its
+  diff; the release branches include both fixes.
 
 - `hl7.org`, `build.fhir.org`, `rfc-editor.org`, `udap.org` are blocked by the
   sandbox network policy. Spec text comes from the IG sources at their release

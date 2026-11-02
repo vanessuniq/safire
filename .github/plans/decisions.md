@@ -84,7 +84,7 @@ headings):
   (extra public API for one grant); a `flow:` constructor kwarg (grant choice
   per call is more natural and avoids mode state). Reviewer may prefer a
   dedicated name; changing it before v0.5.0 is cheap.
-- **Review note (#348):** renaming after release is breaking. Status: keep
+- **Open:** renaming after release is breaking. Status: keep
   `request_backend_token` for v0.5.0; YARD states the contract so a later
   protocol-neutral alias would be additive. **Open for maintainer decision
   before the v0.5.0 release PR merges.**
@@ -176,7 +176,7 @@ headings):
 - **Context:** §7.3 names registration and token requests; authorization
   requests are not named, but the scope requested there is the scope granted
   for the subsequent token.
-- **Decision [I] (revised after #348 review):** §7.3 does not name
+- **Decision [I]:** §7.3 does not name
   authorization requests, so hard-failing there would be stricter than the
   text and could reject requests a server accepts. v0.6.0 uses **warning-only**
   (value-free) for unadvertised wildcards in `authorization_url`; the token

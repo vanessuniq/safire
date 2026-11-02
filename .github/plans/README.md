@@ -98,7 +98,7 @@ resolved six wording conflicts in favor of its v0.6.0 text.
   B2B client credentials; `authorization_url`/`request_access_token`/`refresh_token`).
 - **D-08** — `hl7-b2b` strictness (unknown members and `subject_id`/`subject_role`
   without `subject_name` rejected).
-- **D-07** — Authentication Token lifetime exactly 300 s (the STU2 maximum).
+- **D-07** — Authentication Token lifetime exactly 300 s (the STU2 maximum; a shorter default such as 295 s would leave margin for server clock skew).
 - **D-21** — ActiveSupport 7.1 CI floor keeps three advisories (no 7.1.x fix).
 - **#402** — whether to raise the gemspec's `addressable` runtime floor.
 - **#356** — pin workflow actions by digest; failure alerting for the weekly
